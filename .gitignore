@@ -1,0 +1,51 @@
+# Workspace settings
+.vscode/
+
+# Environment variables
+.env
+*.env
+.env*
+.env.*
+
+# Python virtual environments
+.venv/
+venv/
+**/venv/
+env/
+ENV/
+
+# UV files
+.uv/
+
+# Python cache and bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Python bytecode
+**/__pycache__/
+**.py[cod]
+
+# Python test files
+.pytest_cache/
+
+# API Keys and credentials
+credentials.json
+token.json
+client_secret*.json
+
+# Mac System files
+.DS_Store
+.DS_Store?
+._*
+**/.DS_Store
+
+# Windows files
+**/Thumbs.db
+**/Desktop.ini
+
+# Linux files
+*~
