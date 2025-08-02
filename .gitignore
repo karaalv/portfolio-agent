@@ -49,3 +49,29 @@ client_secret*.json
 
 # Linux files
 *~
+
+# Miscellaneous files
+*.bak
+*.tmp
+*.pid
+*.log
+
+# Testing and coverage files
+.coverage
+*.cover
+*.log
+
+# Terraform files
+**/.terraform/
+
+*.tfstate
+*.tfstate.*
+
+*.tfplan
+*.tfplan.*
+
+*.tfvars
+*.tfvars.*
+
+**/override.tf
+**/override.tf.*

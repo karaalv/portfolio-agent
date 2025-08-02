@@ -63,6 +63,34 @@ def handle_exceptions(context: str):
         return wrapper # type: ignore
     return decorator
 
+def handle_exceptions_async(context: str):
+    """
+    Asynchronous version of the handle_exceptions decorator.
+    It wraps async functions with exception handling.
+
+    Args:
+        context (str): A string describing the context
+                       in which the function is called.
+    """
+    def decorator(func: T) -> T:
+        @wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            try:
+                return await func(*args, **kwargs)
+            except Exception as e:
+                print(
+                    f"{TerminalColors.red}"
+                    f"Error in {context}:"
+                    f"{TerminalColors.reset}"
+                    f" {e}"
+                )
+                raise Exception(
+                    f"Error in application with context "
+                    f"'{context}': {e}"
+                ) from e
+        return wrapper # type: ignore
+    return decorator
+
 # --- Time Utilities ---
 
 def get_timestamp() -> str:
