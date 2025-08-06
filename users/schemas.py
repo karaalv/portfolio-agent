@@ -3,6 +3,7 @@ This module contains Pydantic schemas
 for user related information.
 """
 from pydantic import BaseModel, Field
+from common.utils import get_timestamp
 
 class User(BaseModel):
     """
@@ -18,4 +19,9 @@ class User(BaseModel):
         ...,
         description="Timestamp of the user's "
                     "last activity",
+    )
+    created_at: str = Field(
+        default_factory=get_timestamp,
+        description="Timestamp of when the user "
+                    "was created",
     )

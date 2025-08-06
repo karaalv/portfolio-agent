@@ -5,10 +5,7 @@ for handling user-related operations.
 import uuid
 from users.schemas import User
 from common.utils import handle_exceptions_async, get_timestamp
-from users.database import (
-    push_user,
-    does_user_exist_db
-)
+from users.database import push_user, does_user_exist_db
 
 # --- User Creation ---
 
@@ -34,7 +31,6 @@ async def create_user() -> User:
     )
     await push_user(user)
     return user
-
 
 # --- User Inspection ---
 
