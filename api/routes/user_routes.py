@@ -29,7 +29,8 @@ async def set_session(request: Request):
 
         response = success_response(
             message="User session created successfully.",
-            data={"user_id": user.user_id}
+            data={"user_id": user.user_id},
+            status_code=201
         )
 
         response.set_cookie(
@@ -62,5 +63,6 @@ async def set_session(request: Request):
 
     return success_response(
         message="User session already exists.",
-        data={"user_id": user_id}
+        data={"user_id": user_id},
+        status_code=200
     )

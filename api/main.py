@@ -146,12 +146,14 @@ if __name__ == "__main__":
     import uvicorn
     
     env = os.getenv("ENVIRONMENT")
+    MAIN_PORT = 3001
+    TEST_PORT = 9001
 
     if env == "development":
         uvicorn.run(
             app="api.main:app",
             host="0.0.0.0",
-            port=int(os.getenv("PORT", 3001)),
+            port=int(os.getenv("PORT", MAIN_PORT)),
             log_level="debug",
             reload=True,
         )
@@ -159,7 +161,7 @@ if __name__ == "__main__":
         uvicorn.run(
             app="api.main:app",
             host="0.0.0.0",
-            port=int(os.getenv("PORT", 3001)),
+            port=int(os.getenv("PORT", MAIN_PORT)),
             log_level="debug",
             reload=False,
         )
@@ -167,14 +169,14 @@ if __name__ == "__main__":
         uvicorn.run(
             app="api.main:app",
             host="0.0.0.0",
-            port=int(os.getenv("PORT", 9001)),
+            port=int(os.getenv("PORT", TEST_PORT)),
             reload=False,
         )
     elif env == "staging":
         uvicorn.run(
             app="api.main:app",
             host="0.0.0.0",
-            port=int(os.getenv("PORT", 3001)),
+            port=int(os.getenv("PORT", MAIN_PORT)),
             log_level="debug",
             reload=False,
         )

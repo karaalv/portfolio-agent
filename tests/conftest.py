@@ -13,6 +13,8 @@ load_dotenv(
 import pytest
 from common.utils import TerminalColors
 
+from tests.config.server_config import start_server, stop_server
+
 def pytest_configure():
     """
     Configure pytest, start server 
@@ -33,11 +35,17 @@ def pytest_configure():
             f"{TerminalColors.reset}"
         )
 
+    # Start the server before running tests
+    start_server()
+
 def pytest_sessionfinish():
     """
     Teardown after all tests are done.
     Closes the MongoDB connection.
     """
+    # Stop the server after tests
+    stop_server()
+    
     print(
         f"{TerminalColors.yellow}"
         f"\nTest runtime finished."

@@ -7,15 +7,17 @@ This repository contains my portfolio agent, which is a RAG (Retrieval-Augmented
 
 The agent can also email these documents to you.
 
-To interact wth the agent, you can check it out on my website [Alvin Karanja](https://www.alvinkaranja.dev/chat)
+To interact with the agent, you can check it out on my website [link](https://www.alvinkaranja.dev/chat)
+
+<!-- For a detailed explanation of how the agent works, you can refer to my blog post [link](https://www.alvinkaranja.dev/blog/portfolio-agent). -->
 
 ## 🏗️ Deployment
 
-- The agent is deployed using AWS as a traditional backend service, I use terraform to manage the infrastructure, and kubernetes to manage the containerized application.
+- The agent is deployed using AWS as a traditional backend service, I use terraform to manage the infrastructure, and kubernetes to manage container orchestration.
 
 ## 🌐 User Management
 
-- This repository also contains a user management functionality that manages users and their sessions. It uses JWT for authentication and authorization.
+- This repository also contains user management functionality that manages users and their sessions. It uses JWTs to secure the API endpoints and manage user sessions.
 
 ## 🗂️ Project Structure 
 
@@ -23,4 +25,4 @@ The project is structured into the following packages to make things easier for 
 
 - `agent`: Contains the agent logic and configuration.
 - `database`: Contains the database logic and configuration, mainly to manage database resources.
-- `api`: Contains the API logic and configuration to communicate with the frontend.
+- `api`: Contains API logic and configuration to communicate with the frontend.
