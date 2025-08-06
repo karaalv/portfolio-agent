@@ -21,6 +21,19 @@ database_mappings: dict[str, str] = {
 
 MONGO_CLIENT: Optional[AsyncMongoClient] = None
 
+def resolve_cluster() -> str:
+    """
+    Resolves cluster based on environment.
+    """
+    env = os.getenv("ENVIRONMENT")
+
+    if env == "test":
+        return str(os.getenv("MONGO_DEVELOPMENT"))
+    elif env == "production":
+        return str(os.getenv("MONGO_PRODUCTION"))
+    else:
+        return str(os.getenv("MONGO_DEVELOPMENT"))
+
 async def connect_mongo() -> bool:
     """
     Connects to the MongoDB database using
@@ -36,7 +49,7 @@ async def connect_mongo() -> bool:
     try:
         if MONGO_CLIENT is None:
             MONGO_CLIENT = AsyncMongoClient(
-                os.getenv("MONGO_URI")
+                resolve_cluster(),
             )
             await MONGO_CLIENT.aconnect()
 
