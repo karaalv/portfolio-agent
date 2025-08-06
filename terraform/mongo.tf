@@ -1,14 +1,6 @@
-# --- Config and Providers ---
+# --- MongoDB Atlas Infrastructure ---
 
-terraform {
-  required_version = ">= 1.0"
-  required_providers {
-    mongodbatlas = {
-      source  = "mongodb/mongodbatlas"
-      version = "~> 1.3"
-    }
-  }
-}
+# --- Config and Providers ---  
 
 provider "mongodbatlas" {
   public_key  = var.mongodb_atlas_public_key
@@ -22,15 +14,14 @@ resource "mongodbatlas_project" "portfolio_dev" {
   org_id = var.mongodb_atlas_org_id
 
   tags = {
-    env = "dev"
+    environment = "development"
   }
 }
-
 
 # Cluster Configuration
 resource "mongodbatlas_cluster" "portfolio_dev_cluster" {
   project_id = mongodbatlas_project.portfolio_dev.id
-  name       = "portfolio-dev"
+  name       = "portfolio-development-cluster"
 
   # Provider Settings
   provider_name               = "TENANT"
@@ -39,8 +30,8 @@ resource "mongodbatlas_cluster" "portfolio_dev_cluster" {
   provider_instance_size_name = "M0"
 
   labels {
-    key   = "env"
-    value = "dev"
+    key   = "environment"
+    value = "development"
   }
 }
 
@@ -49,11 +40,4 @@ resource "mongodbatlas_project_ip_access_list" "portfolio_dev_ip_access" {
   project_id = mongodbatlas_project.portfolio_dev.id
   cidr_block = "0.0.0.0/0"
   comment    = "Allow connections from anywhere for development"
-}
-
-
-# --- Outputs ---
-output "portfolio_dev_connection_string" {
-  value       = mongodbatlas_cluster.portfolio_dev_cluster.connection_strings[0].standard
-  description = "Connection string for the development MongoDB cluster"
 }
