@@ -3,6 +3,7 @@ Main interface for agent
 memory management
 """
 import json
+from typing import overload, Literal
 from agent.memory.schemas import AgentMemory, AgentCanvas
 from common.utils import handle_exceptions_async, get_timestamp
 from database.mongodb.main import get_collection
@@ -40,6 +41,18 @@ async def push_memory(
     return None
 
 # --- Retrieval ---
+
+@overload
+async def retrieve_memory(
+    user_id: str,
+    to_str: Literal[True]
+) -> str: ...
+
+@overload
+async def retrieve_memory(
+    user_id: str,
+    to_str: Literal[False]
+) -> list[AgentMemory]: ...
 
 @handle_exceptions_async("agent.memory: Retrieving Agent Memory")
 async def retrieve_memory( 
