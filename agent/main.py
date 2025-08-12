@@ -79,7 +79,7 @@ async def _execute_tool(
 # --- Memory and Prompting --- 
 
 @handle_exceptions_async("agent.main: Getting system prompt")
-async def get_system_prompt(
+async def _get_system_prompt(
     user_id: str,
     verbose: bool = False
 ) -> str:
@@ -175,7 +175,7 @@ async def chat(
     # Get system prompt, if call is 
     # recursive, add context from 
     # tool result
-    system_prompt = await get_system_prompt(
+    system_prompt = await _get_system_prompt(
         user_id=user_id,
         verbose=verbose
     )

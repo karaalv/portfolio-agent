@@ -2,7 +2,7 @@
 This module contains user routes for
 the API.
 """
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Request
 from users.schemas import User
 from api.common.utils import api_exception_handler, create_jwt_token
 from users.main import create_user, does_user_exist

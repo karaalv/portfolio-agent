@@ -8,6 +8,7 @@ from httpx import Response
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
 from api.common.schemas import APIResponse
+from typing import overload, Literal
 
 # --- Authentication Utilities ---
 
@@ -49,6 +50,28 @@ def create_frontend_token() -> str:
     )
 
 # --- Request Utilities ---
+
+@overload
+async def server_fetch(
+    endpoint: str,
+    method: str,
+    parsed: Literal[True],
+    user_id: Optional[str] = None,
+    jwt: Optional[str] = None,
+    body: Optional[Any] = None
+) -> APIResponse:
+    ...
+
+@overload
+async def server_fetch(
+    endpoint: str,
+    method: str,
+    parsed: Literal[False],
+    user_id: Optional[str] = None,
+    jwt: Optional[str] = None,
+    body: Optional[Any] = None
+) -> Response:
+    ...
 
 async def server_fetch(
     endpoint: str,

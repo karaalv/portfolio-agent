@@ -27,8 +27,8 @@ from contextlib import asynccontextmanager
 from database.mongodb.config import connect_mongo, close_mongo
 from api.common.responses import error_response
 from api.common.authentication import verify_frontend_token, verify_jwt
-
-from api.routes import user_routes
+# Routes
+from api.routes import user_routes, agent_routes
 
 # --- Lifecycle Management ---
 
@@ -133,13 +133,22 @@ async def health_check():
 # --- Routes ---
 
 app.include_router(
-    user_routes.router,
+    router=user_routes.router,
     prefix="/users",
     dependencies=[
         Depends(verify_frontend_token)
     ]
 )
-    
+
+app.include_router(
+    router=agent_routes.router,
+    prefix="/agent",
+    dependencies=[
+        Depends(verify_frontend_token),
+        Depends(verify_jwt)
+    ]
+)
+
 # --- Run Server ---
 
 if __name__ == "__main__":

@@ -1,0 +1,97 @@
+"""
+This module contains agent routes for
+the Agent API.
+"""
+from fastapi import APIRouter, Request
+from api.common.utils import api_exception_handler
+from api.common.responses import success_response, error_response
+from agent.main import chat
+from agent.memory.main import retrieve_memory, delete_memory
+
+# --- Constants --- 
+
+router = APIRouter()
+
+# --- Agent Routes ---
+
+@router.post("/chat")
+@api_exception_handler("Agent chat")
+async def agent_chat_api(request: Request):
+    """
+    Handles chat requests to the agent.
+    """
+    data = await request.json()
+    cookies = request.cookies
+
+    user_id = cookies.get("UUID")
+    user_input = data.get("input")
+
+    if not user_id or not user_input:
+        return error_response(
+            "Missing user_id or input",
+            status_code=400
+        )
+
+    response = await chat(
+        user_id=user_id,
+        input=user_input
+    )
+
+    return success_response(
+        message="Successfully retrieved chat response",
+        data=response
+    )
+
+@router.get("/memory")
+@api_exception_handler("Get user memory")
+async def get_memory_api(request: Request):
+    """
+    Retrieves the memory for a user.
+    """
+    cookies = request.cookies
+    user_id = cookies.get("UUID")
+
+    if not user_id:
+        return error_response(
+            "Missing user_id",
+            status_code=400
+        )
+
+    memory = await retrieve_memory(
+        user_id,
+        to_str=False
+    )
+
+    return success_response(
+        message="Successfully retrieved user memory",
+        data=memory
+    )
+
+@router.delete("/clear-memory")
+@api_exception_handler("Delete user memory")
+async def delete_memory_api(request: Request):
+    """
+    Deletes the memory for a user.
+    """
+    cookies = request.cookies
+    user_id = cookies.get("UUID")
+
+    if not user_id:
+        return error_response(
+            "Missing user_id",
+            status_code=400
+        )
+
+    result = await delete_memory(
+        user_id=user_id
+    )
+
+    if result is False:
+        return error_response(
+            "Failed to delete user memory",
+            status_code=500
+        )
+
+    return success_response(
+        message="Successfully deleted user memory"
+    )
