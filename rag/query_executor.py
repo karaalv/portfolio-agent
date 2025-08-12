@@ -9,6 +9,7 @@ import json
 import asyncio
 from corpus.schemas import CorpusItem
 from rag.schemas import QueryPlan
+from common.utils import handle_exceptions_async, TerminalColors
 from database.mongodb.main import get_collection
 from openai_client.main import get_embedding, normal_response
 
@@ -18,7 +19,79 @@ _refiner_model = "gpt-4.1-mini"
 
 # --- Retriever ---
 
-async def retrieve_documents(
+@handle_exceptions_async("rag.query_executor: Retrieve Documents Sequential")
+async def retrieve_documents_sequential(
+    query_plan: QueryPlan,
+    verbose: bool = False
+) -> str:
+    """
+    Retrieve docs from corpus in sequential
+    manner:
+
+    Args:
+        query_plan (QueryPlan): The query plan to
+        execute.
+
+    Returns:
+        str: The concatenated string of retrieved
+        document texts.
+    """
+    retrieval_limit = 1
+    collection = get_collection("corpus")
+    queries = query_plan.queries
+
+    results = []
+    for query in queries:
+        pipeline = [
+            {
+                "$vectorSearch": {
+                    "index": "corpus_vector_index",
+                    "path": "embedding",
+                    "queryVector": await get_embedding(query),
+                    "numCandidates": retrieval_limit * 25,
+                    "limit": retrieval_limit,
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "embedding": 0,
+                }
+            },
+        ]
+        cursor = await collection.aggregate(pipeline)
+        docs = await cursor.to_list(length=None)
+
+        if not docs:
+            continue
+
+        item = CorpusItem(**docs[0])
+        
+        if verbose:
+            print(
+                f"{TerminalColors.cyan}"
+                f"Retrieved document for query: {query}"
+                f"{TerminalColors.reset}"
+            )
+            print(item.model_dump_json(indent=2))
+
+        results.append(
+            json.dumps(
+                {
+                    "context": item.context,
+                    "document": item.document,
+                },
+                indent=2
+            )
+        )
+
+    return "\n".join(results)
+
+# TODO parallel approach has race condition on result
+# implement a locking mechanism or use a more robust data structure
+
+@handle_exceptions_async("rag.query_executor: Retrieve Documents Parallel")
+async def _retrieve_documents_parallel(
     query_plan: QueryPlan
 ) -> str:
     """
@@ -91,10 +164,11 @@ async def retrieve_documents(
 
     return "\n".join(parts)
 
-# --- Augmenter - Context Refiner ---
+# --- Augmenter: Context Refiner ---
 
+@handle_exceptions_async("rag.query_executor: Refine Context")
 async def refine_context(
-    refined_input: str,
+    user_input: str,
     retrieval_results: str
 ) -> str:
     """
@@ -111,12 +185,21 @@ async def refine_context(
     Returns:
         str: The refined context.
     """
-
     system_prompt = textwrap.dedent(f"""
         You are an expert context augmenter for a portfolio
         site with a Retrieval-Augmented Generation (RAG)
-        agent. Use the refined user input to create a single,
-        coherent, and faithful context.
+        agent.
+
+        Task:
+        - First, repeat the user's original input verbatim.
+        - Then, produce a single, coherent Augmented Context
+        using only relevant info from retrieval.
+        - Rephrase the context in present tense and first
+        person (e.g., "I am...", "I work on...", "I have
+        experience in...") so it reads as if I am speaking.
+        - When referring to information from the retrieved
+        documents, make sure to cite the full context that
+        supports your statements to support your claims.
 
         Goals:
         - Preserve the user's intent and constraints.
@@ -124,25 +207,30 @@ async def refine_context(
         - Merge overlaps; deduplicate; normalise terms.
         - Resolve conflicts without inventing new facts.
         - Prefer recent or specific info when entries differ.
+        - Do not provide multiple options or extra commentary.
 
         Method:
         - Treat retrieved context and documents as related
         units.
         - Extract key facts, entities, dates, and definitions
         that support the task.
+        - If uncertainty remains, state it briefly and move on.
 
-        Output:
-        Return a concise "Augmented Context" with a short
-        intent recap and a clear, unified context.
+        Output (exactly two sections):
+        1) "User Input:"
+        - The original user input, verbatim.
+        2) "Augmented Context:"
+        - A concise, first-person, present-tense unified
+            context suitable for generation.
 
         Inputs:
-        - Refined user input: provided in the user message.
+        - Original user input: provided in the user message.
         - Retrieved entries:
         {retrieval_results}
     """)
 
     return await normal_response(
         system_prompt=system_prompt,
-        user_input=refined_input,
+        user_input=user_input,
         model=_refiner_model
     )

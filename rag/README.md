@@ -26,7 +26,7 @@ The system operates in **five core stages**:
    Generates a structured set of targeted sub-queries designed to provide deep contextual coverage from the corpus.  
 
 3. **Retriever**  
-   Executes sub-queries in parallel, fetching relevant documents from the corpus.  
+   Executes sub-queries, fetching relevant documents from the corpus.  
    All retrieved documents are merged for downstream processing.  
 
 4. **Augmenter**  

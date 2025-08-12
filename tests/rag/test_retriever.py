@@ -8,7 +8,7 @@ import time
 from common.utils import TerminalColors
 from rag.schemas import QueryPlan
 from database.mongodb.config import connect_mongo, close_mongo
-from rag.retriever import retrieve_documents
+from rag.query_executor import retrieve_documents
 
 # --- Constants ---
 
