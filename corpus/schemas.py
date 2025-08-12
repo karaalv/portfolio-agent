@@ -3,6 +3,7 @@ This module contains the schemas used
 for RAG Agent Corpus documents.
 """
 from pydantic import BaseModel, Field
+from typing import Optional
 
 class CorpusItem(BaseModel):
     """
@@ -19,8 +20,8 @@ class CorpusItem(BaseModel):
         description="The header for the corpus item "
                     "used when streaming chain of thought."
     )
-    embedding: list[float] = Field(
-        ...,
+    embedding: Optional[list[float]] = Field(
+        None,
         description="The embedding vector for the corpus "
                     "item."
     )

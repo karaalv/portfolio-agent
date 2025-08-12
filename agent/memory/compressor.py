@@ -3,6 +3,7 @@ This module contains the conversation
 compressor which is used to summarise
 the user's conversation history.
 """
+import textwrap
 from common.utils import handle_exceptions_async
 from openai_client.main import normal_response
 from agent.memory.main import retrieve_memory
@@ -24,7 +25,7 @@ async def compress_conversation(
 
     memory = await retrieve_memory(user_id, to_str=True)
 
-    system_prompt = f"""
+    system_prompt = textwrap.dedent(f"""
         You are an expert conversation summarizer for a 
         portfolio website, which features a Retrieval-
         Augmented Generation (RAG) agent to interact with 
@@ -40,7 +41,7 @@ async def compress_conversation(
 
         The conversation history will be passed in the user
         prompt.
-    """
+    """)
 
     return await normal_response(
         system_prompt=system_prompt,

@@ -3,8 +3,7 @@ This module acts as the main interface
 for the agent, wrapping all memory, tools
 and components into a cohesive system.
 """
-from agent import memory
-from agent.memory.schemas import AgentMemory, AgentCanvas
+import textwrap
 from common.utils import TerminalColors, handle_exceptions_async, get_timestamp
 from openai_client.main import agent_response
 from agent.memory.main import push_memory, retrieve_memory
@@ -49,7 +48,7 @@ async def get_system_prompt(
             f"{memory}"
         )
 
-    system_prompt = f"""
+    system_prompt = textwrap.dedent(f"""
         You are an AI impersonation of Alvin Karanja for my
         portfolio site. I am a software engineer, machine
         learning engineer, and data scientist, recently
@@ -77,7 +76,7 @@ async def get_system_prompt(
 
         Note: Chat history is deleted after 7 days of inactivity
         to manage platform data.
-    """
+    """)
 
     return system_prompt
 

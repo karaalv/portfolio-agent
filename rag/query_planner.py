@@ -2,6 +2,7 @@
 This module contains the Input Refiner
 and Query Planner for the RAG system.
 """
+import textwrap
 from rag.schemas import QueryPlan
 from common.utils import handle_exceptions_async
 from openai_client.main import normal_response, structured_response
@@ -25,7 +26,7 @@ async def input_refiner(
     """
     summary = await get_user_summarisation(user_id)
 
-    system_prompt = f"""
+    system_prompt = textwrap.dedent(f"""
         You are an expert input refiner for a portfolio site 
         with a Retrieval-Augmented Generation (RAG) agent. 
         It interacts with visitors, recruiters, and 
@@ -38,7 +39,7 @@ async def input_refiner(
 
         Conversation summary:
         {summary}
-    """
+    """)
 
     return await normal_response(
         system_prompt=system_prompt,
@@ -56,8 +57,8 @@ async def query_planner(
     Plan the query by breaking it down 
     into sub-queries.
     """
-    
-    system_prompt = """
+
+    system_prompt = textwrap.dedent(f"""
         You are an expert query planner for a portfolio site 
         with a Retrieval-Augmented Generation (RAG) agent. 
         It interacts with visitors, recruiters, and 
@@ -83,7 +84,7 @@ async def query_planner(
         The output will be structured separately; focus only 
         on creating the most effective sub-queries for 
         retrieval.
-    """
+    """)
 
     query_plan = await structured_response(
         system_prompt=system_prompt,
