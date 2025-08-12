@@ -36,3 +36,11 @@ The system operates in **five core stages**:
    Synthesizes the augmented content into a coherent, context-aware final response.  
 
 This architecture allows the portfolio agent to combine precise retrieval with fluent generation, producing outputs that are **accurate, personalized, and contextually rich**.
+
+## Folder Structure
+
+The folder has the following main files:
+
+- `query_planner.py`: Contains the logic for the input refiner and query planner.
+- `query_executor.py`: Handles the execution of queries against the document corpus (retrieval) and augmentation of the retrieved content.
+- `main.py`: The entry point for the RAG system, orchestrating the overall process.

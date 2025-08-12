@@ -10,8 +10,8 @@ from agent.memory.compressor import get_user_summarisation
 
 # --- Constants ---
 
-refiner_model = "gpt-4.1-nano"
-planner_model = "gpt-4.1-mini"
+_refiner_model = "gpt-4.1-nano"
+_planner_model = "gpt-4.1-mini"
 
 # --- Input Refiner ---
 
@@ -44,7 +44,7 @@ async def input_refiner(
     return await normal_response(
         system_prompt=system_prompt,
         user_input=user_input,
-        model=refiner_model
+        model=_refiner_model
     )
 
 # --- Query Planner ---
@@ -90,7 +90,7 @@ async def query_planner(
         system_prompt=system_prompt,
         user_input=refined_input,
         response_format=QueryPlan,
-        model=planner_model
+        model=_planner_model
     )
 
     return query_plan
