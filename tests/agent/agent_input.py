@@ -11,13 +11,37 @@ load_dotenv(
 )
 
 import asyncio
-from common.utils import TerminalColors
+from common.utils import TerminalColors, Timer
 from database.mongodb.config import connect_mongo, close_mongo
+from users.main import create_user, does_user_exist
 from agent.main import chat
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+file_path = os.path.join(current_dir, "test_user_id.txt")
+
+async def setup():
+    try:
+        with open(file_path, "r") as f:
+            id = f.read().strip()
+    except FileNotFoundError:
+        id = None
+
+    if id and await does_user_exist(id):
+       return id
+    
+    user = await create_user()
+    with open(file_path, "w") as f:
+        f.write(str(user.user_id))
+
+    return user.user_id
 
 async def main():
     await connect_mongo()
-    print("Interact with agent:")
+    user_id = await setup()
+    
+    print("\nInteract with agent:\n")
+    timer = Timer(start=False)
+
     while True:
         user_message = input(">> ")
 
@@ -25,10 +49,18 @@ async def main():
             await close_mongo()
             break
 
+        timer.start()
         agent_message = await chat(
-            user_id='test_user',
+            user_id=user_id,
             input=user_message,
             verbose=True
+        )
+        response_time = timer.stop()
+
+        print(
+            f"{TerminalColors.yellow}"
+            f"Agent response in {response_time:.4f} seconds"
+            f"{TerminalColors.reset}"
         )
 
         print(

@@ -8,15 +8,15 @@ import time
 from common.utils import TerminalColors
 from rag.schemas import QueryPlan
 from database.mongodb.config import connect_mongo, close_mongo
-from rag.query_executor import retrieve_documents
+from rag.query_executor import retrieve_documents_sequential
 
 # --- Constants ---
 
 TEST_QUERY = QueryPlan(
     queries=[
-        "what are your career goals?",
+        #"what are your career goals?",
         "what is your favorite programming language?",
-        "what is your greatest strength?"
+        #"what is your greatest strength?"
     ]
 )
 
@@ -45,7 +45,10 @@ async def test_retrieve_documents():
     Test parallel semantic document retrieval.
     """
     start = time.perf_counter()
-    results = await retrieve_documents(TEST_QUERY)
+    results = await retrieve_documents_sequential(
+        TEST_QUERY,
+        verbose=True
+    )
     end = time.perf_counter()
 
     print(

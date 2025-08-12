@@ -17,6 +17,21 @@ from openai_client.main import get_embedding, normal_response
 
 _refiner_model = "gpt-4.1-mini"
 
+# --- Utils ---
+
+def _package_item(item: CorpusItem) -> str:
+    """
+    Package a CorpusItem into a JSON string
+    with relevant information.
+    """
+    return json.dumps(
+        {
+            "context": item.context,
+            "document": item.document,
+        },
+        indent=2
+    )
+
 # --- Retriever ---
 
 @handle_exceptions_async("rag.query_executor: Retrieve Documents Sequential")
@@ -36,11 +51,12 @@ async def retrieve_documents_sequential(
         str: The concatenated string of retrieved
         document texts.
     """
-    retrieval_limit = 1
+    retrieval_limit = 3
+    retrieval_threshold = 0.6
     collection = get_collection("corpus")
     queries = query_plan.queries
 
-    results = []
+    results: list[str] = []
     for query in queries:
         pipeline = [
             {
@@ -56,34 +72,47 @@ async def retrieve_documents_sequential(
                 "$project": {
                     "_id": 0,
                     "embedding": 0,
+                    'score': {
+                        '$meta': 'vectorSearchScore'
+                    }
+                }
+            },
+            {
+                "$match": {
+                    "score": {
+                        "$gt": retrieval_threshold
+                    }
+                }
+            },
+            {
+                "$project": {
+                    "score": 0
                 }
             },
         ]
+        
         cursor = await collection.aggregate(pipeline)
         docs = await cursor.to_list(length=None)
 
         if not docs:
             continue
 
-        item = CorpusItem(**docs[0])
-        
+        items = [CorpusItem(**doc) for doc in docs]
+        items_str = "\n".join(
+            item.model_dump_json(indent=2) for item in items
+        )
+
+        item_results = [_package_item(item) for item in items]
+
         if verbose:
             print(
                 f"{TerminalColors.cyan}"
                 f"Retrieved document for query: {query}"
                 f"{TerminalColors.reset}"
             )
-            print(item.model_dump_json(indent=2))
+            print(items_str)
 
-        results.append(
-            json.dumps(
-                {
-                    "context": item.context,
-                    "document": item.document,
-                },
-                indent=2
-            )
-        )
+        results.append('\n'.join(item_results))
 
     return "\n".join(results)
 

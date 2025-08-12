@@ -31,7 +31,7 @@
         ---
         I optimised the documentation workflow by deploying NLP 
         summarisation models with LangChain, JavaScript, and AWS 
-        S3, condensing 20–50 page technical reports into 1–2 page 
+        S3, condensing 20 to 50 page technical reports into 1 to 2 page 
         actionable insights for business and sales teams.
     </document>
 </section>

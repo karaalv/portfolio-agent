@@ -9,6 +9,10 @@ from openai_client.main import normal_response
 from agent.memory.main import retrieve_memory
 from database.mongodb.main import get_collection
 
+# --- Constants ---
+
+compression_model = "gpt-4.1-mini"
+
 # --- Conversation compression ---
 
 @handle_exceptions_async("agent.memory: Compressing Conversation")
@@ -26,26 +30,33 @@ async def compress_conversation(
     memory = await retrieve_memory(user_id, to_str=True)
 
     system_prompt = textwrap.dedent(f"""
-        You are an expert conversation summarizer for a 
-        portfolio website, which features a Retrieval-
-        Augmented Generation (RAG) agent to interact with 
-        visitors, potential recruiters, and collaborators.
+        You are an expert conversation summarizer for a portfolio
+        sites RAG agent, which interacts as me—Alvin Karanja.
 
-        Your task is to condense the following conversation 
-        history into a clear, concise summary that preserves 
-        all key details, context, and nuances relevant to the 
-        user. The summary will be used for RAG retrieval, so 
-        maintain any information that could support accurate 
-        inference in future interactions. Avoid unnecessary 
-        wording—focus only on essential facts and context.
+        Your job is to condense the following chat history into a
+        clear and concise summary, written in first person to
+        sound like me ("I worked on...", "I discussed..."), while
+        retaining all key details, intent, and context that
+        matter for retrieval accuracy.
 
-        The conversation history will be passed in the user
-        prompt.
+        Key rules:
+        - Use first person present or past tense to match the
+        persona (e.g., "I explored...", "I learned...").
+        - Preserve user intent and conversation nuance.
+        - Keep the summary focused: no filler, no assumptions.
+        - Ensure it supports accurate inference in future
+        RAG retrieval.
+        - Make it as short as possible while remaining
+        context-rich.
+
+        The conversation history follows in the user message.
     """)
+
 
     return await normal_response(
         system_prompt=system_prompt,
-        user_input=memory
+        user_input=memory,
+        model=compression_model
     )
 
 # --- User Update ---

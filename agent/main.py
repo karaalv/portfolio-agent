@@ -4,20 +4,77 @@ for the agent, wrapping all memory, tools
 and components into a cohesive system.
 """
 import textwrap
-from common.utils import TerminalColors, handle_exceptions_async, get_timestamp
+import json
+import asyncio
+from typing import Optional, Any
+from common.utils import TerminalColors, handle_exceptions_async
 from openai_client.main import agent_response
 from agent.memory.main import push_memory, retrieve_memory
 from agent.memory.compressor import update_user_summarisation
 from agent.tools.tool_definitions import agent_tools
-from openai.types.responses import ResponseOutputItem
+# Tools
+from rag.main import fetch_context
 
 # --- Constants ---
 
 RECURSION_LIMIT = 3
+_agent_model = "gpt-4.1-mini"
 
 # --- Resolvers ---
 
-# TODO: Implement resolvers for agent logic
+@handle_exceptions_async("agent.main: Execute Tool")
+async def _execute_tool(
+    user_id: str,
+    tool_name: str,
+    tool_args: dict[str, Any],
+    verbose: bool
+) -> str:
+    """
+    This function executes the agent
+    tool with the given arguments.
+    """
+    recursive_prompt = textwrap.dedent(f"""
+        The following is information retrieved using one of my
+        tools in response to the user's request. It provides
+        relevant context or details needed to continue the
+        conversation naturally.
+
+        Using this information, respond in character as Alvin
+        Karanja—maintaining tone, clarity, and accuracy—
+        and continue the conversation as if this knowledge
+        was already mine.
+
+        Avoid mentioning tools or retrievals. Focus on
+        answering the user's original query based on the
+        content provided below.
+
+        Tool result:\n
+    """)
+
+    tool_result = ''
+
+    if tool_name == "fetch_context":
+        tool_result = await fetch_context(
+            user_id=user_id,
+            user_input=tool_args['user_input'],
+            verbose=verbose
+        )
+    else: 
+        return """
+            The tool requested was not recognized,
+            try again and be more careful with the
+            tool invocation.
+        """
+    
+    if verbose:
+        print(
+            f"{TerminalColors.blue}"
+            f"Tool result for {tool_name}: \n"
+            f"{TerminalColors.reset}"
+            f"{tool_result.strip()}"
+        )
+
+    return recursive_prompt + tool_result.strip()
 
 # --- Memory and Prompting --- 
 
@@ -84,6 +141,7 @@ async def get_system_prompt(
 async def chat(
     user_id: str,
     input: str,
+    recursive_prompt: Optional[str] = None,
     recursion_count: int = 0,
     verbose: bool = False
 ) -> str:
@@ -114,17 +172,23 @@ async def chat(
         content=input
     )
 
-    # Get system prompt
+    # Get system prompt, if call is 
+    # recursive, add context from 
+    # tool result
     system_prompt = await get_system_prompt(
         user_id=user_id,
         verbose=verbose
     )
 
+    if recursive_prompt:
+        system_prompt += f"\n\n{recursive_prompt}"
+
     # Call OpenAI API
     response = await agent_response(
         system_prompt=system_prompt, 
         user_input=input,
-        tools=agent_tools
+        tools=agent_tools,
+        model=_agent_model
     )
 
     if response.type == "message":
@@ -138,16 +202,29 @@ async def chat(
 
         # Update user summarisation in background
         # DO NOT AWAIT
-        _ = update_user_summarisation(user_id)
+        asyncio.create_task(update_user_summarisation(user_id))
 
         return message
     elif response.type == "function_call":
         # function call response
-        name, args = response.name, response.arguments
-        return f"""
-            {name}({', '.join(args)})
-        """
-    else: 
+        tool_name: str = response.name
+        tool_args: dict[str, Any] = json.loads(response.arguments)
+
+        tool_result = await _execute_tool(
+            user_id=user_id,
+            tool_name=tool_name,
+            tool_args=tool_args,
+            verbose=verbose
+        )
+
+        return await chat(
+            user_id=user_id,
+            input=input,
+            recursive_prompt=tool_result,
+            recursion_count=recursion_count + 1,
+            verbose=verbose
+        )
+    else:
         # unknown response type
         raise ValueError(
             f"Unknown response type: "

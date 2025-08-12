@@ -3,23 +3,9 @@ This module contains the main entry point
 for the RAG system, orchestrating the overall
 process.
 """
-import time
-from common.utils import handle_exceptions_async, TerminalColors
+from common.utils import handle_exceptions_async, TerminalColors, Timer
 from rag.query_planner import input_refiner, query_planner
 from rag.query_executor import retrieve_documents_sequential, refine_context
-
-# --- Utils ---
-
-class Timer:
-    def __init__(self):
-        self.start_time = time.perf_counter()
-        self.prev_time = self.start_time
-
-    def elapsed(self):
-        current_time = time.perf_counter()
-        delta = current_time - self.prev_time
-        self.prev_time = current_time
-        return delta
 
 # --- Main Orchestrator ---
 
@@ -40,10 +26,11 @@ async def fetch_context(
     Returns:
         str: The augmented context for generation.
     """
-    timer = Timer()
+    timer = Timer(start=True)
     refined_input = await input_refiner(
         user_id=user_id, 
-        user_input=user_input
+        user_input=user_input,
+        verbose=verbose
     )
     refinement_time = timer.elapsed()
 

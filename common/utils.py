@@ -2,6 +2,7 @@
 This module contains utility functions
 used across the backend.
 """
+import time
 from datetime import datetime, timezone
 from typing import Callable, Any, TypeVar, Optional
 from functools import wraps
@@ -109,3 +110,27 @@ def get_datetime(timestamp: Optional[str] = None) -> datetime:
     if not timestamp:
         return datetime.now(timezone.utc)
     return datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+
+class Timer:
+    def __init__(self, start: bool = False):
+        self.start_time = 0.0
+        self.stop_time = 0.0
+        self.prev_time = 0.0
+        
+        if start:
+            self.start_time = time.perf_counter()
+            self.stop_time = self.start_time
+            self.prev_time = self.start_time
+
+    def start(self) -> None:
+        self.start_time = time.perf_counter()
+
+    def stop(self) -> float:
+        self.stop_time = time.perf_counter()
+        return self.stop_time - self.start_time
+
+    def elapsed(self) -> float:
+        current_time = time.perf_counter()
+        delta = current_time - self.prev_time
+        self.prev_time = current_time
+        return delta
