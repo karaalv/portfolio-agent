@@ -27,7 +27,8 @@ async def create_user() -> User:
     
     user = User(
         user_id=user_id,
-        last_active=get_timestamp()
+        last_active=get_timestamp(),
+        conversation_summary=""
     )
     await push_user(user)
     return user

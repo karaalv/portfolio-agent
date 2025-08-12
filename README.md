@@ -23,6 +23,8 @@ To interact with the agent, you can check it out on my website [link](https://ww
 
 The project is structured into the following packages to make things easier for myself:
 
-- `agent`: Contains the agent logic and configuration.
-- `database`: Contains the database logic and configuration, mainly to manage database resources.
-- `api`: Contains API logic and configuration to communicate with the frontend.
+- `agent/`: Contains the agent logic and configuration.
+- `database/`: Contains the database logic and configuration, mainly to manage database resources.
+- `api/`: Contains API logic and configuration to communicate with the frontend.
+- `rag/`: Contains the implementation of the Retrieval-Augmented Generation (RAG) system.
+- `corpus/`: Contains the RAG Agent Corpus, a collection of documents and resources for contextual knowledge.

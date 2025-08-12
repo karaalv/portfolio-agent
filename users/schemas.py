@@ -25,3 +25,7 @@ class User(BaseModel):
         description="Timestamp of when the user "
                     "was created",
     )
+    conversation_summary: str = Field(
+        ...,
+        description="Summary of the user's conversation",
+    )

@@ -8,6 +8,7 @@ from agent.memory.schemas import AgentMemory, AgentCanvas
 from common.utils import TerminalColors, handle_exceptions_async, get_timestamp
 from openai_client.main import agent_response
 from agent.memory.main import push_memory, retrieve_memory
+from agent.memory.compressor import update_user_summarisation
 from agent.tools.tool_definitions import agent_tools
 from openai.types.responses import ResponseOutputItem
 
@@ -135,6 +136,11 @@ async def chat(
             source='agent',
             content=message
         )
+
+        # Update user summarisation in background
+        # DO NOT AWAIT
+        _ = update_user_summarisation(user_id)
+
         return message
     elif response.type == "function_call":
         # function call response
