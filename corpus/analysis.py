@@ -12,7 +12,7 @@ from corpus.schemas import CorpusItem
 
 # --- Utils --- 
 
-def get_token_count(text: str) -> int:
+def _get_token_count(text: str) -> int:
     """
     Get the number of tokens in a text string.
     """
@@ -22,7 +22,7 @@ def get_token_count(text: str) -> int:
 
 # --- Processing Functions ---
 
-def load_file(file_name: str) -> list[CorpusItem]:
+def _load_file(file_name: str) -> list[CorpusItem]:
     """
     Load a file and return a list of CorpusItems.
 
@@ -41,6 +41,12 @@ def load_file(file_name: str) -> list[CorpusItem]:
     # Clean comments
     cleaned = re.sub(r"<!--.*?-->", "", content, flags=re.DOTALL)
     cleaned = re.sub(r"\n\s*\n", "\n", cleaned)
+
+    # Clean trailing spaces
+    cleaned = re.sub(r"\s*\n\s*", " ", cleaned, flags=re.MULTILINE)
+
+    # Clear separators
+    cleaned = re.sub(r"---", " ", cleaned, flags=re.DOTALL)
     
     # Extract Sections
     sections = re.findall(r"<section>(.*?)</section>", cleaned, re.DOTALL)
@@ -65,7 +71,7 @@ def load_file(file_name: str) -> list[CorpusItem]:
 
     return corpus_items
 
-def analyse_corpus_item(corpus_item: CorpusItem) -> dict:
+def _analyse_corpus_item(corpus_item: CorpusItem) -> dict:
     """
     Analyse a single CorpusItem and return 
     relevant metrics.
@@ -78,8 +84,8 @@ def analyse_corpus_item(corpus_item: CorpusItem) -> dict:
         dict: A dictionary containing analysis 
         results.
     """
-    token_count = get_token_count(corpus_item.document) + \
-                  get_token_count(corpus_item.context)
+    token_count = _get_token_count(corpus_item.document) + \
+                  _get_token_count(corpus_item.context)
     print(
         f"{TerminalColors.blue}"
         f"{corpus_item.id}"
@@ -116,9 +122,9 @@ if __name__ == "__main__":
             f"Processing file: {file} ..."
             f"{TerminalColors.reset}"
         )
-        corpus_items = load_file(file)
+        corpus_items = _load_file(file)
         analysis = [
-            analyse_corpus_item(item) 
+            _analyse_corpus_item(item) 
             for item in corpus_items
         ]
 

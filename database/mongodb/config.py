@@ -10,11 +10,12 @@ from common.utils import TerminalColors
 # --- Databases and Collections ---
 
 DATABASES: list[str] = ["application", "analytics",]
-COLLECTIONS: list[str] = ["users", "messages"]
+COLLECTIONS: list[str] = ["users", "messages", "corpus"]
 database_mappings: dict[str, str] = {
     # Application Database
     "users": "application",
     "messages": "application",
+    "corpus": "application",
 }
 
 # --- Connection Management ---

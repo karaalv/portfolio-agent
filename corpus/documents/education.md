@@ -9,13 +9,13 @@
     <id>education_masters</id>
     <header>Masters Degree Information</header>
     <context>
-        Master’s degree in Business Analytics at Imperial 
-        College London (Aug 2024–Aug 2025), covering machine 
+        Master's degree in Business Analytics at Imperial 
+        College London (Aug 2024 - Aug 2025), covering machine 
         learning, statistical modelling, data visualisation, 
         and industry applications.
     </context>
     <document>
-        I completed my Master’s degree at Imperial College 
+        I completed my Master's degree at Imperial College 
         London between August 2024 and August 2025, earning an 
         MSc in Business Analytics. I was awarded the Africa 
         Regional Scholarship in recognition of my academic 
@@ -46,13 +46,13 @@
     <id>education_undergraduate</id>
     <header>Undergraduate Degree Information</header>
     <context>
-        Bachelor’s degree in Computer Systems Engineering at 
-        the University of Warwick (Sep 2021–Jul 2024), combining 
+        Bachelor's degree in Computer Systems Engineering at 
+        the University of Warwick (Sep 2021 - Jul 2024), combining 
         computer science, electronic engineering, and hardware-
         software integration.
     </context>
     <document>
-        I completed my Bachelor’s degree in Computer Systems 
+        I completed my Bachelor's degree in Computer Systems 
         Engineering at the University of Warwick between 
         September 2021 and July 2024, graduating with Upper 
         Second-Class Honours. The degree combined computer 
