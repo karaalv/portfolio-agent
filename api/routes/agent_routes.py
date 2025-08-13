@@ -2,17 +2,39 @@
 This module contains agent routes for
 the Agent API.
 """
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
+from fastapi import WebSocket, WebSocketDisconnect
 from api.common.utils import api_exception_handler
 from api.common.responses import success_response, error_response
 from agent.main import chat
 from agent.memory.main import retrieve_memory, delete_memory
+from api.common.authentication import verify_frontend_token, verify_jwt
+from api.common.authentication import verify_frontend_token_ws, verify_jwt_ws
 
 # --- Constants --- 
 
 router = APIRouter()
 
 # --- Agent Routes ---
+
+@router.websocket(
+    "/ws/chat",
+    dependencies=[
+        Depends(verify_frontend_token_ws),
+        Depends(verify_jwt_ws)
+    ]
+)
+async def agent_chat_ws(ws: WebSocket):
+    """
+    WebSocket endpoint for agent chat.
+    """
+    await ws.accept()
+    try:
+        while True:
+            data = await ws.receive_json()
+            await ws.send_json(data)
+    except WebSocketDisconnect:
+        pass
 
 @router.post("/chat")
 @api_exception_handler("Agent chat")
@@ -42,7 +64,15 @@ async def agent_chat_api(request: Request):
         data=response
     )
 
-@router.get("/memory")
+# --- HTTP Based Routes ---
+
+@router.get(
+    "/memory",
+    dependencies=[
+        Depends(verify_frontend_token),
+        Depends(verify_jwt)
+    ]
+)
 @api_exception_handler("Get user memory")
 async def get_memory_api(request: Request):
     """
@@ -67,7 +97,13 @@ async def get_memory_api(request: Request):
         data=memory
     )
 
-@router.delete("/clear-memory")
+@router.delete(
+    "/clear-memory", 
+    dependencies=[
+        Depends(verify_frontend_token),
+        Depends(verify_jwt)
+    ]
+)
 @api_exception_handler("Delete user memory")
 async def delete_memory_api(request: Request):
     """

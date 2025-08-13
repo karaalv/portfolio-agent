@@ -140,13 +140,11 @@ app.include_router(
     ]
 )
 
+# HTTP and Websocket dependencies handled
+# on a per-route basis
 app.include_router(
     router=agent_routes.router,
     prefix="/agent",
-    dependencies=[
-        Depends(verify_frontend_token),
-        Depends(verify_jwt)
-    ]
 )
 
 # --- Run Server ---
