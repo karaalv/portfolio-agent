@@ -12,6 +12,7 @@ from rag.schemas import QueryPlan
 from common.utils import handle_exceptions_async, TerminalColors
 from database.mongodb.main import get_collection
 from openai_client.main import get_embedding, normal_response
+from api.common.socket_registry import send_message_ws
 
 # --- Constants ---
 
@@ -36,6 +37,7 @@ def _package_item(item: CorpusItem) -> str:
 
 @handle_exceptions_async("rag.query_executor: Retrieve Documents Sequential")
 async def retrieve_documents_sequential(
+    user_id: str,
     query_plan: QueryPlan,
     verbose: bool = False
 ) -> str:
@@ -98,8 +100,16 @@ async def retrieve_documents_sequential(
             continue
 
         items = [CorpusItem(**doc) for doc in docs]
+        headers = [item.header for item in items]
         items_str = "\n".join(
             item.model_dump_json(indent=2) for item in items
+        )
+
+        # Send headers to client
+        await send_message_ws(
+            user_id=user_id,
+            type="agent_thinking",
+            data=headers
         )
 
         item_results = [_package_item(item) for item in items]

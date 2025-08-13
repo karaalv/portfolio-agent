@@ -10,6 +10,8 @@ from agent.main import chat
 from agent.memory.main import retrieve_memory, delete_memory
 from api.common.authentication import verify_frontend_token, verify_jwt
 from api.common.authentication import verify_frontend_token_ws, verify_jwt_ws
+from api.common.socket_registry import add_connection_registry, delete_connection_registry
+from api.common.socket_registry import send_message_ws
 
 # --- Constants --- 
 
@@ -28,13 +30,37 @@ async def agent_chat_ws(ws: WebSocket):
     """
     WebSocket endpoint for agent chat.
     """
+    user_id = ws.cookies.get("UUID")
+    if not user_id:
+        return error_response(
+            "Missing user_id",
+            status_code=400
+        )
+    
+    # Start socket connection
     await ws.accept()
+    await add_connection_registry(user_id=user_id, ws=ws)
+    
     try:
         while True:
-            data = await ws.receive_json()
-            await ws.send_json(data)
+            data: dict = await ws.receive_json()
+            user_input = data.get("input")
+
+            if not user_input:
+                continue
+
+            response = await chat(
+                user_id=user_id,
+                input=user_input
+            )
+
+            await send_message_ws(
+                user_id=user_id,
+                type="agent_memory",
+                data=response
+            )
     except WebSocketDisconnect:
-        pass
+        await delete_connection_registry(user_id=user_id)
 
 @router.post("/chat")
 @api_exception_handler("Agent chat")

@@ -26,7 +26,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from database.mongodb.config import connect_mongo, close_mongo
 from api.common.responses import error_response
-from api.common.authentication import verify_frontend_token, verify_jwt
+from api.common.authentication import verify_frontend_token
 # Routes
 from api.routes import user_routes, agent_routes
 
@@ -163,6 +163,7 @@ if __name__ == "__main__":
             port=int(os.getenv("PORT", MAIN_PORT)),
             log_level="debug",
             reload=True,
+            workers=1
         )
     elif env == "production":
         uvicorn.run(
@@ -171,6 +172,7 @@ if __name__ == "__main__":
             port=int(os.getenv("PORT", MAIN_PORT)),
             log_level="debug",
             reload=False,
+            workers=1
         )
     elif env == "test":
         uvicorn.run(
@@ -178,6 +180,7 @@ if __name__ == "__main__":
             host="0.0.0.0",
             port=int(os.getenv("PORT", TEST_PORT)),
             reload=False,
+            workers=1
         )
     elif env == "staging":
         uvicorn.run(
@@ -186,6 +189,7 @@ if __name__ == "__main__":
             port=int(os.getenv("PORT", MAIN_PORT)),
             log_level="debug",
             reload=False,
+            workers=1
         )
     else:
         print(

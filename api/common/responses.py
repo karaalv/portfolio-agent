@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from api.common.schemas import APIResponse, MetaData
 from typing import Any, Optional 
 
-# --- Response Constructors ---
+# --- HTTP Response Constructors ---
 
 def success_response(
     message: str,
