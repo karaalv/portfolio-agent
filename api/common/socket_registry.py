@@ -3,7 +3,7 @@ This module contains the socket registry
 used in the server for managing WebSocket
 connections.
 """
-from typing import Any, Optional
+from typing import Any
 from fastapi import WebSocket
 from api.common.socket_manager import SocketManager
 
@@ -21,7 +21,6 @@ async def add_connection_registry(
     """
     manager = SocketManager(user_id=user_id, ws=ws)
     _active_connections[user_id] = manager
-    return manager
 
 async def delete_connection_registry(
     user_id: str
@@ -30,7 +29,7 @@ async def delete_connection_registry(
     Delete a WebSocket connection 
     from the registry.
     """
-    if user_id in _active_connections:
+    if user_id in _active_connections.keys():
         del _active_connections[user_id]
 
 async def get_connection_registry(
@@ -40,13 +39,10 @@ async def get_connection_registry(
     Retrieve a WebSocket connection 
     from the registry.
     """
-    if user_id not in _active_connections.keys():
-        raise ValueError(
-            f"No active connection for user_id: "
-            f"{user_id}"
-        )
-
-    return _active_connections.get(user_id, None)
+    if user_id in _active_connections.keys():
+        return _active_connections[user_id]
+    else:
+        return None
 
 # --- Communication ---
 

@@ -46,8 +46,11 @@ async def retrieve_documents_sequential(
     manner:
 
     Args:
+        user_id (str): The ID of the user making the 
+        request.
         query_plan (QueryPlan): The query plan to
         execute.
+        verbose (bool): Whether to print verbose output.
 
     Returns:
         str: The concatenated string of retrieved

@@ -42,11 +42,12 @@ async def mongo_session():
 
 async def test_retrieve_documents():
     """
-    Test parallel semantic document retrieval.
+    Test semantic document retrieval.
     """
     start = time.perf_counter()
     results = await retrieve_documents_sequential(
-        TEST_QUERY,
+        user_id="test_user",
+        query_plan=TEST_QUERY,
         verbose=True
     )
     end = time.perf_counter()

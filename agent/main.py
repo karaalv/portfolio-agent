@@ -14,10 +14,11 @@ from agent.memory.compressor import update_user_summarisation
 from agent.tools.tool_definitions import agent_tools
 # Tools
 from rag.main import fetch_context
+from agent.tools.main import generate_resume, generate_letter
 
 # --- Constants ---
 
-RECURSION_LIMIT = 3
+_RECURSION_LIMIT = 3
 _agent_model = "gpt-4.1-mini"
 
 # --- Resolvers ---
@@ -59,7 +60,22 @@ async def _execute_tool(
             user_input=tool_args['user_input'],
             verbose=verbose
         )
-    else: 
+
+    elif tool_name == "generate_resume":
+        # tool_result = await generate_resume(
+        #     user_id=user_id,
+        #     context_seed=tool_args['context_seed'],
+        #     verbose=verbose
+        # )
+        print(f"Context Seed: {tool_args['context_seed']}")
+    elif tool_name == "generate_letter":
+        # tool_result = await generate_letter(
+        #     user_id=user_id,
+        #     context_seed=tool_args['context_seed'],
+        #     verbose=verbose
+        # )
+        print(f"Context Seed: {tool_args['context_seed']}")
+    else:
         return """
             The tool requested was not recognized,
             try again and be more careful with the
@@ -159,7 +175,7 @@ async def chat(
     Returns:
         str: The agent's response message.
     """
-    if recursion_count >= RECURSION_LIMIT:
+    if recursion_count >= _RECURSION_LIMIT:
         return """
             Sorry I have reached my limit for processing 
             this request, please try again later.
@@ -192,7 +208,7 @@ async def chat(
     )
 
     if response.type == "message":
-        message = response.content[0].text.strip()  # type: ignore
+        message = response.content[0].text.strip() # type: ignore
         
         await push_memory(
             user_id=user_id,
@@ -216,6 +232,9 @@ async def chat(
             tool_args=tool_args,
             verbose=verbose
         )
+
+        if tool_name == "generate_resume" or tool_name == "generate_letter":
+            return f"Context Seed: {tool_args['context_seed']}"
 
         return await chat(
             user_id=user_id,
