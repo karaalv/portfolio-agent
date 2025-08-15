@@ -6,12 +6,16 @@ in the `main.py` file in the agent tool
 package.
 """
 import textwrap
+from typing import Any
 from common.utils import TerminalColors, Timer, get_timestamp
 from agent.tools.schemas import ResearchPlan
+from api.common.socket_manager import SocketManager
+from agent.memory.schemas import AgentMemory, AgentCanvas
 from openai_client.main import normal_response, structured_response
 from agent.tools.utils import researcher
 from rag.query_planner import query_planner
 from rag.query_executor import retrieve_documents_sequential, refine_context
+from api.common.socket_registry import get_connection_registry
 
 class LetterConstructor:
     """
@@ -45,8 +49,29 @@ class LetterConstructor:
         # Utils
         self.timer = Timer(start=False)
         self._passthrough_prompt = "Obey the system prompt"
+        # Socket connection
+        socket_connection = get_connection_registry(user_id)
+        if socket_connection is None:
+            raise ValueError(
+                "No active WebSocket connection found for user."
+            )
+        self.socket_manager: SocketManager = socket_connection
 
     # --- Utilities ---
+
+    async def _send_message_ws(
+        self,
+        type: str,
+        data: Any,
+        success: bool = True,
+        message: str = "Data sent successfully"
+    ):
+        await self.socket_manager.send_message(
+            type=type,
+            data=data,
+            success=success,
+            message=message
+        )
 
     async def _get_research_plan(self) -> ResearchPlan:
         """
@@ -167,6 +192,12 @@ class LetterConstructor:
         research_plan = await self._get_research_plan()
         queries: list[str] = research_plan.queries
 
+        if len(queries) > 0:
+            await self._send_message_ws(
+                type="agent_writing_phase",
+                data="Researching job description and requirements"
+            )
+
         if len(queries) > 3:
             queries = queries[:3]
 
@@ -198,6 +229,7 @@ class LetterConstructor:
         context = await retrieve_documents_sequential(
             user_id=self.user_id,
             query_plan=plan,
+            streaming_context="agent_writing_thinking",
             verbose=self.verbose
         )
         refined_context = await refine_context(
@@ -247,7 +279,21 @@ class LetterConstructor:
             model=self._response_model
         )
 
-        # TODO stream acknowledgement
+        agent_memory = AgentMemory(
+            id="streaming_id",
+            user_id=self.user_id,
+            source="agent",
+            content=response,
+            agent_canvas=AgentCanvas(
+                id="streaming_id",
+                content="\n\n"
+            )
+        )
+
+        await self._send_message_ws(
+            type="agent_memory",
+            data=agent_memory
+        )
 
         if self.verbose:
             print(
@@ -299,17 +345,42 @@ class LetterConstructor:
                 f"{response}"
             )
 
-        # TODO stream summary
+        agent_memory = AgentMemory(
+            id="streaming_id",
+            user_id=self.user_id,
+            source="agent",
+            content=response,
+            agent_canvas=AgentCanvas(
+                id="streaming_id",
+                content="\n\n"
+            )
+        )
+
+        # Clear document writing state
+        await self._send_message_ws(
+            type="agent_writing_phase",
+            data="<complete>"
+        )
+
+        await self._send_message_ws(
+            type="agent_memory",
+            data=agent_memory
+        )
 
         self.summary = response
 
     # --- Letter Sections ---
 
-    def _header_section(self):
+    async def _header_section(self):
         """
         Constructs the header section 
         of the cover letter.
         """
+        await self._send_message_ws(
+            type="agent_writing_phase",
+            data="Writing header section..."
+        )
+
         header = "---\n\n"
         header += "<div align='center'><h2>Alvin Karanja</h2></div>\n\n"
         header += "<br>London, United Kingdom\n\n"
@@ -332,6 +403,11 @@ class LetterConstructor:
         Constructs the address section of 
         the resume.
         """
+        await self._send_message_ws(
+            type="agent_writing_phase",
+            data="Writing letter address..."
+        )
+
         formatter_prompt = textwrap.dedent(f"""
             You are part of a cover letter generation tool, 
             and your task is to refine the address section of 
@@ -390,6 +466,11 @@ class LetterConstructor:
         """
         Constructs opening paragraph.
         """
+        await self._send_message_ws(
+            type="agent_writing_phase",
+            data="Writing opening paragraph..."
+        )
+
         input_refiner_prompt = textwrap.dedent(f"""
             You are part of a cover letter generation tool, tasked
             with creating a single, precise query to retrieve
@@ -488,6 +569,11 @@ class LetterConstructor:
         """
         Writes body section of cover letter.
         """
+        await self._send_message_ws(
+            type="agent_writing_phase",
+            data="Developing main body section..."
+        )
+
         input_refiner_prompt = textwrap.dedent(f"""
             You are part of a cover letter generation tool.
             Your task is to create a single, precise query to
@@ -598,6 +684,11 @@ class LetterConstructor:
         Write closing section of the cover
         letter.
         """
+        await self._send_message_ws(
+            type="agent_writing_phase",
+            data="Writing closing statement..."
+        )
+
         input_refiner_prompt = textwrap.dedent(f"""
             You are part of a cover letter generation tool.
             Your task is to create a single, precise query
@@ -701,11 +792,16 @@ class LetterConstructor:
 
         self.letter += closing_section
 
-    def _signature(self):
+    async def _signature(self):
         """
         Write signature section of
         the cover letter.
         """
+        await self._send_message_ws(
+            type="agent_writing_phase",
+            data="Signing off letter..."
+        )
+
         signature = "\n\n<br>\n\n"
         signature += "Kind regards,\n\n"
         signature += "Alvin Karanja (AI)"
@@ -734,7 +830,7 @@ class LetterConstructor:
         research_time = self.timer.elapsed()
 
         # Build cover letter
-        self._header_section()
+        await self._header_section()
         header_time = self.timer.elapsed()
 
         await self._address_section()
@@ -749,7 +845,7 @@ class LetterConstructor:
         await self._closing_section()
         closing_time = self.timer.elapsed()
 
-        self._signature()
+        await self._signature()
         signature_time = self.timer.elapsed()
 
         await self._summarise_request()

@@ -32,7 +32,7 @@ async def delete_connection_registry(
     if user_id in _active_connections.keys():
         del _active_connections[user_id]
 
-async def get_connection_registry(
+def get_connection_registry(
     user_id: str
 ) -> SocketManager | None:
     """
@@ -53,7 +53,7 @@ async def send_message_ws(
     success: bool = True,
     message: str = "Data sent successfully"
 ):
-    connection = await get_connection_registry(user_id)
+    connection = get_connection_registry(user_id)
     if connection:
         await connection.send_message(
             type=type,

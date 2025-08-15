@@ -48,6 +48,7 @@ async def test_retrieve_documents():
     results = await retrieve_documents_sequential(
         user_id="test_user",
         query_plan=TEST_QUERY,
+        streaming_context="agent_thinking",
         verbose=True
     )
     end = time.perf_counter()

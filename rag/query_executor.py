@@ -39,6 +39,7 @@ def _package_item(item: CorpusItem) -> str:
 async def retrieve_documents_sequential(
     user_id: str,
     query_plan: QueryPlan,
+    streaming_context: str,
     verbose: bool = False
 ) -> str:
     """
@@ -114,7 +115,7 @@ async def retrieve_documents_sequential(
         # Send headers to client
         await send_message_ws(
             user_id=user_id,
-            type="agent_thinking",
+            type=streaming_context,
             data=headers
         )
 

@@ -42,6 +42,7 @@ async def fetch_context(
     retrieval_results = await retrieve_documents_sequential(
         user_id=user_id,
         query_plan=query_plan,
+        streaming_context="agent_thinking",
         verbose=verbose
     )
     retrieval_time = timer.elapsed()

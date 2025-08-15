@@ -7,7 +7,7 @@ This repository contains my portfolio agent, which is a RAG (Retrieval-Augmented
 
 The agent can also email these documents to you.
 
-To interact with the agent, you can check it out on my website [link](https://www.alvinkaranja.dev/chat)
+To interact with the agent, you can check it out on my website [alvinkaranja.dev/chat](https://www.alvinkaranja.dev/chat)
 
 <!-- For a detailed explanation of how the agent works, you can refer to my blog post [link](https://www.alvinkaranja.dev/blog/portfolio-agent). -->
 

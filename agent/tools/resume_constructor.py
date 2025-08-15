@@ -5,12 +5,16 @@ interface function can be found in the
 `main.py` file in the agent tools package.
 """
 import textwrap
+from typing import Any
 from common.utils import TerminalColors, Timer
 from agent.tools.schemas import ResearchPlan
+from api.common.socket_manager import SocketManager
+from agent.memory.schemas import AgentMemory, AgentCanvas
 from openai_client.main import normal_response, structured_response
 from agent.tools.utils import researcher
 from rag.query_planner import query_planner
 from rag.query_executor import retrieve_documents_sequential, refine_context
+from api.common.socket_registry import get_connection_registry
 
 class ResumeConstructor:
     """
@@ -44,8 +48,29 @@ class ResumeConstructor:
         # Utils
         self.timer = Timer(start=False)
         self._passthrough_prompt = "Obey the system prompt"
+        # Socket connection
+        socket_connection = get_connection_registry(user_id)
+        if socket_connection is None:
+            raise ValueError(
+                "No active WebSocket connection found for user."
+            )
+        self.socket_manager: SocketManager = socket_connection
 
     # --- Utilities ---
+
+    async def _send_message_ws(
+        self,
+        type: str,
+        data: Any,
+        success: bool = True,
+        message: str = "Data sent successfully"
+    ):
+        await self.socket_manager.send_message(
+            type=type,
+            data=data,
+            success=success,
+            message=message
+        )
 
     async def _get_research_plan(self) -> ResearchPlan:
         """
@@ -111,34 +136,7 @@ class ResumeConstructor:
             )
 
         return research_plan
-
-    async def _perform_research(self):
-        """
-        Performs research based on the
-        research plan, research is added
-        to class instance.
-        """
-        research_plan = await self._get_research_plan()
-        queries: list[str] = research_plan.queries
-
-        if len(queries) > 3:
-            queries = queries[:3]
-
-        for plan in queries:
-            research = await researcher(plan)
-            
-            if self.verbose:
-                print(
-                    f"{TerminalColors.cyan}"
-                    f"Research Results for '{plan}':\n"
-                    f"{TerminalColors.reset}"
-                    f"{research}\n"
-                )
-            
-            self.research += research
-
-        await self._refine_research()
-
+    
     async def _refine_research(self):
         """
         Refines the research conducted by the
@@ -184,6 +182,39 @@ class ResumeConstructor:
 
         self.research = refined_research
 
+    async def _perform_research(self):
+        """
+        Performs research based on the
+        research plan, research is added
+        to class instance.
+        """
+        research_plan = await self._get_research_plan()
+        queries: list[str] = research_plan.queries
+
+        if len(queries) > 0:
+            await self._send_message_ws(
+                type="agent_writing_phase",
+                data="Researching job description and requirements"
+            )
+
+        if len(queries) > 3:
+            queries = queries[:3]
+
+        for plan in queries:
+            research = await researcher(plan)
+            
+            if self.verbose:
+                print(
+                    f"{TerminalColors.cyan}"
+                    f"Research Results for '{plan}':\n"
+                    f"{TerminalColors.reset}"
+                    f"{research}\n"
+                )
+            
+            self.research += research
+
+        await self._refine_research()
+
     async def _fetch_context(
         self, 
         section_query: str
@@ -197,6 +228,7 @@ class ResumeConstructor:
         context = await retrieve_documents_sequential(
             user_id=self.user_id,
             query_plan=plan,
+            streaming_context="agent_writing_thinking",
             verbose=self.verbose
         )
         refined_context = await refine_context(
@@ -246,7 +278,21 @@ class ResumeConstructor:
             model=self._response_model
         )
 
-        # TODO stream acknowledgement
+        agent_memory = AgentMemory(
+            id="streaming_id",
+            user_id=self.user_id,
+            source="agent",
+            content=response,
+            agent_canvas=AgentCanvas(
+                id="streaming_id",
+                content="\n\n"
+            )
+        )
+
+        await self._send_message_ws(
+            type="agent_memory",
+            data=agent_memory
+        )
 
         if self.verbose:
             print(
@@ -300,17 +346,42 @@ class ResumeConstructor:
                 f"{response}"
             )
 
-        # TODO stream summary
+        agent_memory = AgentMemory(
+            id="streaming_id",
+            user_id=self.user_id,
+            source="agent",
+            content=response,
+            agent_canvas=AgentCanvas(
+                id="streaming_id",
+                content="\n\n"
+            )
+        )
+
+        # Clear document writing state
+        await self._send_message_ws(
+            type="agent_writing_phase",
+            data="<complete>"
+        )
+
+        await self._send_message_ws(
+            type="agent_memory",
+            data=agent_memory
+        )
 
         self.summary = response
 
     # --- Resume Sections ---
 
-    def _header_section(self):
+    async def _header_section(self):
         """
         Constructs the header section of the 
         resume.
         """
+        await self._send_message_ws(
+            type="agent_writing_phase",
+            data="Writing header section..."
+        )
+
         header = "<div align='center'><h2>Alvin Karanja</h2></div>\n\n"
         header += "**Email:** alviinkaranjja@gmail.com - "
         header += "**LinkedIn:** /in/alvin-n-karanja - "
@@ -333,6 +404,11 @@ class ResumeConstructor:
         Constructs the skills section of the 
         resume.
         """
+        await self._send_message_ws(
+            type="agent_writing_phase",
+            data="Writing skills..."
+        )
+
         # Input Refinement
         input_refiner_prompt = textwrap.dedent(f"""
             You are part of a resume generation tool, responsible
@@ -432,6 +508,11 @@ class ResumeConstructor:
         Constructs the experience section of the
         resume.
         """
+        await self._send_message_ws(
+            type="agent_writing_phase",
+            data="Writing relevant experience..."
+        )
+
         # Input Refinement
         input_refiner_prompt = textwrap.dedent(f"""
             You are part of a resume generation tool, responsible
@@ -545,6 +626,11 @@ class ResumeConstructor:
         Constructs the projects section of the
         resume.
         """
+        await self._send_message_ws(
+            type="agent_writing_phase",
+            data="Citing notable projects..."
+        )
+        
         # Input Refinement
         input_refiner_prompt = textwrap.dedent(f"""
             You are part of a resume generation tool, responsible
@@ -654,6 +740,10 @@ class ResumeConstructor:
         Constructs the education section of the
         resume.
         """
+        await self._send_message_ws(
+            type="agent_writing_phase",
+            data="Writing education section..."
+        )
         # Input Refinement
         input_refiner_prompt = textwrap.dedent(f"""
             You are part of a resume generation tool, responsible
@@ -780,7 +870,7 @@ class ResumeConstructor:
         research_time = self.timer.elapsed()
 
         # Build resume
-        self._header_section()
+        await self._header_section()
         header_time = self.timer.elapsed()
         
         await self._skills_section()
