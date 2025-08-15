@@ -7,7 +7,8 @@ from openai_client.main import (
     get_embedding, 
     normal_response, 
     structured_response, 
-    agent_response
+    agent_response,
+    agent_search
 )
 from openai.types.responses import ToolParam
 
@@ -77,7 +78,8 @@ async def test_agent_response():
         tools=tools
     )
 
-    assert response.type == "message", "Response type should be 'message'."
+    assert response.type == "message", \
+        "Response type should be 'message'."
     assert response.content[0].text is not None, "Response content should not be None." # type: ignore
 
     # Test function call response
@@ -87,5 +89,20 @@ async def test_agent_response():
         tools=tools
     )
 
-    assert response.type == "function_call", "Response type should be 'function_call'."
-    assert response.name == "get_weather", "Function name should be 'get_weather'."
+    assert response.type == "function_call", \
+        "Response type should be 'function_call'."
+    assert response.name == "get_weather", \
+        "Function name should be 'get_weather'."
+
+async def test_agent_search():
+    """
+    Tests the OpenAI agent search functionality.
+    """
+    query = "This is a test query, return a short response."
+    
+    response = await agent_search(
+        search_query=query
+    )
+
+    assert response is not None, \
+        "Search response should not be None."

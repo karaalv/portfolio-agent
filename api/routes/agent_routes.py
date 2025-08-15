@@ -62,34 +62,6 @@ async def agent_chat_ws(ws: WebSocket):
     except WebSocketDisconnect:
         await delete_connection_registry(user_id=user_id)
 
-@router.post("/chat")
-@api_exception_handler("Agent chat")
-async def agent_chat_api(request: Request):
-    """
-    Handles chat requests to the agent.
-    """
-    data = await request.json()
-    cookies = request.cookies
-
-    user_id = cookies.get("UUID")
-    user_input = data.get("input")
-
-    if not user_id or not user_input:
-        return error_response(
-            "Missing user_id or input",
-            status_code=400
-        )
-
-    response = await chat(
-        user_id=user_id,
-        input=user_input
-    )
-
-    return success_response(
-        message="Successfully retrieved chat response",
-        data=response
-    )
-
 # --- HTTP Based Routes ---
 
 @router.get(

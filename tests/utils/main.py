@@ -98,7 +98,7 @@ async def server_fetch(
     # Set Header
     header = {
         "Content-Type": "application/json",
-        "Frontend-Token": create_frontend_token(),
+        "frontend-token": create_frontend_token(),
     }
     if user_id and jwt:
         header["Cookie"] = f"JWT={jwt};UUID={user_id}"
