@@ -5,7 +5,7 @@ interface function can be found in the
 `main.py` file in the agent tools package.
 """
 import textwrap
-from common.utils import TerminalColors
+from common.utils import TerminalColors, Timer
 from agent.tools.schemas import ResearchPlan
 from openai_client.main import normal_response, structured_response
 from agent.tools.utils import researcher
@@ -27,14 +27,22 @@ class ResumeConstructor:
         context_seed: str,
         verbose: bool
     ):
+        # Input
         self.user_id = user_id
         self.context_seed = context_seed
         self.verbose = verbose
+        # Models
         self._planner_model = "gpt-4.1"
-        self._refiner_model = "gpt-4.1-mini"
-        self._formatter_model = "gpt-4.1-mini"
+        self._refiner_model = "gpt-4.1-nano"
+        self._formatter_model = "gpt-4.1-nano"
+        self._response_model = "gpt-4.1-nano"
+        # Content
         self.research = ""
         self.resume = ""
+        self.acknowledgment = ""
+        self.summary = ""
+        # Utils
+        self.timer = Timer(start=False)
 
     # --- Utilities ---
 
@@ -107,8 +115,12 @@ class ResumeConstructor:
         to class instance.
         """
         research_plan = await self._get_research_plan()
+        queries: list[str] = research_plan.queries
 
-        for plan in research_plan.queries:
+        if len(queries) > 3:
+            queries = queries[:3]
+
+        for plan in queries:
             research = await researcher(plan)
             
             if self.verbose:
@@ -195,6 +207,81 @@ class ResumeConstructor:
 
         return refined_context
     
+    async def _acknowledge_request(self):
+        """
+        Acknowledges the user's request and provides
+        a brief summary of the information being used
+        to create a resume.
+        """
+        acknowledgment_prompt = textwrap.dedent(f"""
+            You are an acknowledgment model in a resume generation 
+            pipeline for my personal portfolio website.
+
+            Your task is to confirm to the user that their resume 
+            request is being processed using the provided context. 
+            Give a brief, clear confirmation summarizing what the 
+            user requested—no extra details or unrelated content.
+
+            Context for request:
+            {self.context_seed}
+        """)
+
+        response = await normal_response(
+            system_prompt=acknowledgment_prompt,
+            user_input=self.context_seed,
+            model=self._response_model
+        )
+
+        # TODO stream acknowledgement
+
+        if self.verbose:
+            print(
+                f"{TerminalColors.magenta}"
+                f"Acknowledgment:\n"
+                f"{TerminalColors.reset}"
+                f"{response}"
+            )
+
+        self.acknowledgment = response
+
+    async def _summarise_request(self):
+        """
+        Summarises the resume creation process.
+        """
+        summary_prompt = textwrap.dedent(f"""
+            You are part of a resume generation tool. 
+            Your task is to read the generated resume 
+            and produce a very brief summary of its 
+            contents.
+
+            Rules:
+            - Base the summary only on what is written 
+            in the resume.
+            - Keep it concise (1-3 sentences max).
+            - Do not add new information or commentary.
+
+            Current resume:
+            {self.resume}
+        """)
+
+        response = await normal_response(
+            system_prompt=summary_prompt,
+            user_input=self.resume,
+            model=self._response_model
+        )
+
+        if self.verbose:
+            print(
+                f"{TerminalColors.cyan}"
+                f"Summary:\n"
+                f"{TerminalColors.reset}"
+                f"{response}"
+            )
+
+        # TODO stream summary
+
+        self.summary = response
+
     # --- Resume Sections ---
 
     def _header_section(self):
@@ -202,7 +289,7 @@ class ResumeConstructor:
         Constructs the header section of the 
         resume.
         """
-        header = "## Alvin Karanja\n <br>"
+        header = "## Alvin Karanja\n"
         header += "**Email:** alviinkaranjja@gmail.com - "
         header += "**LinkedIn:** [Alvin Karanja](https://www.linkedin.com/in/alvin-n-karanja/) - "
         header += "**GitHub:** [karaalv](https://github.com/karaalv) - "
@@ -278,7 +365,7 @@ class ResumeConstructor:
             produce a succinct, well-organized skills list
             tailored to the target role and company.
 
-            Current resume context:
+            This is the current resume for context:
             {self.resume}
 
             Output format rules:
@@ -377,7 +464,7 @@ class ResumeConstructor:
             produce a concise, well-structured experience list
             tailored to the target role and company.
 
-            Current resume context:
+            This is the current resume for context:
             {self.resume}
 
             Output format rules:
@@ -403,6 +490,8 @@ class ResumeConstructor:
                 improvements, timelines, etc.).
             - Highlighting standout or unique
                 contributions.
+            - For each experience list a maximum of 3
+            bullet points.
 
             Context for resume creation:
             - Research findings: {self.research}
@@ -488,7 +577,7 @@ class ResumeConstructor:
             produce a concise, well-structured project list
             tailored to the target role and company.
 
-            Current projects context:
+            This is the current resume for context:
             {projects_context}
 
             Output format rules:
@@ -510,6 +599,8 @@ class ResumeConstructor:
             - Exclude unrelated work experience.
             - Exclude irrelevant coursework unless it
                 directly supports the role.
+            - For each project list a maximum of 3 bullet 
+            points.
 
             Context for resume creation:
             - Research findings: {self.research}
@@ -595,7 +686,7 @@ class ResumeConstructor:
             produce a concise, well-structured education list
             tailored to the target role and company.
 
-            Current education context:
+            This is the current resume for context:
             {education_context}
 
             Output format rules:
@@ -621,6 +712,9 @@ class ResumeConstructor:
             6. Keep only content relevant to the job
             description and company values. Remove
             unrelated or generic entries.
+            7. Do not make additional comments or
+            remarks, only present the formatted 
+            education section.
 
             Context for resume creation:
             - Research findings: {self.research}
@@ -647,7 +741,7 @@ class ResumeConstructor:
 
         self.resume += education_section
 
-    async def construct_resume(self) -> str:
+    async def construct_resume(self) -> dict[str, str]:
         """
         Construct the resume doing each
         section sequentially, intermediary
@@ -655,13 +749,48 @@ class ResumeConstructor:
         resume is returned.
         """
         # Research phase
+        self.timer.start()
+
+        await self._acknowledge_request()
+        acknowledgment_time = self.timer.elapsed()
+
         await self._perform_research()
+        research_time = self.timer.elapsed()
 
         # Build resume
         self._header_section()
+        header_time = self.timer.elapsed()
+        
         await self._skills_section()
-        await self._experience_section()
-        await self._projects_section()
-        await self._education_section()
+        skills_time = self.timer.elapsed()
 
-        return self.resume.strip()
+        await self._experience_section()
+        experience_time = self.timer.elapsed()
+
+        await self._projects_section()
+        projects_time = self.timer.elapsed()
+
+        await self._education_section()
+        education_time = self.timer.elapsed()
+
+        await self._summarise_request()
+        summary_time = self.timer.elapsed()
+
+        total_time = self.timer.stop()
+
+        if self.verbose:
+            print("\n--- Resume generation Time ---\n")
+            print(f"Acknowledgment Time: {acknowledgment_time:.2f} seconds")
+            print(f"Research Time: {research_time:.2f} seconds")
+            print(f"Header Time: {header_time:.2f} seconds")
+            print(f"Skills Time: {skills_time:.2f} seconds")
+            print(f"Experience Time: {experience_time:.2f} seconds")
+            print(f"Projects Time: {projects_time:.2f} seconds")
+            print(f"Education Time: {education_time:.2f} seconds")
+            print(f"Summary Time: {summary_time:.2f} seconds")
+            print(f"Total Time: {total_time:.2f} seconds")
+
+        return {
+            "resume": self.resume.strip(),
+            "response": self.acknowledgment.strip() + self.summary.strip()
+        }

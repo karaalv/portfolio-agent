@@ -61,6 +61,9 @@ async def retrieve_documents_sequential(
     collection = get_collection("corpus")
     queries = query_plan.queries
 
+    if len(queries) > 3:
+        queries = queries[:3]
+
     results: list[str] = []
     for query in queries:
         pipeline = [

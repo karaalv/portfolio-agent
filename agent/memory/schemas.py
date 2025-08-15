@@ -16,18 +16,9 @@ class AgentCanvas(BaseModel):
         description="The unique identifier for "
                     "the agent's canvas"
     )
-    user_id: str = Field(
-        ...,
-        description="The unique identifier for "
-                    "the user associated with the canvas"
-    )
     content: Optional[str] = Field(
         default=None,
         description="The content of the canvas, if any"
-    )
-    created_at: str = Field(
-        default_factory=get_timestamp,
-        description="The timestamp when the canvas was created"
     )
 
 class AgentMemory(BaseModel):

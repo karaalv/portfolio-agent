@@ -12,6 +12,6 @@ class QueryPlan(BaseModel):
     queries: list[str] = Field(
         ...,
         description="A list of queries to be executed "
-                    "as part of the plan, max 5",
-        max_length=5,
+                    "as part of the plan, max 3",
+        max_length=3,
     )

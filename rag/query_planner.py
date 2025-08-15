@@ -111,8 +111,7 @@ async def query_planner(
         ambiguous.
         - Sub-queries must be succinct and use wording that is
         more likely to get a strong semantic match.
-        - Limit to a maximum of 5 sub-queries, unless the query
-        is complicated use 2.
+        - Limit to a maximum of 3 sub-queries.
         - Base all queries strictly on provided input and
         context — never invent facts.
 

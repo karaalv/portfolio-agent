@@ -9,7 +9,7 @@ import asyncio
 from typing import Optional, Any
 from common.utils import TerminalColors, handle_exceptions_async
 from openai_client.main import agent_response
-from agent.memory.main import push_memory, retrieve_memory
+from agent.memory.main import push_memory, push_canvas_memory, retrieve_memory
 from agent.memory.compressor import update_user_summarisation
 from agent.tools.tool_definitions import agent_tools
 # Tools
@@ -62,12 +62,23 @@ async def _execute_tool(
         )
 
     elif tool_name == "generate_resume":
-        # tool_result = await generate_resume(
-        #     user_id=user_id,
-        #     context_seed=tool_args['context_seed'],
-        #     verbose=verbose
-        # )
-        print(f"Context Seed: {tool_args['context_seed']}")
+        tool_result = await generate_resume(
+            user_id=user_id,
+            context_seed=tool_args['context_seed'],
+            verbose=verbose
+        )
+
+        # Push results to memory
+        # DO NOT WAIT
+        asyncio.create_task(
+            push_canvas_memory(
+                user_id=user_id,
+                agent_response=tool_result['response'],
+                canvas_content=tool_args['resume']
+            )
+        )
+
+        return ""
     elif tool_name == "generate_letter":
         # tool_result = await generate_letter(
         #     user_id=user_id,
@@ -85,7 +96,7 @@ async def _execute_tool(
     if verbose:
         print(
             f"{TerminalColors.blue}"
-            f"Tool result for {tool_name}: \n"
+            f"\n--- Tool result for {tool_name}---\n"
             f"{TerminalColors.reset}"
             f"{tool_result.strip()}"
         )
@@ -233,8 +244,11 @@ async def chat(
             verbose=verbose
         )
 
-        if tool_name == "generate_resume" or tool_name == "generate_letter":
-            return f"Context Seed: {tool_args['context_seed']}"
+        if (
+            tool_name == "generate_resume" or 
+            tool_name == "generate_letter"
+        ):
+            return ""
 
         return await chat(
             user_id=user_id,

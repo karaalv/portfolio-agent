@@ -15,7 +15,7 @@ async def push_memory(
     user_id: str,
     source: str,
     content: str
-) -> None:
+):
     """
     Pushes agent memory to the database, note this
     is explicitly for instances without canvas 
@@ -38,6 +38,41 @@ async def push_memory(
     collection = get_collection("messages")
     await collection.insert_one(memory.model_dump())
     
+    return None
+
+@handle_exceptions_async("agent.memory: Pushing Canvas Memory")
+async def push_canvas_memory(
+    user_id: str,
+    agent_response: str,
+    canvas_content: str
+):
+    """
+    Pushes canvas memory to the database.
+
+    Args:
+        user_id: The unique identifier for the user
+        agent_memory: The agent memory content
+        canvas_content: The canvas content
+    """
+
+    # Package canvas memory
+    canvas_memory = AgentCanvas(
+        id=f"{user_id}_canvas_{get_timestamp()}",
+        content=canvas_content
+    )
+
+    # Package agent memory
+    agent_memory = AgentMemory(
+        id=f"{user_id}_agent_{get_timestamp()}",
+        user_id=user_id,
+        source="agent",
+        content=agent_response,
+        agent_canvas=canvas_memory
+    )
+
+    collection = get_collection("messages")
+    await collection.insert_one(agent_memory.model_dump())
+
     return None
 
 # --- Retrieval ---

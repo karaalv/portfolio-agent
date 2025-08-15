@@ -122,8 +122,9 @@ class Timer:
             self.stop_time = self.start_time
             self.prev_time = self.start_time
 
-    def start(self) -> None:
+    def start(self):
         self.start_time = time.perf_counter()
+        self.prev_time = self.start_time
 
     def stop(self) -> float:
         self.stop_time = time.perf_counter()

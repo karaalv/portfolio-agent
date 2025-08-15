@@ -66,6 +66,12 @@ agent_tools: list[ToolParam] = [
             system to gather additional supporting information
             before generation, so it must be complete, specific,
             and strictly limited to job-related details.
+                                       
+            Do not include any personal information,
+            details from conversation history, or
+            unrelated content in the `context_seed`.
+            It should only contain information about the
+            job posting and target role.
         """),
         "strict": True,
         "parameters": {
@@ -82,12 +88,6 @@ agent_tools: list[ToolParam] = [
                         included here if provided).
                         - The company name and any other details
                         useful for tailoring the resume.
-
-                        Do not include any personal information,
-                        details from conversation history, or
-                        unrelated content in the `context_seed`.
-                        It should only contain information about the
-                        job posting and target role.
 
                         Only invoke this tool when sufficient
                         job-related context is available to produce

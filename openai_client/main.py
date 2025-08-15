@@ -142,3 +142,18 @@ async def agent_response(
         )
     
     return response.output[0]
+
+@handle_exceptions_async("OpenAI: Web Search")
+async def agent_search(
+    search_query: str,
+    model: str = "gpt-4.1-nano"
+) -> str:
+    """
+    Performs a web search using the specified model.
+    """
+    response = await client.responses.create(
+        model=model,
+        tools=[{"type": "web_search_preview"}],
+        input=search_query
+    )
+    return response.output_text
