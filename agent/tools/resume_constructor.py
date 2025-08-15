@@ -43,6 +43,7 @@ class ResumeConstructor:
         self.summary = ""
         # Utils
         self.timer = Timer(start=False)
+        self._passthrough_prompt = "Obey the system prompt"
 
     # --- Utilities ---
 
@@ -89,11 +90,14 @@ class ResumeConstructor:
 
             Your output should be a clear, actionable list
             ready for execution by the research agent.
+
+            The context is as follows:
+            {self.context_seed}
         """)
 
         research_plan = await structured_response(
             system_prompt=system_prompt,
-            user_input=self.context_seed,
+            user_input=self._passthrough_prompt,
             response_format=ResearchPlan,
             model=self._planner_model
         )
@@ -159,11 +163,14 @@ class ResumeConstructor:
 
             Ensure your summary is clear, actionable, and
             free of irrelevant details.
+
+            The context is as follows:
+            {self.context_seed}
         """)
 
         refined_research = await normal_response(
             system_prompt=system_prompt,
-            user_input=self.research,
+            user_input=self._passthrough_prompt,
             model=self._refiner_model
         )
 
@@ -222,13 +229,20 @@ class ResumeConstructor:
             Give a brief, clear confirmation summarizing what the 
             user requested—no extra details or unrelated content.
 
+            Note: You are addressing a visitor on my website,
+            so respond in a friendly, professional style such as:
+
+            "Your request to create a resume for <role> at <company> 
+            has been received. I'm now preparing it based on the 
+            details provided."
+
             Context for request:
             {self.context_seed}
         """)
 
         response = await normal_response(
             system_prompt=acknowledgment_prompt,
-            user_input=self.context_seed,
+            user_input=self._passthrough_prompt,
             model=self._response_model
         )
 
@@ -259,14 +273,22 @@ class ResumeConstructor:
             in the resume.
             - Keep it concise (1-3 sentences max).
             - Do not add new information or commentary.
+            - Address the visitor directly in a friendly, 
+            professional tone.
 
-            Current resume:
+            Example:
+            "Here's a quick overview of the resume created 
+            for <role> at <company>, highlighting key 
+            skills, experience, and achievements relevant 
+            to the position."
+
+            The generated resume is as follows:
             {self.resume}
         """)
 
         response = await normal_response(
             system_prompt=summary_prompt,
-            user_input=self.resume,
+            user_input=self._passthrough_prompt,
             model=self._response_model
         )
 
@@ -289,12 +311,12 @@ class ResumeConstructor:
         Constructs the header section of the 
         resume.
         """
-        header = "## Alvin Karanja\n"
+        header = "<div align='center'><h2>Alvin Karanja</h2></div>\n\n"
         header += "**Email:** alviinkaranjja@gmail.com - "
-        header += "**LinkedIn:** [Alvin Karanja](https://www.linkedin.com/in/alvin-n-karanja/) - "
-        header += "**GitHub:** [karaalv](https://github.com/karaalv) - "
-        header += "**Portfolio:** [alvinkaranja.dev](https://alvinkaranja.dev)"
-        header += "\n"
+        header += "**LinkedIn:** /in/alvin-n-karanja - "
+        header += "**GitHub:** github.com/karaalv - "
+        header += "**Portfolio:** alvinkaranja.dev"
+        header += "\n\n"
 
         if self.verbose:
             print(
@@ -341,7 +363,7 @@ class ResumeConstructor:
 
         skills_query = await normal_response(
             system_prompt=input_refiner_prompt,
-            user_input=self.context_seed,
+            user_input=self._passthrough_prompt,
             model=self._refiner_model
         )
 
@@ -369,7 +391,7 @@ class ResumeConstructor:
             {self.resume}
 
             Output format rules:
-            1. Use markdown.
+            1. Use markdown
             2. Group related skills on the same line, separated
             by commas.
             3. Start each line with a bold skill category name,
@@ -388,12 +410,12 @@ class ResumeConstructor:
 
         formatted_skills = await normal_response(
             system_prompt=formatter_prompt,
-            user_input=skills_context,
+            user_input=self._passthrough_prompt,
             model=self._formatter_model
         )
 
-        title = "### Skills\n---"
-        skills_section = f"{title}\n{formatted_skills}\n"
+        title = "\n\n### Skills\n\n---"
+        skills_section = f"{title}\n\n{formatted_skills}\n\n"
 
         if self.verbose:
             print(
@@ -440,7 +462,7 @@ class ResumeConstructor:
 
         experience_query = await normal_response(
             system_prompt=input_refiner_prompt,
-            user_input=self.context_seed,
+            user_input=self._passthrough_prompt,
             model=self._refiner_model
         )
 
@@ -501,12 +523,12 @@ class ResumeConstructor:
 
         formatted_experience = await normal_response(
             system_prompt=formatter_prompt,
-            user_input=experience_context,
+            user_input=self._passthrough_prompt,
             model=self._formatter_model
         )
 
-        title = "### Experience\n---"
-        experience_section = f"{title}\n{formatted_experience}\n"
+        title = "\n\n### Experience\n\n---"
+        experience_section = f"{title}\n\n{formatted_experience}\n\n"
         
         if self.verbose:
             print(
@@ -553,7 +575,7 @@ class ResumeConstructor:
 
         projects_query = await normal_response(
             system_prompt=input_refiner_prompt,
-            user_input=self.context_seed,
+            user_input=self._passthrough_prompt,
             model=self._refiner_model
         )
 
@@ -610,12 +632,12 @@ class ResumeConstructor:
 
         formatted_projects = await normal_response(
             system_prompt=formatter_prompt,
-            user_input=projects_context,
+            user_input=self._passthrough_prompt,
             model=self._formatter_model
         )
 
-        title = "### Projects\n---"
-        projects_section = f"{title}\n{formatted_projects}\n"
+        title = "\n\n### Projects\n\n---"
+        projects_section = f"{title}\n\n{formatted_projects}\n"
 
         if self.verbose:
             print(
@@ -662,7 +684,7 @@ class ResumeConstructor:
 
         education_query = await normal_response(
             system_prompt=input_refiner_prompt,
-            user_input=self.context_seed,
+            user_input=self._passthrough_prompt,
             model=self._refiner_model
         )
 
@@ -724,12 +746,12 @@ class ResumeConstructor:
 
         formatted_education = await normal_response(
             system_prompt=formatter_prompt,
-            user_input=education_context,
+            user_input=self._passthrough_prompt,
             model=self._formatter_model
         )
 
-        title = "### Education\n---"
-        education_section = f"{title}\n{formatted_education}\n"
+        title = "\n\n### Education\n\n---"
+        education_section = f"{title}\n\n{formatted_education}\n"
 
         if self.verbose:
             print(

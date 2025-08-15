@@ -67,25 +67,34 @@ async def _execute_tool(
             context_seed=tool_args['context_seed'],
             verbose=verbose
         )
-
         # Push results to memory
         # DO NOT WAIT
         asyncio.create_task(
             push_canvas_memory(
                 user_id=user_id,
                 agent_response=tool_result['response'],
-                canvas_content=tool_args['resume']
+                canvas_content=tool_result['resume']
             )
         )
 
         return ""
     elif tool_name == "generate_letter":
-        # tool_result = await generate_letter(
-        #     user_id=user_id,
-        #     context_seed=tool_args['context_seed'],
-        #     verbose=verbose
-        # )
-        print(f"Context Seed: {tool_args['context_seed']}")
+        tool_result = await generate_letter(
+            user_id=user_id,
+            context_seed=tool_args['context_seed'],
+            verbose=verbose
+        )
+        # Push results to memory
+        # DO NOT WAIT
+        asyncio.create_task(
+            push_canvas_memory(
+                user_id=user_id,
+                agent_response=tool_result['response'],
+                canvas_content=tool_result['letter']
+            )
+        )
+
+        return ""
     else:
         return """
             The tool requested was not recognized,
