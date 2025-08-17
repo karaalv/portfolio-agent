@@ -4,6 +4,7 @@ the Agent API.
 """
 from fastapi import APIRouter, Request, Depends
 from fastapi import WebSocket, WebSocketDisconnect
+from api.common.schemas import SocketMessage
 from api.common.utils import api_exception_handler
 from api.common.responses import success_response, error_response
 from agent.main import chat
@@ -54,14 +55,26 @@ async def agent_chat_ws(ws: WebSocket):
     try:
         while True:
             data: dict = await ws.receive_json()
-            user_input = data.get("input")
+            socket_message = SocketMessage(**data)
 
-            if not user_input:
+            # Ping for connection
+            if socket_message.type == "ping":
+                await send_message_ws(
+                    user_id=user_id,
+                    type="ping",
+                    data="pong"
+                )
                 continue
+
+            # Handle user input for chat
+            if not socket_message.data:
+                continue
+
+            user_input = socket_message.data
 
             response = await chat(
                 user_id=user_id,
-                input=user_input
+                input=str(user_input)
             )
 
             await send_message_ws(

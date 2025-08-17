@@ -47,7 +47,7 @@ class APIResponse(BaseModel):
         description="The actual data returned by the API."
     )
 
-# --- Socket Response ---
+# --- Socket Data ---
 
 class SocketResponse(BaseModel):
     """
@@ -68,4 +68,19 @@ class SocketResponse(BaseModel):
         None,
         description="The actual data returned by the "
                     "websocket."
+    )
+
+class SocketMessage(BaseModel):
+    """
+    Schema for messages sent from
+    websocket clients.
+    """
+    type: str = Field(
+        ...,
+        description="The type of message being sent."
+    )
+    data: Optional[str] = Field(
+        None,
+        description="The actual data being sent in "
+                    "the message."
     )

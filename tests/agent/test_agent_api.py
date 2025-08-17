@@ -90,7 +90,8 @@ async def test_agent_chat():
     Test the agent chat API endpoint.
     """
     body = {
-        "input": "Hello, agent! This is a test message."
+        "type": "agent_message",
+        "data": "Hello, agent! This is a test message."
     }
 
     url = f"ws://127.0.0.1:9001/api/agent/ws/chat?ft={create_frontend_token()}"
