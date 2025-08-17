@@ -43,6 +43,7 @@ async def push_memory(
 @handle_exceptions_async("agent.memory: Pushing Canvas Memory")
 async def push_canvas_memory(
     user_id: str,
+    title: str,
     agent_response: str,
     canvas_content: str
 ):
@@ -57,6 +58,7 @@ async def push_canvas_memory(
 
     # Package canvas memory
     canvas_memory = AgentCanvas(
+        title=title,
         id=f"{user_id}_canvas_{get_timestamp()}",
         content=canvas_content
     )

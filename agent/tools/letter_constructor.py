@@ -42,11 +42,13 @@ class LetterConstructor:
         self._formatter_model = "gpt-4.1-nano"
         self._response_model = "gpt-4.1-nano"
         # Content
+        self.title = ""
         self.research = ""
         self.letter = ""
         self.acknowledgment = ""
         self.summary = ""
         # Utils
+        self.message_id = f"streaming_{get_timestamp()}"
         self.timer = Timer(start=False)
         self._passthrough_prompt = "Obey the system prompt"
         # Socket connection
@@ -279,13 +281,39 @@ class LetterConstructor:
             model=self._response_model
         )
 
+        title_prompt = textwrap.dedent(f"""
+            You are part of a cover letter generation tool.
+            Generate a short, professional title for the cover
+            letter based on the user's request and context.
+
+            Rules:
+            - Keep it concise (max 6 words).
+            - Clearly reflect the target role or request.
+            - Format it as a standalone title (no extra text).
+
+            Example:
+            Request: software engineering position
+            Title: "Software Engineer Application"
+
+            Context for request:
+            {self.context_seed}
+        """)
+
+        title = await normal_response(
+            system_prompt=title_prompt,
+            user_input=self._passthrough_prompt,
+            model=self._response_model
+        )
+        self.title = title
+
         agent_memory = AgentMemory(
-            id="streaming_id",
+            id=self.message_id,
             user_id=self.user_id,
             source="agent",
             content=response,
             agent_canvas=AgentCanvas(
-                id="streaming_id",
+                title=self.title,
+                id=self.message_id + "_canvas",
                 content="\n\n"
             )
         )
@@ -346,12 +374,13 @@ class LetterConstructor:
             )
 
         agent_memory = AgentMemory(
-            id="streaming_id",
+            id=self.message_id,
             user_id=self.user_id,
             source="agent",
             content=response,
             agent_canvas=AgentCanvas(
-                id="streaming_id",
+                title=self.title,
+                id=self.message_id + "_canvas",
                 content="\n\n"
             )
         )
@@ -868,5 +897,6 @@ class LetterConstructor:
 
         return {
             "letter": self.letter.strip(),
-            "response": self.acknowledgment.strip() + self.summary.strip()
+            "response": self.acknowledgment.strip() + self.summary.strip(),
+            "title": self.title.strip()
         }

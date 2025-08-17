@@ -70,7 +70,7 @@ def verify_jwt_ws(ws: WebSocket):
 
 # --- Frontend Token Authentication ---
 
-def _validate_frontend_token(token: str):
+def validate_frontend_token(token: str):
     """
     Validates the frontend token.
 
@@ -115,7 +115,7 @@ def verify_frontend_token(request: Request):
         request (Request): The FastAPI request object.
     """
     token = request.headers.get("frontend-token", "")
-    _validate_frontend_token(token)
+    validate_frontend_token(token)
 
 def verify_frontend_token_ws(ws: WebSocket):
     """
@@ -126,4 +126,4 @@ def verify_frontend_token_ws(ws: WebSocket):
         ws (WebSocket): The FastAPI websocket object.
     """
     token = ws.headers.get("frontend-token", "")
-    _validate_frontend_token(token)
+    validate_frontend_token(token)

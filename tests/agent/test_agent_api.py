@@ -93,9 +93,8 @@ async def test_agent_chat():
         "input": "Hello, agent! This is a test message."
     }
 
-    url = "ws://127.0.0.1:9001/api/agent/ws/chat"
+    url = f"ws://127.0.0.1:9001/api/agent/ws/chat?ft={create_frontend_token()}"
     headers = {
-        'frontend-token': create_frontend_token(),
         'Cookie': f'JWT={JWT};UUID={UUID}'
     }
 

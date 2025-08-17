@@ -16,6 +16,10 @@ class AgentCanvas(BaseModel):
         description="The unique identifier for "
                     "the agent's canvas"
     )
+    title: str = Field(
+        ...,
+        description="The title of the canvas"
+    )
     content: Optional[str] = Field(
         default=None,
         description="The content of the canvas, if any"

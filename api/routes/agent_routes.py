@@ -9,7 +9,7 @@ from api.common.responses import success_response, error_response
 from agent.main import chat
 from agent.memory.main import retrieve_memory, delete_memory
 from api.common.authentication import verify_frontend_token, verify_jwt
-from api.common.authentication import verify_frontend_token_ws, verify_jwt_ws
+from api.common.authentication import validate_frontend_token, verify_jwt_ws
 from api.common.socket_registry import add_connection_registry, delete_connection_registry
 from api.common.socket_registry import send_message_ws
 
@@ -22,7 +22,6 @@ router = APIRouter()
 @router.websocket(
     "/ws/chat",
     dependencies=[
-        Depends(verify_frontend_token_ws),
         Depends(verify_jwt_ws)
     ]
 )
@@ -30,6 +29,17 @@ async def agent_chat_ws(ws: WebSocket):
     """
     WebSocket endpoint for agent chat.
     """
+    token = ws.query_params.get("ft")
+    if not token:
+        return error_response(
+            "Missing frontend token",
+            status_code=400
+        )
+    
+    # Validate token - HTTP exception raised
+    # on validation
+    validate_frontend_token(token)
+    
     user_id = ws.cookies.get("UUID")
     if not user_id:
         return error_response(

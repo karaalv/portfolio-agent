@@ -73,7 +73,8 @@ async def _execute_tool(
             push_canvas_memory(
                 user_id=user_id,
                 agent_response=tool_result['response'],
-                canvas_content=tool_result['resume']
+                canvas_content=tool_result['resume'],
+                title=tool_result['title']
             )
         )
 
@@ -90,7 +91,8 @@ async def _execute_tool(
             push_canvas_memory(
                 user_id=user_id,
                 agent_response=tool_result['response'],
-                canvas_content=tool_result['letter']
+                canvas_content=tool_result['letter'],
+                title=tool_result['title']
             )
         )
 

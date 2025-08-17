@@ -6,7 +6,7 @@ interface function can be found in the
 """
 import textwrap
 from typing import Any
-from common.utils import TerminalColors, Timer
+from common.utils import TerminalColors, Timer, get_timestamp
 from agent.tools.schemas import ResearchPlan
 from api.common.socket_manager import SocketManager
 from agent.memory.schemas import AgentMemory, AgentCanvas
@@ -41,11 +41,13 @@ class ResumeConstructor:
         self._formatter_model = "gpt-4.1-nano"
         self._response_model = "gpt-4.1-nano"
         # Content
+        self.title = ""
         self.research = ""
         self.resume = ""
         self.acknowledgment = ""
         self.summary = ""
         # Utils
+        self.message_id = f"streaming_{get_timestamp()}"
         self.timer = Timer(start=False)
         self._passthrough_prompt = "Obey the system prompt"
         # Socket connection
@@ -278,13 +280,39 @@ class ResumeConstructor:
             model=self._response_model
         )
 
+        title_prompt = textwrap.dedent(f"""
+            You are part of a resume generation tool.
+            Generate a short, professional title for the resume
+            based on the user's request and context.
+
+            Rules:
+            - Keep it concise (max 6 words).
+            - Clearly reflect the target role or request.
+            - Format it as a standalone title (no extra text).
+
+            Example:
+            Request: data science internship
+            Title: "Data Science Internship Resume"
+
+            Context for request:
+            {self.context_seed}
+        """)
+
+        title = await normal_response(
+            system_prompt=title_prompt,
+            user_input=self._passthrough_prompt,
+            model=self._response_model
+        )
+        self.title = title
+
         agent_memory = AgentMemory(
-            id="streaming_id",
+            id=self.message_id,
             user_id=self.user_id,
             source="agent",
             content=response,
             agent_canvas=AgentCanvas(
-                id="streaming_id",
+                title=self.title,
+                id=self.message_id + "_canvas",
                 content="\n\n"
             )
         )
@@ -347,12 +375,13 @@ class ResumeConstructor:
             )
 
         agent_memory = AgentMemory(
-            id="streaming_id",
+            id=self.message_id,
             user_id=self.user_id,
             source="agent",
             content=response,
             agent_canvas=AgentCanvas(
-                id="streaming_id",
+                title=self.title,
+                id=self.message_id + "_canvas",
                 content="\n\n"
             )
         )
@@ -904,5 +933,6 @@ class ResumeConstructor:
 
         return {
             "resume": self.resume.strip(),
-            "response": self.acknowledgment.strip() + self.summary.strip()
+            "response": self.acknowledgment.strip() + self.summary.strip(),
+            "title": self.title.strip()
         }
