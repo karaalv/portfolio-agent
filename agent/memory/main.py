@@ -32,7 +32,8 @@ async def push_memory(
         id=f"{user_id}_{source}_{get_timestamp()}",
         user_id=user_id,
         source=source,
-        content=content
+        content=content,
+        illusion=False
     )
 
     collection = get_collection("messages")
@@ -69,6 +70,7 @@ async def push_canvas_memory(
         user_id=user_id,
         source="agent",
         content=agent_response,
+        illusion=False,
         agent_canvas=canvas_memory
     )
 
@@ -82,19 +84,22 @@ async def push_canvas_memory(
 @overload
 async def retrieve_memory(
     user_id: str,
-    to_str: Literal[True]
+    to_str: Literal[True],
+    drop_canvas: bool = False
 ) -> str: ...
 
 @overload
 async def retrieve_memory(
     user_id: str,
-    to_str: Literal[False]
+    to_str: Literal[False],
+    drop_canvas: bool = False
 ) -> list[AgentMemory]: ...
 
 @handle_exceptions_async("agent.memory: Retrieving Agent Memory")
 async def retrieve_memory( 
     user_id: str, 
-    to_str: bool = False
+    to_str: bool = False,
+    drop_canvas: bool = False
 ) -> list[AgentMemory] | str:
     """
     Retrieves agent memory from the database.
@@ -116,6 +121,11 @@ async def retrieve_memory(
 
     data = await cursor.to_list(length=None)
     results = [AgentMemory(**item) for item in data]
+
+    if drop_canvas:
+        for r in results:
+            if r.agent_canvas:
+                r.agent_canvas = None
 
     if to_str:
         return json.dumps([

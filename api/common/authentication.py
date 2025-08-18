@@ -65,7 +65,6 @@ def verify_jwt_ws(ws: WebSocket):
         object.
     """
     token = ws.cookies.get("JWT", "")
-    print(f"Verifying JWT token: {token}")
     _validate_jwt(token)
 
 # --- Frontend Token Authentication ---

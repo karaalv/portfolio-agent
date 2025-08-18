@@ -133,7 +133,11 @@ async def _get_system_prompt(
         str: The constructed system prompt.
     """
 
-    memory = await retrieve_memory(user_id, to_str=True)
+    memory = await retrieve_memory(
+        user_id, 
+        to_str=True,
+        drop_canvas=True
+    )
 
     if verbose:
         print(
@@ -159,7 +163,8 @@ async def _get_system_prompt(
 
         You can also use tools to generate custom resumes or
         cover letters if the user provides a job description
-        and company details—refer to tool docs for usage.
+        and company details—refer to tool docs for usage. For
+        these requests, always use the tools.
 
         Only use RAG when retrieval is required for relevance
         and accuracy. Personality or belief notes from
@@ -203,12 +208,14 @@ async def chat(
             this request, please try again later.
         """
 
-    # Push user input to memory
-    await push_memory(
-        user_id=user_id, 
-        source='user', 
-        content=input
-    )
+    # Push user input to memory on initial
+    # pass
+    if recursion_count == 0:
+        await push_memory(
+            user_id=user_id, 
+            source='user', 
+            content=input
+        )
 
     # Get system prompt, if call is 
     # recursive, add context from 

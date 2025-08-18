@@ -74,6 +74,30 @@ class ResumeConstructor:
             message=message
         )
 
+    async def _update_writing_state_ws(self):
+        """
+        Used to update the client
+        writing state with messages
+        and progress updates.
+        """
+        update = AgentMemory(
+            id=self.message_id,
+            user_id=self.user_id,
+            source="agent",
+            content=self.acknowledgment + self.summary,
+            illusion=True,
+            agent_canvas=AgentCanvas(
+                title=self.title,
+                id=self.message_id + "_canvas",
+                content=self.resume
+            )
+        )
+
+        await self._send_message_ws(
+            type="agent_writing",
+            data=update.model_dump(),
+        )
+
     async def _get_research_plan(self) -> ResearchPlan:
         """
         Constructs a research plan based on the
@@ -305,23 +329,6 @@ class ResumeConstructor:
         )
         self.title = title
 
-        agent_memory = AgentMemory(
-            id=self.message_id,
-            user_id=self.user_id,
-            source="agent",
-            content=response,
-            agent_canvas=AgentCanvas(
-                title=self.title,
-                id=self.message_id + "_canvas",
-                content="\n\n"
-            )
-        )
-
-        await self._send_message_ws(
-            type="agent_memory",
-            data=agent_memory
-        )
-
         if self.verbose:
             print(
                 f"{TerminalColors.magenta}"
@@ -331,6 +338,7 @@ class ResumeConstructor:
             )
 
         self.acknowledgment = response
+        await self._update_writing_state_ws()
 
     async def _summarise_request(self):
         """
@@ -349,12 +357,14 @@ class ResumeConstructor:
             - Do not add new information or commentary.
             - Address the visitor directly in a friendly, 
             professional tone.
+            - Continue to use first person in the response,
+            respond as if you are the one who created the
+            resume.
 
             Example:
-            "Here's a quick overview of the resume created 
-            for <role> at <company>, highlighting key 
-            skills, experience, and achievements relevant 
-            to the position."
+            "Here's a quick overview of the resume I created 
+            for <role>, highlighting my skills, experience, 
+            and achievements relevant to the position."
 
             The generated resume is as follows:
             {self.resume}
@@ -374,30 +384,14 @@ class ResumeConstructor:
                 f"{response}"
             )
 
-        agent_memory = AgentMemory(
-            id=self.message_id,
-            user_id=self.user_id,
-            source="agent",
-            content=response,
-            agent_canvas=AgentCanvas(
-                title=self.title,
-                id=self.message_id + "_canvas",
-                content="\n\n"
-            )
-        )
-
-        # Clear document writing state
+        self.summary = response
+        await self._update_writing_state_ws()
+        
+        # End writing state on client
         await self._send_message_ws(
             type="agent_writing_phase",
             data="<complete>"
         )
-
-        await self._send_message_ws(
-            type="agent_memory",
-            data=agent_memory
-        )
-
-        self.summary = response
 
     # --- Resume Sections ---
 
@@ -427,6 +421,7 @@ class ResumeConstructor:
             )
 
         self.resume += header
+        await self._update_writing_state_ws()
 
     async def _skills_section(self):
         """
@@ -506,6 +501,9 @@ class ResumeConstructor:
             **Tools**: Git, Docker, Jenkins
             4. Only include relevant skills for the role and
             company — remove unrelated or redundant items.
+            5. The first token must be the content itself
+            (not 'Sure,' 'Here,' 'I will,' etc.). No preamble
+            or explanation.
 
             Context for resume creation:
             - Research findings: {self.research}
@@ -530,7 +528,9 @@ class ResumeConstructor:
                 f"{skills_section}"
             )
 
+
         self.resume += skills_section
+        await self._update_writing_state_ws()
 
     async def _experience_section(self):
         """
@@ -617,13 +617,16 @@ class ResumeConstructor:
                 - **Project Management**: Led a team of
                 5 engineers to deliver X in Y months.
             5. Ensure all bullet points are:
-            - Relevant to the target role and company.
-            - Quantified where possible (metrics, %
-                improvements, timelines, etc.).
-            - Highlighting standout or unique
-                contributions.
-            - For each experience list a maximum of 3
-            bullet points.
+                - Relevant to the target role and company.
+                - Quantified where possible (metrics, %
+                    improvements, timelines, etc.).
+                - Highlighting standout or unique
+                    contributions.
+                - For each experience list a maximum of 3
+                bullet points.
+            6. The first token must be the content itself
+            (not 'Sure,' 'Here,' 'I will,' etc.). No preamble
+            or explanation.
 
             Context for resume creation:
             - Research findings: {self.research}
@@ -649,7 +652,8 @@ class ResumeConstructor:
             )
         
         self.resume += experience_section
-    
+        await self._update_writing_state_ws()
+
     async def _projects_section(self):
         """
         Constructs the projects section of the
@@ -733,11 +737,14 @@ class ResumeConstructor:
                 a feature increasing engagement by 20%.
             5. Include only projects relevant to the job
             description or company values.
-            - Exclude unrelated work experience.
-            - Exclude irrelevant coursework unless it
-                directly supports the role.
-            - For each project list a maximum of 3 bullet 
-            points.
+                - Exclude unrelated work experience.
+                - Exclude irrelevant coursework unless it
+                    directly supports the role.
+                - For each project list a maximum of 3 bullet 
+                points.
+            6. The first token must be the content itself
+            (not 'Sure,' 'Here,' 'I will,' etc.). No preamble
+            or explanation.
 
             Context for resume creation:
             - Research findings: {self.research}
@@ -763,7 +770,8 @@ class ResumeConstructor:
             )
 
         self.resume += projects_section
-    
+        await self._update_writing_state_ws()
+
     async def _education_section(self):
         """
         Constructs the education section of the
@@ -790,11 +798,14 @@ class ResumeConstructor:
             development, programming languages, and frameworks such
             as Python, Java, React, and Agile methodologies?"
 
-            Rules:
-            - Output only one prompt, no alternatives or extra text.
-            - Make the prompt specific to the provided context.
-            - Ensure it covers both technical and soft skills
+            Output format rules:
+            1. Output only one prompt, no alternatives or extra text.
+            2. Make the prompt specific to the provided context.
+            3. Ensure it covers both technical and soft skills
               if relevant to the role.
+            4. The first token must be the content itself
+              (not 'Sure,' 'Here,' 'I will,' etc.). No preamble
+              or explanation.
 
             Context for resume creation:
             - Research findings: {self.research}
@@ -853,9 +864,9 @@ class ResumeConstructor:
             6. Keep only content relevant to the job
             description and company values. Remove
             unrelated or generic entries.
-            7. Do not make additional comments or
-            remarks, only present the formatted 
-            education section.
+            7. The first token must be the content itself
+            (not 'Sure,' 'Here,' 'I will,' etc.). No preamble
+            or explanation.
 
             Context for resume creation:
             - Research findings: {self.research}
@@ -881,6 +892,7 @@ class ResumeConstructor:
             )
 
         self.resume += education_section
+        await self._update_writing_state_ws()
 
     async def construct_resume(self) -> dict[str, str]:
         """

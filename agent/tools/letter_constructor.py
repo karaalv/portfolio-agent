@@ -75,6 +75,30 @@ class LetterConstructor:
             message=message
         )
 
+    async def _update_writing_state_ws(self):
+        """
+        Used to update the client
+        writing state with messages
+        and progress updates.
+        """
+        update = AgentMemory(
+            id=self.message_id,
+            user_id=self.user_id,
+            source="agent",
+            content=self.acknowledgment + self.summary,
+            illusion=True,
+            agent_canvas=AgentCanvas(
+                title=self.title,
+                id=self.message_id + "_canvas",
+                content=self.letter
+            )
+        )
+
+        await self._send_message_ws(
+            type="agent_writing",
+            data=update.model_dump(),
+        )
+
     async def _get_research_plan(self) -> ResearchPlan:
         """
         Constructs a research plan based on the
@@ -306,23 +330,6 @@ class LetterConstructor:
         )
         self.title = title
 
-        agent_memory = AgentMemory(
-            id=self.message_id,
-            user_id=self.user_id,
-            source="agent",
-            content=response,
-            agent_canvas=AgentCanvas(
-                title=self.title,
-                id=self.message_id + "_canvas",
-                content="\n\n"
-            )
-        )
-
-        await self._send_message_ws(
-            type="agent_memory",
-            data=agent_memory
-        )
-
         if self.verbose:
             print(
                 f"{TerminalColors.magenta}"
@@ -332,6 +339,7 @@ class LetterConstructor:
             )
 
         self.acknowledgment = response
+        await self._update_writing_state_ws()
 
     async def _summarise_request(self):
         """
@@ -347,13 +355,15 @@ class LetterConstructor:
             cover letter.
             - Keep it concise (1-3 sentences max).
             - Do not add new information or commentary.
+            - Continue to use first person in the response,
+            respond as if you are the one who created the
+            resume.
                                             
             Note: You are addressing a visitor on my website,
             so respond in a friendly, professional style such as:
-                                            
-            "Your cover letter for <role> at <company> focuses on
-            <points from letter> and conveys a strong match for
-            the role."
+
+            "I have finished writing the cover letter, it covers"
+            the following points: [summary of the letter].
 
             The generated cover letter is:
             {self.letter}
@@ -373,30 +383,14 @@ class LetterConstructor:
                 f"{response}"
             )
 
-        agent_memory = AgentMemory(
-            id=self.message_id,
-            user_id=self.user_id,
-            source="agent",
-            content=response,
-            agent_canvas=AgentCanvas(
-                title=self.title,
-                id=self.message_id + "_canvas",
-                content="\n\n"
-            )
-        )
-
-        # Clear document writing state
+        self.summary = response
+        await self._update_writing_state_ws()
+        
+        # End writing state on client
         await self._send_message_ws(
             type="agent_writing_phase",
             data="<complete>"
         )
-
-        await self._send_message_ws(
-            type="agent_memory",
-            data=agent_memory
-        )
-
-        self.summary = response
 
     # --- Letter Sections ---
 
@@ -410,12 +404,11 @@ class LetterConstructor:
             data="Writing header section..."
         )
 
-        header = "---\n\n"
-        header += "<div align='center'><h2>Alvin Karanja</h2></div>\n\n"
+        header = "<div align='center'><h2>Alvin Karanja</h2></div>\n\n"
         header += "<br>London, United Kingdom\n\n"
         header += "**Email:** alviinkaranjja@gmail.com\n\n"
         header += "**LinkedIn:** /in/alvin-n-karanja\n\n"
-        header += "**Website:** alvinkaranja.dev<br>\n\n"
+        header += "**Website:** alvinkaranja.dev\n\n"
 
         if self.verbose:
             print(
@@ -426,6 +419,7 @@ class LetterConstructor:
             )
 
         self.letter += header
+        await self._update_writing_state_ws()
 
     async def _address_section(self):
         """
@@ -456,11 +450,15 @@ class LetterConstructor:
             newline character appended to the end.
 
             Example:
-            John Doe
             March 2023
             Acme Corp
             123 Main St, Anytown, USA
             (123) 456-7890
+
+            Output format rules:
+            1. The first token must be the content itself
+            (not 'Sure,' 'Here,' 'I will,' etc.). No preamble
+            or explanation.
 
             Use the following information:
             Current date: {get_timestamp()}
@@ -489,7 +487,8 @@ class LetterConstructor:
                 f"{formatted_address}"
             )
 
-        self.letter += formatted_address + "<br>"
+        self.letter += "<br><br>" +formatted_address
+        await self._update_writing_state_ws()
 
     async def _opening_section(self):
         """
@@ -564,8 +563,12 @@ class LetterConstructor:
             - Use markdown formatting, to separate paragraphs,
             use a double newline character appended to the end.
 
-            Keep it to one paragraph, using personal context
+            Output format rules:
+            1. Keep it to one paragraph, using personal context
             to connect skills/experience with the job description.
+            2. The first token must be the content itself
+            (not 'Sure,' 'Here,' 'I will,' etc.). No preamble
+            or explanation.
 
             Information provided:
             - Research context:
@@ -592,7 +595,8 @@ class LetterConstructor:
                 f"{opening_section}"
             )
 
-        self.letter += opening_section
+        self.letter += "<br><br>" + opening_section
+        await self._update_writing_state_ws()
 
     async def _body_section(self):
         """
@@ -622,11 +626,14 @@ class LetterConstructor:
             on that demonstrate your skills in software
             engineering?"
 
-            Rules:
-            - Output only one prompt — no alternatives or extra
+            Output format rules:
+            1. Output only one prompt — no alternatives or extra
             commentary.
-            - Make it specific to the provided context.
-            - Include both technical and soft skills if relevant.
+            2. Make it specific to the provided context.
+            3. Include both technical and soft skills if relevant.
+            4. The first token must be the content itself
+            (not 'Sure,' 'Here,' 'I will,' etc.). No preamble
+            or explanation.
 
             Context for generation:
             - Research findings: 
@@ -666,7 +673,7 @@ class LetterConstructor:
             - Cite relevant projects that show alignment with
             the role, covering both technical and soft skills.
             - Use markdown formatting, to separate paragraphs,
-            use a double newline character appended to the end.
+            use a '<br>' character appended to the end.
             - Be compelling and clearly link projects and
             experience to job requirements.
             - Consist of two comprehensive paragraphs that cite
@@ -680,6 +687,11 @@ class LetterConstructor:
 
             Keep it concise, compelling, and focused on
             demonstrating qualifications for the role.
+
+            Output format rules:
+            1. The first token must be the content itself
+               (not 'Sure,' 'Here,' 'I will,' etc.). No preamble
+               or explanation.
 
             Information provided:
             - Research context:
@@ -706,7 +718,8 @@ class LetterConstructor:
                 f"{body_section}"
             )
 
-        self.letter += body_section
+        self.letter += "<br><br>" + body_section
+        await self._update_writing_state_ws()
 
     async def _closing_section(self):
         """
@@ -735,12 +748,15 @@ class LetterConstructor:
             "What beliefs and values drive your work and
             motivate you?"
 
-            Rules:
-            - Output only one prompt — no alternatives or
+            Output format rules:
+            1. Output only one prompt — no alternatives or
             extra commentary.
-            - Make it specific to the provided context.
-            - Only consider soft skills and psychological
+            2. Make it specific to the provided context.
+            3. Only consider soft skills and psychological
             attributes.
+            4. The first token must be the content itself
+            (not 'Sure,' 'Here,' 'I will,' etc.). No preamble
+            or explanation.
 
             Context for generation:
             - Research findings:
@@ -794,6 +810,11 @@ class LetterConstructor:
             Keep it concise, compelling, and focused on
             demonstrating qualifications for the role.
 
+            Output format rules:
+            1. The first token must be the content itself
+               (not 'Sure,' 'Here,' 'I will,' etc.). No preamble
+               or explanation.
+
             Information provided:
             - Research context: 
             {self.research}
@@ -819,7 +840,8 @@ class LetterConstructor:
                 f"{closing_section}"
             )
 
-        self.letter += closing_section
+        self.letter += "<br><br>" + closing_section
+        await self._update_writing_state_ws()
 
     async def _signature(self):
         """
@@ -843,7 +865,8 @@ class LetterConstructor:
                 f"{signature}"
             )
 
-        self.letter += signature
+        self.letter += signature + "<br><br>"
+        await self._update_writing_state_ws()
 
     async def construct_letter(self) -> dict[str, str]:
         """

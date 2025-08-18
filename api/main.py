@@ -170,7 +170,7 @@ if __name__ == "__main__":
             app="api.main:app",
             host="0.0.0.0",
             port=int(os.getenv("PORT", MAIN_PORT)),
-            log_level="debug",
+            log_level="info",
             reload=False,
             workers=1
         )

@@ -66,16 +66,16 @@ async def agent_chat_ws(ws: WebSocket):
                 )
                 continue
 
-            # Handle user input for chat
-            if not socket_message.data:
-                continue
-
             user_input = socket_message.data
 
             response = await chat(
                 user_id=user_id,
                 input=str(user_input)
             )
+
+            # Handle streamed responses
+            if not response:
+                continue
 
             await send_message_ws(
                 user_id=user_id,

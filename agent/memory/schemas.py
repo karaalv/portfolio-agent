@@ -53,6 +53,11 @@ class AgentMemory(BaseModel):
         default_factory=get_timestamp,
         description="The timestamp when the memory was created"
     )
+    illusion: bool = Field(
+        default=False,
+        description="Illusion flag to indicate if message "
+                    "is should be \"streamed\" in UI"
+    )
     agent_canvas: Optional[AgentCanvas] = Field(
         default=None,
         description="The canvas associated with the memory"
