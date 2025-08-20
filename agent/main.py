@@ -12,6 +12,7 @@ from openai_client.main import agent_response
 from agent.memory.main import push_memory, push_canvas_memory, retrieve_memory
 from agent.memory.compressor import update_user_summarisation
 from agent.tools.tool_definitions import agent_tools
+from users.database import update_last_active
 # Tools
 from rag.main import fetch_context
 from agent.tools.main import generate_resume, generate_letter
@@ -208,13 +209,17 @@ async def chat(
             this request, please try again later.
         """
 
-    # Push user input to memory on initial
-    # pass
+    # Push user input to memory on 
+    # initial pass, update timestamp
     if recursion_count == 0:
         await push_memory(
             user_id=user_id, 
             source='user', 
             content=input
+        )
+
+        asyncio.create_task(
+            update_last_active(user_id)
         )
 
     # Get system prompt, if call is 

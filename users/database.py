@@ -5,7 +5,7 @@ for user management.
 """
 from users.schemas import User
 from database.mongodb.main import get_collection
-from common.utils import handle_exceptions_async
+from common.utils import handle_exceptions_async, get_timestamp
 
 # --- Creation ---
 
@@ -85,3 +85,59 @@ async def does_user_exist_db(user_id: str) -> bool:
 
     user = await collection.find_one({"user_id": user_id})
     return user is not None
+
+# --- Modification ---
+
+@handle_exceptions_async("users.database: Updating last active")
+async def update_last_active(user_id: str) -> bool:
+    """
+    Updates the last active timestamp for a user 
+    in the database.
+
+    Args:
+        user_id (str): The unique identifier 
+        for the user.
+
+    Returns:
+        bool: True if the update was successful, 
+        False otherwise.
+    """
+    collection = get_collection("users")
+
+    if collection is None:
+        raise ConnectionError(
+            "MongoDB client is not connected."
+        )
+
+    result = await collection.update_one(
+        {"user_id": user_id},
+        {"$set": {"last_active": get_timestamp()}}
+    )
+
+    return result.modified_count > 0
+
+# --- Deletion ---
+
+@handle_exceptions_async("users.database: Deleting User")
+async def delete_user(user_id: str) -> bool:
+    """
+    Deletes a user from the MongoDB database 
+    by user ID.
+
+    Args:
+        user_id (str): The unique identifier 
+        for the user.
+
+    Returns:
+        bool: True if the deletion was successful, 
+        False otherwise.
+    """
+    collection = get_collection("users")
+
+    if collection is None:
+        raise ConnectionError(
+            "MongoDB client is not connected."
+        )
+
+    result = await collection.delete_one({"user_id": user_id})
+    return result.deleted_count > 0

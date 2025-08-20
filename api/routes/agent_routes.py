@@ -13,6 +13,7 @@ from api.common.authentication import verify_frontend_token, verify_jwt
 from api.common.authentication import validate_frontend_token, verify_jwt_ws
 from api.common.socket_registry import add_connection_registry, delete_connection_registry
 from api.common.socket_registry import send_message_ws
+from users.main import does_user_exist
 
 # --- Constants --- 
 
@@ -47,7 +48,13 @@ async def agent_chat_ws(ws: WebSocket):
             "Missing user_id",
             status_code=400
         )
-    
+
+    if not await does_user_exist(user_id):
+        return error_response(
+            "User does not exist",
+            status_code=404
+        )
+
     # Start socket connection
     await ws.accept()
     await add_connection_registry(user_id=user_id, ws=ws)
@@ -108,6 +115,12 @@ async def get_memory_api(request: Request):
             status_code=400
         )
 
+    if not await does_user_exist(user_id):
+        return error_response(
+            "User does not exist",
+            status_code=404
+        )
+
     memory = await retrieve_memory(
         user_id,
         to_str=False
@@ -137,6 +150,12 @@ async def delete_memory_api(request: Request):
         return error_response(
             "Missing user_id",
             status_code=400
+        )
+
+    if not await does_user_exist(user_id):
+        return error_response(
+            "User does not exist",
+            status_code=404
         )
 
     result = await delete_memory(

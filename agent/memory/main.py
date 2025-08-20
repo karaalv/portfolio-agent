@@ -117,7 +117,7 @@ async def retrieve_memory(
     cursor = collection.find(
         {"user_id": user_id},
         {"_id": 0}
-    ).sort("serverCreatedAt", 1)
+    ).sort("created_at", 1)
 
     data = await cursor.to_list(length=None)
     results = [AgentMemory(**item) for item in data]
@@ -148,6 +148,16 @@ async def delete_memory(
         user_id: The unique identifier for the user
     """
     collection = get_collection("messages")
+
+    # Move messages for analysis
+    pipeline = [
+        {"$match": {"user_id": user_id}},
+        {"$out": {"db": "analysis", "coll": "messages"}}
+    ]
+    cursor = await collection.aggregate(pipeline)
+    await cursor.to_list(length=None)
+    
+    # Delete original messages
     result = await collection.delete_many({"user_id": user_id})
 
     if result.deleted_count > 0:

@@ -37,7 +37,7 @@ class LetterConstructor:
         self.context_seed = context_seed
         self.verbose = verbose
         # Models
-        self._planner_model = "gpt-4.1"
+        self._planner_model = "gpt-4.1-mini"
         self._refiner_model = "gpt-4.1-nano"
         self._formatter_model = "gpt-4.1-nano"
         self._response_model = "gpt-4.1-nano"

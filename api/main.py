@@ -19,6 +19,7 @@ else:
         dotenv_path=os.path.abspath(".env")
     )
 
+from api.common.maintainer import Maintainer
 from common.utils import TerminalColors
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -50,6 +51,9 @@ async def lifespan(app: FastAPI):
     # 1. Connect to MongoDB
     if not await connect_mongo():
         exit(1)
+
+    # 2. Start the maintainer
+    _ = Maintainer()
 
     print(
         f"{TerminalColors.green}"
