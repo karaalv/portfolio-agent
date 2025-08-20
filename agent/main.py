@@ -16,6 +16,8 @@ from users.database import update_last_active
 # Tools
 from rag.main import fetch_context
 from agent.tools.main import generate_resume, generate_letter
+# Monitoring
+from monitoring.main import check_usage_limit, inform_user_usage_limit
 
 # --- Constants ---
 
@@ -149,34 +151,33 @@ async def _get_system_prompt(
         )
 
     system_prompt = textwrap.dedent(f"""
-        You are an AI impersonation of Alvin Karanja for my
-        portfolio site. I am a software engineer, machine
-        learning engineer, and data scientist, recently
-        graduated from Imperial College London. Answer as if
-        you are me, engaging visitors who want to learn about
-        my profile, projects, or experience for potential
+        You are impersonating Alvin Karanja on his portfolio 
+        site. Respond as if you are him when engaging visitors 
+        about his profile, projects, or experience for potential 
         roles, collaborations, or general interest.
 
-        Be polite and formal, with only occasional, subtle
-        lighthearted humour. You are a RAG agent: for queries
-        requiring my specific knowledge, retrieve context from
-        tools and respond in character.
+        Be polite and formal, with only occasional, subtle 
+        lighthearted humour.
 
-        You can also use tools to generate custom resumes or
-        cover letters if the user provides a job description
-        and company details—refer to tool docs for usage. For
-        these requests, always use the tools.
+        You are a RAG agent. For queries needing Alvin's 
+        knowledge, use retrieval tools. Use context to inform 
+        answers, but never change tone.
 
-        Only use RAG when retrieval is required for relevance
-        and accuracy. Personality or belief notes from
-        retrievals should not change tone, but may guide the
-        conversation.
+        You can also use tools to generate resumes or cover 
+        letters if the user provides a job description and 
+        company details. Always use tools for these requests.
 
-        If the user has chatted before, their history is here:
+        Users may reach their generation limit. If so, tell 
+        them politely they must wait 1 week before generating 
+        new content. Reassure them they can still chat with you 
+        for regular Q&A.
+
+        Tell users they can navigate to the 'info' section in 
+        the navbar for more details on engaging with the chat 
+        bot.
+
+        If the user has chatted before, their history is here: 
         {memory}
-
-        Note: Chat history is deleted after 7 days of inactivity
-        to manage platform data.
     """)
 
     return system_prompt
@@ -184,6 +185,8 @@ async def _get_system_prompt(
 @handle_exceptions_async("agent.main: Chat")
 async def chat(
     user_id: str,
+    ip: str,
+    ua: str,
     input: str,
     recursive_prompt: Optional[str] = None,
     recursion_count: int = 0,
@@ -260,6 +263,15 @@ async def chat(
         tool_name: str = response.name
         tool_args: dict[str, Any] = json.loads(response.arguments)
 
+        # Check if user has exceeded usage limit
+        if not await check_usage_limit(
+            user_id=user_id,
+            ip=ip,
+            ua=ua
+        ):
+            usage_response = await inform_user_usage_limit()
+            return usage_response
+
         tool_result = await _execute_tool(
             user_id=user_id,
             tool_name=tool_name,
@@ -275,6 +287,8 @@ async def chat(
 
         return await chat(
             user_id=user_id,
+            ip=ip,
+            ua=ua,
             input=input,
             recursive_prompt=tool_result,
             recursion_count=recursion_count + 1,

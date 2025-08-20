@@ -54,6 +54,16 @@ async def agent_chat_ws(ws: WebSocket):
             "User does not exist",
             status_code=404
         )
+    
+    # Extract info for finger printing
+    ip = ws.client.host # type: ignore
+    user_agent = ws.headers.get("user-agent")
+
+    if not ip or not user_agent:
+        return error_response(
+            "Suspicious user activity detected",
+            status_code=400
+        )
 
     # Start socket connection
     await ws.accept()
@@ -77,6 +87,8 @@ async def agent_chat_ws(ws: WebSocket):
 
             response = await chat(
                 user_id=user_id,
+                ip=ip,
+                ua=user_agent,
                 input=str(user_input)
             )
 
