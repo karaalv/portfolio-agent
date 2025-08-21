@@ -5,6 +5,7 @@ monitoring processes.
 import hashlib
 import textwrap
 from datetime import timedelta
+from typing import Any
 from monitoring.schemas import UserUsage
 from common.utils import handle_exceptions_async, handle_exceptions
 from common.utils import TerminalColors, get_timestamp, get_datetime
@@ -13,7 +14,7 @@ from openai_client.main import normal_response
 
 # --- Constants ---
 
-_usage_limit = 5 # Number of generations allowed weekly
+USAGE_LIMIT = 5 # Number of generations allowed weekly
 
 # --- Utility Functions ---
 
@@ -113,7 +114,7 @@ async def check_usage_limit(
     result = await collection.update_one(
         {
             "usage_id": usage_id,
-            "generation_count": {"$lt": _usage_limit}
+            "generation_count": {"$lt": USAGE_LIMIT}
         },
         {
             "$inc": {"generation_count": 1, "total_generations": 1},
@@ -126,6 +127,21 @@ async def check_usage_limit(
         return False
 
     return True
+
+@handle_exceptions_async("monitoring.main: Get Usages Remaining")
+async def get_usages_remaining(ip: str, ua: str) -> int:
+    """
+    Get the number of usages remaining for a user.
+    """
+    usage_id = generate_usage_id(ip, ua)
+    collection = get_collection("monitoring")
+    data = await collection.find_one({"usage_id": usage_id})
+    usage_info: dict[str, Any] = data # type: ignore
+
+    if not usage_info:
+        return USAGE_LIMIT
+
+    return USAGE_LIMIT - usage_info['generation_count']
 
 # --- Warnings ---
 
@@ -146,6 +162,10 @@ async def inform_user_usage_limit() -> str:
         they can still chat with you for regular Q&A, but 
         won't be able to generate new documents until their 
         usage limit resets in 1 week.
+
+        Do not greet the user or add any unnecessary 
+        commentary, simply inform the user that they have 
+        reached their limit.
     """)
 
     return await normal_response(

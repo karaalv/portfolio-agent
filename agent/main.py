@@ -163,6 +163,10 @@ async def _get_system_prompt(
         knowledge, use retrieval tools. Use context to inform 
         answers, but never change tone.
 
+        Do not answer general knowledge questions, keep the 
+        conversation focused on discussing my portfolio, 
+        projects, and experience.
+
         You can also use tools to generate resumes or cover 
         letters if the user provides a job description and 
         company details. Always use tools for these requests.
@@ -264,13 +268,17 @@ async def chat(
         tool_args: dict[str, Any] = json.loads(response.arguments)
 
         # Check if user has exceeded usage limit
-        if not await check_usage_limit(
-            user_id=user_id,
-            ip=ip,
-            ua=ua
+        if (
+            tool_name == "generate_resume" or 
+            tool_name == "generate_letter"
         ):
-            usage_response = await inform_user_usage_limit()
-            return usage_response
+            if not await check_usage_limit(
+                user_id=user_id,
+                ip=ip,
+                ua=ua
+            ):
+                usage_response = await inform_user_usage_limit()
+                return usage_response
 
         tool_result = await _execute_tool(
             user_id=user_id,

@@ -14,6 +14,7 @@ from api.common.authentication import validate_frontend_token, verify_jwt_ws
 from api.common.socket_registry import add_connection_registry, delete_connection_registry
 from api.common.socket_registry import send_message_ws
 from users.main import does_user_exist
+from monitoring.main import get_usages_remaining
 
 # --- Constants --- 
 
@@ -83,6 +84,20 @@ async def agent_chat_ws(ws: WebSocket):
                 )
                 continue
 
+            # Checking usage limits
+            if socket_message.type == "check_usage":
+                remaining = await get_usages_remaining(
+                    ip=ip,
+                    ua=user_agent
+                )
+                await send_message_ws(
+                    user_id=user_id,
+                    type="usage_info",
+                    data=remaining
+                )
+                continue
+            
+            # Chat responses
             user_input = socket_message.data
 
             response = await chat(
