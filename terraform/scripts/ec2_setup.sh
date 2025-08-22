@@ -20,9 +20,10 @@ sudo /tmp/aws/install
 # Clean up
 rm -rf /tmp/aws /tmp/awscliv2.zip
 
-# 3. Installing git
+# 3. Installing git and make
 echo "3. Installing git..."
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y git
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y make
 
 # 4. Installing Docker
 echo "4. Installing Docker..."

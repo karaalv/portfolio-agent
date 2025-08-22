@@ -177,7 +177,7 @@ data "aws_ami" "ubuntu_arm_latest" {
 # EC2 Instance
 resource "aws_instance" "ec2_instance" {
   ami           = data.aws_ami.ubuntu_arm_latest.id
-  instance_type = "t3.small"
+  instance_type = "t4g.small"
   key_name      = "ec2_key_personal"
 
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
@@ -256,14 +256,14 @@ resource "aws_cloudfront_distribution" "cloudfront_main" {
   aliases = ["alvinkaranja.dev"]
 
   origin {
-    domain_name = "216.198.79.1"
+    domain_name = "9ca58e9d9bb312b7.vercel-dns-017.com"
     origin_id   = "vercel-origin"
 
     custom_origin_config {
       http_port              = 80
       https_port             = 443
       origin_protocol_policy = "https-only"
-      origin_ssl_protocols   = ["TLSv1.2", "TLSv1.3"]
+      origin_ssl_protocols   = ["TLSv1.2"]
     }
   }
 
@@ -283,8 +283,8 @@ resource "aws_cloudfront_distribution" "cloudfront_main" {
     target_origin_id       = "vercel-origin"
     viewer_protocol_policy = "redirect-to-https"
 
-    allowed_methods            = ["GET", "HEAD", "OPTIONS"]
-    cached_methods             = ["GET", "HEAD"]
+    allowed_methods = ["GET", "HEAD", "OPTIONS"]
+    cached_methods  = ["GET", "HEAD"]
 
     cache_policy_id            = aws_cloudfront_cache_policy.cache_policy.id
     origin_request_policy_id   = aws_cloudfront_origin_request_policy.origin_request_policy.id

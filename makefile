@@ -2,8 +2,8 @@
 
 .PHONY: push secrets deploy
 
-AWS_PROFILE   = personal # Use for personal dev
-# AWS_PROFILE   = default # Use for deployment
+# For local dev 'export AWS_PROFILE=personal'
+AWS_PROFILE   ?= default
 AWS_REGION    = eu-west-2
 K8S_NAMESPACE = default
 
