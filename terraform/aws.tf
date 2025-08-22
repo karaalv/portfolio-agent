@@ -297,7 +297,7 @@ resource "aws_cloudfront_distribution" "cloudfront_main" {
     target_origin_id       = "vercel-origin"
     viewer_protocol_policy = "redirect-to-https"
 
-    allowed_methods = ["GET", "HEAD", "OPTIONS"]
+    allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
     cached_methods  = ["GET", "HEAD"]
 
     cache_policy_id            = aws_cloudfront_cache_policy.cache_policy.id
