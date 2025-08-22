@@ -1,9 +1,8 @@
 # --- Config ---
 
-.PHONY: push secrets deploy
+.PHONY: push secrets deploy	push-local secrets-local deploy-local
 
-# For local dev 'export AWS_PROFILE=personal'
-AWS_PROFILE   ?= default
+AWS_PROFILE   = personal
 AWS_REGION    = eu-west-2
 K8S_NAMESPACE = default
 
@@ -12,10 +11,10 @@ ACCOUNT_ID  = $(shell aws sts get-caller-identity --profile $(AWS_PROFILE) --que
 IMAGE_TAG   = $(shell git rev-parse --short HEAD)
 ECR_URI     = $(ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(REPO_NAME)
 
-# --- Targets ---
+# --- Targets Local development ---
 
 # Build and push Docker image to ECR
-push:
+push-local:
 	@echo "🏗️ Building and pushing $(ECR_URI):$(IMAGE_TAG)"
 	aws ecr get-login-password --region $(AWS_REGION) --profile $(AWS_PROFILE) \
 	| docker login --username AWS --password-stdin $(ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
@@ -26,7 +25,7 @@ push:
 	@echo "✅ Portfolio Agent image pushed: $(ECR_URI)"
 
 # Create/update Kubernetes secrets
-secrets:
+secrets-local:
 	@echo "🔑 Creating regcred-portfolio secret in Kubernetes"
 	kubectl create secret docker-registry regcred-portfolio \
 	  --docker-server=$(ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com \
@@ -42,6 +41,45 @@ secrets:
 	  --secret-id portfolio-agent/env/prod \
 	  --region $(AWS_REGION) \
 	  --profile $(AWS_PROFILE) \
+	  --query SecretString \
+	  --output text > tmp/.env.prod
+
+	@echo "🔑 Creating portfolio-env-prod secret in Kubernetes"
+	kubectl create secret generic portfolio-env-prod \
+	  --from-env-file=tmp/.env.prod \
+	  --namespace=$(K8S_NAMESPACE) \
+	  --dry-run=client -o yaml | kubectl apply -f -
+	@echo "✅ portfolio-env-prod secret ready"
+
+	@echo "🧹 Cleaning up temp files"
+	rm -rf ./tmp
+
+# Deploy Portfolio Agent to Kubernetes (depends on secrets)
+deploy-local: secrets-local
+	@echo "🚀 Deploying Portfolio Agent to Kubernetes"
+	ECR_URI=$(ECR_URI) IMAGE_TAG=$(IMAGE_TAG) ENV_SECRET=portfolio-env-prod \
+	envsubst '$${ECR_URI} $${IMAGE_TAG} $${ENV_SECRET}' < kubernetes/deployment.yaml | \
+	kubectl apply -f - --namespace=$(K8S_NAMESPACE)
+	@echo "✅ Portfolio Agent deployed"
+
+# --- Targets for EC2 Instance ---
+
+# Create/update Kubernetes secrets
+secrets:
+	@echo "🔑 Creating regcred-portfolio secret in Kubernetes"
+	kubectl create secret docker-registry regcred-portfolio \
+	  --docker-server=$(ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com \
+	  --docker-username=AWS \
+	  --docker-password="$$(aws ecr get-login-password --region $(AWS_REGION))" \
+	  --namespace=$(K8S_NAMESPACE) \
+	  --dry-run=client -o yaml | kubectl apply -f -
+	@echo "✅ regcred-portfolio secret ready"
+
+	@echo "🔑 Fetching environment secrets from AWS Secrets Manager"
+	mkdir -p tmp
+	aws secretsmanager get-secret-value \
+	  --secret-id portfolio-agent/env/prod \
+	  --region $(AWS_REGION) \
 	  --query SecretString \
 	  --output text > tmp/.env.prod
 
