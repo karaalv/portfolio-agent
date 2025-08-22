@@ -11,6 +11,11 @@ To interact with the agent, you can check it out on my website [alvinkaranja.dev
 
 <!-- For a detailed explanation of how the agent works, you can refer to my blog post [link](https://www.alvinkaranja.dev/blog/portfolio-agent). -->
 
+## 👨🏾‍⚖️ License
+
+This project is licensed under the [Apache License 2.0](./LICENSE).  
+See the [NOTICE](./NOTICE) file for attribution and additional details.
+
 ## 🏗️ Deployment
 
 - The agent is deployed using AWS as a traditional backend service, I use terraform to manage the infrastructure, and kubernetes to manage container orchestration.

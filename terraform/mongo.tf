@@ -41,3 +41,34 @@ resource "mongodbatlas_project_ip_access_list" "portfolio_dev_ip_access" {
   cidr_block = "0.0.0.0/0"
   comment    = "Allow connections from anywhere for development"
 }
+
+# --- Production Project ---
+
+resource "mongodbatlas_project" "portfolio_prod" {
+  name   = "Portfolio-Production"
+  org_id = var.mongodb_atlas_org_id
+
+  tags = {
+    environment = "production"
+  }
+}
+
+# Cluster Configuration
+resource "mongodbatlas_cluster" "portfolio_prod_cluster" {
+  project_id = mongodbatlas_project.portfolio_prod.id
+  name       = "portfolio-production-cluster"
+
+  # Provider Settings
+  provider_name               = "TENANT"
+  backing_provider_name       = "AWS"
+  provider_region_name        = "US_EAST_1"
+  provider_instance_size_name = "M0"
+
+  labels {
+    key   = "environment"
+    value = "production"
+  }
+}
+
+# Network access
+# TODO: Have access only to the IP of the EC2 instance

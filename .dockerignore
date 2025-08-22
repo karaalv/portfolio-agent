@@ -1,0 +1,43 @@
+# Environment files
+.env
+.env.dev
+.env.prod
+
+# Git files
+.git
+.gitignore
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Visual Studio Code files
+.vscode
+.vscode/*
+
+# Logs
+*.log
+*.tmp
+
+# System files
+**/.DS_Store
+**/Thumbs.db
+**/Desktop.ini
+**/~
+
+# Python bytecode
+**/__pycache__/
+**.py[cod]
+
+# Python test files
+.pytest_cache/
+
+# Virtual environment
+**/venv/
+
+# Test files
+**/tests/
+
+# Markdown files
+**/*.md
