@@ -2,6 +2,7 @@
 This module contains user routes for
 the API.
 """
+import os
 from fastapi import APIRouter, Request
 from users.schemas import User
 from api.common.utils import api_exception_handler, create_jwt_token
@@ -40,7 +41,8 @@ async def set_session(request: Request):
             secure=True,
             samesite="lax",
             max_age=COOKIE_EXPIRY_SECONDS,
-            expires=COOKIE_EXPIRY_SECONDS
+            expires=COOKIE_EXPIRY_SECONDS,
+            domain=os.getenv("CORS_DOMAIN")
         )
 
         response.set_cookie(
@@ -50,7 +52,8 @@ async def set_session(request: Request):
             secure=True,
             samesite="lax",
             max_age=COOKIE_EXPIRY_SECONDS,
-            expires=COOKIE_EXPIRY_SECONDS
+            expires=COOKIE_EXPIRY_SECONDS,
+            domain=os.getenv("CORS_DOMAIN")
         )
 
         return response

@@ -2,7 +2,7 @@
 
 .PHONY: push secrets deploy	push-local secrets-local deploy-local
 
-# For local development use AWS_PROFILE=personal
+# For local development use export AWS_PROFILE=personal
 AWS_PROFILE   ?= 
 AWS_REGION    = eu-west-2
 K8S_NAMESPACE = default
@@ -103,4 +103,6 @@ deploy: secrets
 	ECR_URI=$(ECR_URI) IMAGE_TAG=$(IMAGE_TAG) ENV_SECRET=portfolio-env-prod \
 	envsubst '$${ECR_URI} $${IMAGE_TAG} $${ENV_SECRET}' < kubernetes/deployment.yaml | \
 	kubectl apply -f - --namespace=$(K8S_NAMESPACE)
+	@echo "🔄 Forcing rollout restart to pick up new secrets"
+	kubectl rollout restart deployment/portfolio-agent --namespace=$(K8S_NAMESPACE)
 	@echo "✅ Portfolio Agent deployed"

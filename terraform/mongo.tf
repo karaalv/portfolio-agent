@@ -71,4 +71,8 @@ resource "mongodbatlas_cluster" "portfolio_prod_cluster" {
 }
 
 # Network access
-# TODO: Have access only to the IP of the EC2 instance
+resource "mongodbatlas_project_ip_access_list" "production_project_ec2_access" {
+  project_id = mongodbatlas_project.portfolio_prod.id
+  cidr_block = "${aws_instance.ec2_instance.public_ip}/32"
+  comment    = "Allow connections from EC2 instance"
+}

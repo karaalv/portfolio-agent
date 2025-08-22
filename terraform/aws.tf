@@ -235,13 +235,27 @@ resource "aws_cloudfront_response_headers_policy" "cors_policy" {
   cors_config {
     access_control_allow_credentials = true
     access_control_allow_headers {
-      items = ["Content-Type", "Authorization", "X-Requested-With", "frontend-token"]
+      items = [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "frontend-token",
+        "Connection",
+        "Upgrade",
+        "Sec-WebSocket-Key",
+        "Sec-WebSocket-Version",
+        "Sec-WebSocket-Accept",
+        "Sec-WebSocket-Protocol"
+      ]
     }
     access_control_allow_methods {
       items = ["ALL"]
     }
     access_control_allow_origins {
-      items = ["https://alvinkaranja.dev"]
+      items = [
+        "https://alvinkaranja.dev",
+        "https://staging.alvinkaranja.dev"
+      ]
     }
     origin_override            = false
     access_control_max_age_sec = 86400
