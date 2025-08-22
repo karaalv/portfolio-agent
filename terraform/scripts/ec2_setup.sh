@@ -49,13 +49,15 @@ echo "5. Installing k3s with Docker..."
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--docker" sh -
 sudo ln -sf /usr/local/bin/kubectl /usr/bin/kubectl
 
-echo "alias kubectl='sudo k3s kubectl'" >> ~/.bashrc
-source ~/.bashrc
+mkdir -p ~/.kube
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+sudo chown $USER:$USER ~/.kube/config
+chmod 600 ~/.kube/config
 
 # Wait for the node to appear in kubectl
 for i in {1..30}; do
   NODE_NAME=$(hostname)
-  if sudo k3s kubectl get node "$NODE_NAME" &>/dev/null; then
+  if kubectl get node "$NODE_NAME" &>/dev/null; then
     break
   fi
   echo "Waiting for node $NODE_NAME to register with k3s..."
