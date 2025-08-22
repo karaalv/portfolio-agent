@@ -49,10 +49,8 @@ echo "5. Installing k3s with Docker..."
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--docker" sh -
 sudo ln -sf /usr/local/bin/kubectl /usr/bin/kubectl
 
-mkdir -p ~/.kube
-sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-sudo chown $USER:$USER ~/.kube/config
-chmod 600 ~/.kube/config
+# TODO: Find more secure way of handling access to k3s
+sudo chmod 644 /etc/rancher/k3s/k3s.yaml # For now this works but not the best
 
 # Wait for the node to appear in kubectl
 for i in {1..30}; do
