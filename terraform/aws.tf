@@ -17,9 +17,9 @@ resource "aws_route53_zone" "alvinkaranja_dev" {
 }
 
 # Cloudfront Record
-resource "aws_route53_record" "root" {
+resource "aws_route53_record" "api_domain" {
   zone_id = aws_route53_zone.alvinkaranja_dev.zone_id
-  name    = "alvinkaranja.dev"
+  name    = "api.alvinkaranja.dev"
   type    = "A"
 
   alias {
@@ -254,6 +254,7 @@ resource "aws_cloudfront_response_headers_policy" "cors_policy" {
     access_control_allow_origins {
       items = [
         "https://alvinkaranja.dev",
+        "https://api.alvinkaranja.dev",
         "https://staging.alvinkaranja.dev"
       ]
     }
@@ -265,21 +266,9 @@ resource "aws_cloudfront_response_headers_policy" "cors_policy" {
 # Main distribution
 resource "aws_cloudfront_distribution" "cloudfront_main" {
   enabled = true
-  comment = "CloudFront for alvinkaranja.dev - Vercel + API routing"
+  comment = "CloudFront for api.alvinkaranja.dev - Vercel + API routing"
 
-  aliases = ["alvinkaranja.dev"]
-
-  origin {
-    domain_name = "9ca58e9d9bb312b7.vercel-dns-017.com"
-    origin_id   = "vercel-origin"
-
-    custom_origin_config {
-      http_port              = 80
-      https_port             = 443
-      origin_protocol_policy = "https-only"
-      origin_ssl_protocols   = ["TLSv1.2"]
-    }
-  }
+  aliases = ["api.alvinkaranja.dev"]
 
   origin {
     domain_name = aws_instance.ec2_instance.public_dns
@@ -294,19 +283,6 @@ resource "aws_cloudfront_distribution" "cloudfront_main" {
   }
 
   default_cache_behavior {
-    target_origin_id       = "vercel-origin"
-    viewer_protocol_policy = "redirect-to-https"
-
-    allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
-    cached_methods  = ["GET", "HEAD"]
-
-    cache_policy_id            = aws_cloudfront_cache_policy.cache_policy.id
-    origin_request_policy_id   = aws_cloudfront_origin_request_policy.origin_request_policy.id
-    response_headers_policy_id = aws_cloudfront_response_headers_policy.cors_policy.id
-  }
-
-  ordered_cache_behavior {
-    path_pattern           = "/api/*"
     target_origin_id       = "api-origin"
     viewer_protocol_policy = "redirect-to-https"
 
