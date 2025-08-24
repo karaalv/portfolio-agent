@@ -22,7 +22,7 @@ push-local:
 	@echo "🏗️ Building and pushing $(ECR_URI):$(IMAGE_TAG)"
 	aws ecr get-login-password --region $(AWS_REGION) --profile $(AWS_PROFILE) \
 	| docker login --username AWS --password-stdin $(ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-	docker buildx build --platform linux/amd64,linux/arm64 \
+	docker buildx build --platform linux/arm64 \
 		-t $(ECR_URI):$(IMAGE_TAG) \
 		-t $(ECR_URI):latest \
 		--push .
