@@ -5,6 +5,7 @@ The main interface function can be found
 in the `main.py` file in the agent tool
 package.
 """
+import time
 import textwrap
 from typing import Any
 from common.utils import TerminalColors, Timer, get_timestamp
@@ -219,9 +220,15 @@ class LetterConstructor:
         queries: list[str] = research_plan.queries
 
         if len(queries) > 0:
+            # Set phase
             await self._send_message_ws(
                 type="agent_writing_phase",
                 data="Researching job description and requirements"
+            )
+            # Set thinking
+            await self._send_message_ws(
+                type="agent_writing_thinking",
+                data=["Online research", "Job Description Analysis"]
             )
 
         if len(queries) > 3:
@@ -884,21 +891,27 @@ class LetterConstructor:
         # Build cover letter
         await self._header_section()
         header_time = self.timer.elapsed()
+        time.sleep(2)
 
         await self._address_section()
         address_time = self.timer.elapsed()
+        time.sleep(2)
 
         await self._opening_section()
         opening_time = self.timer.elapsed()
+        time.sleep(2)
 
         await self._body_section()
         body_time = self.timer.elapsed()
+        time.sleep(2)
 
         await self._closing_section()
         closing_time = self.timer.elapsed()
+        time.sleep(2)
 
         await self._signature()
         signature_time = self.timer.elapsed()
+        time.sleep(2)
 
         await self._summarise_request()
         summarise_time = self.timer.elapsed()

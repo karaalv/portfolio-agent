@@ -4,6 +4,7 @@ system and associated utilities. The main
 interface function can be found in the
 `main.py` file in the agent tools package.
 """
+import time
 import textwrap
 from typing import Any
 from common.utils import TerminalColors, Timer, get_timestamp
@@ -218,9 +219,15 @@ class ResumeConstructor:
         queries: list[str] = research_plan.queries
 
         if len(queries) > 0:
+            # Set phase
             await self._send_message_ws(
                 type="agent_writing_phase",
                 data="Researching job description and requirements"
+            )
+            # Set thinking
+            await self._send_message_ws(
+                type="agent_writing_thinking",
+                data=["Online research", "Job Description Analysis"]
             )
 
         if len(queries) > 3:
@@ -913,18 +920,23 @@ class ResumeConstructor:
         # Build resume
         await self._header_section()
         header_time = self.timer.elapsed()
-        
+        time.sleep(2)
+
         await self._skills_section()
         skills_time = self.timer.elapsed()
+        time.sleep(2)
 
         await self._experience_section()
         experience_time = self.timer.elapsed()
+        time.sleep(2)
 
         await self._projects_section()
         projects_time = self.timer.elapsed()
+        time.sleep(2)
 
         await self._education_section()
         education_time = self.timer.elapsed()
+        time.sleep(2)
 
         await self._summarise_request()
         summary_time = self.timer.elapsed()

@@ -53,6 +53,27 @@ async def _create_user_usage(
     await collection.insert_one(user_usage.model_dump())
     return user_usage
 
+@handle_exceptions_async("monitoring.main: Create User Usage Fallback")
+async def create_user_usage_fallback(
+    user_id: str
+) -> UserUsage:
+    """
+    Fallback function to create a user usage record.
+    """
+    collection = get_collection("monitoring")
+
+    user_usage = UserUsage(
+        user_id=user_id,
+        usage_id=user_id,
+        ip="<unknown>",
+        generation_count=1,
+        total_generations=1,
+        latest_generation=get_timestamp()
+    )
+
+    await collection.insert_one(user_usage.model_dump())
+    return user_usage
+
 # --- Retrieval ---
 
 @handle_exceptions_async("monitoring.main: Get User Usage")
@@ -85,11 +106,21 @@ async def check_usage_limit(
 ) -> bool:
     """
     Checks if user has exceeded their usage limit.
+    IP and User-Agent are used for fingerprinting,
+    if not available, user id is used as fallback.
     """
-    usage_id = generate_usage_id(ip, ua)
+    usage_id = ""
+
+    if ip and ua:
+        usage_id = generate_usage_id(ip, ua)
+    else:
+        usage_id = user_id
     
     if not await does_usage_id_exist(usage_id):
-        await _create_user_usage(user_id, ip, ua)
+        if ip and ua:
+            await _create_user_usage(user_id, ip, ua)
+        else:
+            await create_user_usage_fallback(user_id)
         return True
     
     collection = get_collection("monitoring")
@@ -129,11 +160,20 @@ async def check_usage_limit(
     return True
 
 @handle_exceptions_async("monitoring.main: Get Usages Remaining")
-async def get_usages_remaining(ip: str, ua: str) -> int:
+async def get_usages_remaining(
+    user_id: str,
+    ip: str, 
+    ua: str
+) -> int:
     """
     Get the number of usages remaining for a user.
     """
-    usage_id = generate_usage_id(ip, ua)
+    usage_id = ""
+    if ip and ua:
+        usage_id = generate_usage_id(ip, ua)
+    else:
+        usage_id = user_id
+
     collection = get_collection("monitoring")
     data = await collection.find_one({"usage_id": usage_id})
     usage_info: dict[str, Any] = data # type: ignore
