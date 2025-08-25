@@ -2,7 +2,8 @@
 
 .PHONY: build-push secrets deploy
 
-# For local development use export AWS_PROFILE=personal
+# NOTE: For local development use export AWS_PROFILE=personal
+
 AWS_PROFILE   ?= 
 AWS_REGION    = eu-west-2
 K8S_NAMESPACE = default

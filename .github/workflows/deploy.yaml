@@ -24,15 +24,37 @@ jobs:
           role-to-assume: ${{ secrets.OIDC_ROLE }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Run deploy script via SSM
-        uses: forgedconcepts/aws-ssm-send-command-action@master
-        with:
-          aws-region: ${{ secrets.AWS_REGION }}
-          targets: |
-            [{"Key":"InstanceIds","Values":["${{ secrets.INSTANCE_ID }}"]}]
-          document-name: AWS-RunShellScript
-          parameters: |
-            {"commands":[
-                "chmod +x scripts/deploy.sh",
-                "scripts/deploy.sh"
-            ]}
+      - name: Trigger deploy script via SSM
+        id: ssm_deploy
+        run: |
+          INSTANCE="${{ secrets.INSTANCE_ID }}"
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE" \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands='["chmod +x scripts/deploy.sh","scripts/deploy.sh"]' \
+            --query "Command.CommandId" --output text)
+          echo "Command ID: $COMMAND_ID"
+
+          # Wait until command finishes
+          STATUS="InProgress"
+          while [ "$STATUS" = "InProgress" ]; do
+            sleep 5
+            STATUS=$(aws ssm get-command-invocation \
+              --instance-id "$INSTANCE" \
+              --command-id "$COMMAND_ID" \
+              --query "Status" --output text)
+            echo "Status: $STATUS"
+          done
+
+          EXIT_CODE=$(aws ssm get-command-invocation \
+            --instance-id "$INSTANCE" \
+            --command-id "$COMMAND_ID" \
+            --query "ResponseCode" --output text)
+          echo "Exit code: $EXIT_CODE"
+
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            echo "❌ Deployment failed"
+            exit 1
+          fi
+
+          echo "✅ Deployment succeeded"

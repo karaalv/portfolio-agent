@@ -1,5 +1,5 @@
 # Build new Docker image and push to ECR
-name: Build & Push via Makefile
+name: Build and Push
 
 on:
   push:
