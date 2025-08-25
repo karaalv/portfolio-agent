@@ -365,6 +365,7 @@ resource "aws_iam_policy" "github_actions_ssm_policy" {
         "ec2:DescribeInstances",
         "ssm:SendCommand",
         "ssm:ListCommandInvocations",
+        "ssm:GetCommandInvocation",
         "ssm:DescribeInstanceInformation"
       ]
       Resource = "*"

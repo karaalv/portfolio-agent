@@ -3,6 +3,7 @@
 # This script redeploys the application 
 # with the latest Docker image
 set -euo pipefail
+set -x
 
 echo "1. Setting up application redeployment"
 

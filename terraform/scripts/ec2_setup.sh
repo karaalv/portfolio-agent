@@ -16,6 +16,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y unzip
 curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/tmp/awscliv2.zip"
 unzip -q /tmp/awscliv2.zip -d /tmp
 sudo /tmp/aws/install
+sudo snap start amazon-ssm-agent
 
 # Clean up
 rm -rf /tmp/aws /tmp/awscliv2.zip

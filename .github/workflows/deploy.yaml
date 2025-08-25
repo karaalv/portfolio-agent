@@ -44,6 +44,21 @@ jobs:
               --command-id "$COMMAND_ID" \
               --query "Status" --output text)
             echo "Status: $STATUS"
+
+            # Fetch and print logs so far
+            echo "[stdout]"
+            aws ssm get-command-invocation \
+              --instance-id "$INSTANCE" \
+              --command-id "$COMMAND_ID" \
+              --query "StandardOutputContent" \
+              --output text | sed 's/^/[stdout] /'
+
+            echo "[stderr]"
+            aws ssm get-command-invocation \
+              --instance-id "$INSTANCE" \
+              --command-id "$COMMAND_ID" \
+              --query "StandardErrorContent" \
+              --output text | sed 's/^/[stderr] /'
           done
 
           EXIT_CODE=$(aws ssm get-command-invocation \
