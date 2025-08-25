@@ -1,0 +1,38 @@
+# Deploy application with new image
+# on successful build
+name: Deploy Application
+
+on:
+  workflow_run:
+    workflows: ["Build and Push"]
+    branches: [main]
+    types:
+      - completed
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.OIDC_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Run deploy script via SSM
+        uses: forgedconcepts/aws-ssm-send-command-action@master
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          targets: |
+            [{"Key":"InstanceIds","Values":["${{ secrets.INSTANCE_ID }}"]}]
+          document-name: AWS-RunShellScript
+          parameters: |
+            {"commands":[
+                "chmod +x scripts/deploy.sh",
+                "scripts/deploy.sh"
+            ]}
