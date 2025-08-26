@@ -14,25 +14,32 @@
         technical capabilities and project contributions.
     </context>
     <document>
-        I am proficient in several programming languages, 
-        including Python, JavaScript/TypeScript, Java, C/C++, 
-        and SQL. I also have experience with MATLAB, Kotlin, 
-        and Swift. I have strong programming fundamentals and 
-        can quickly adapt to new languages or paradigms.  
+        I have a strong foundation in programming and software 
+        engineering, with proficiency in Python, JavaScript, 
+        TypeScript, Java, C/C++, and SQL. In addition, I have 
+        working experience with MATLAB, Kotlin, and Swift. My 
+        strong programming fundamentals allow me to adapt 
+        quickly to new languages, paradigms, and technical 
+        environments. 
         ---
-        I am familiar with frameworks and tools across multiple 
-        areas of software development:  
+        I am experienced with a broad range of frameworks, 
+        libraries, and tools across the software development 
+        stack:  
         - Frontend: React, Next.js, Vercel  
         - Backend: Node.js, Express, FastAPI, MongoDB, PostgreSQL, 
           Redis, PineconeDB  
         - Mobile: React Native, Expo  
         - DevOps: Docker, Kubernetes  
-        - Cloud: AWS, GCP  
+        - Cloud Platforms: AWS, GCP  
         - Machine Learning & Data Science: PyTorch, Apache Spark, 
           Pandas, Scikit-learn  
         ---
-        I am flexible in working with different technologies and 
-        adapting to new tools and frameworks as needed.
+        My technical expertise is complemented by flexibility in 
+        adopting new tools and frameworks, enabling me to 
+        contribute effectively across diverse projects. I take 
+        a problem-driven approach to technology, selecting the 
+        right tools and architectures based on scalability, 
+        efficiency, and long-term maintainability. 
     </document>
 </section>
 
@@ -46,21 +53,35 @@
         organising, testing, and coordinating development.
     </context>
     <document>
-        To manage product development effectively, I use a 
-        range of tools for organisation, testing, and 
-        communication with collaborators.  
+        I approach product management with a structured yet 
+        adaptable methodology, ensuring that both strategic 
+        goals and day-to-day execution are aligned. My focus is 
+        on creating clarity, driving collaboration, and enabling 
+        efficient development cycles that balance speed with 
+        quality. 
         ---
         For design and development workflows, I use Figma for 
-        prototyping and collaboration, and GitHub for version 
-        control and code management. For code testing and 
-        quality assurance, I use Jest, Mocha, and pytest. I 
-        also leverage CI/CD pipelines with GitHub Actions and 
-        AWS services, including CodeBuild, CodeDeploy, and 
-        CodePipeline. For testing HTTP APIs, I use Postman.  
+        prototyping and collaborative design, alongside GitHub 
+        for version control, code reviews, and release 
+        management. Quality assurance is supported through 
+        testing frameworks such as Jest, Mocha, and pytest, 
+        integrated into CI/CD pipelines built with GitHub 
+        Actions and AWS services, including CodeBuild, 
+        CodeDeploy, and CodePipeline. I also use Postman for 
+        structured testing of HTTP APIs. 
         ---
-        For task tracking and assigning responsibilities, I use 
-        GitHub Projects and Asana, but I am open to adopting 
-        other project management tools as needed.
+        In coordinating work across teams, I leverage GitHub 
+        Projects and Asana for task tracking, progress 
+        monitoring, and assigning responsibilities. I am 
+        comfortable adapting to other project management tools 
+        depending on team needs, and I place strong emphasis on 
+        transparency, clear communication, and incremental 
+        delivery. 
+        ---
+        Overall, my product management skills are grounded in 
+        practical experience, combining technical expertise with 
+        organisational practices that ensure products are 
+        designed, built, and delivered effectively. 
     </document>
 </section>
 
@@ -74,20 +95,30 @@
         related tools.
     </context>
     <document>
-        I have a strong quantitative mindset, with experience in 
-        data analysis and statistical methods. I am proficient in 
-        using tools such as R and Python for data manipulation 
-        and analysis. I am familiar with statistical concepts such 
-        as hypothesis testing, regression analysis, and A/B testing.  
+        I have a strong quantitative mindset, developed through 
+        experience in data analysis, statistical modelling, and 
+        mathematical problem-solving. I am proficient in R and 
+        Python for data manipulation and analysis, with practical 
+        knowledge of statistical techniques such as hypothesis 
+        testing, regression analysis, and A/B testing. 
         ---
-        I approach problem-solving with a strong mathematical 
-        foundation, leveraging concepts such as optimisation 
-        theory, network analysis, and statistical inference. I can 
-        break down large problems into smaller components and 
-        derive actionable strategies, enabling me to tackle 
-        large-scale projects effectively.  
+        My problem-solving approach is grounded in mathematics, 
+        leveraging optimisation theory, network analysis, and 
+        statistical inference to break down complex challenges 
+        into structured components. This enables me to design 
+        actionable strategies and effectively manage large-scale 
+        projects. 
         ---
-        I have experience with data visualisation tools such as 
-        Tableau and Matplotlib to create insightful visualisations and dashboards. I am comfortable working with large datasets and can extract meaningful insights from data. I also have experience using SQL to query databases and retrieve relevant data for analysis.
+        I also have experience with data visualisation, using 
+        tools such as Tableau, Matplotlib, and Seaborn to build 
+        dashboards and communicate insights clearly. I am 
+        comfortable working with large datasets, and I regularly 
+        use SQL to query databases and extract relevant data for 
+        analysis. 
+        ---
+        Overall, my quantitative skill set combines technical 
+        proficiency with analytical rigour, allowing me to 
+        transform raw data into meaningful insights and 
+        data-driven solutions. 
     </document>
 </section>
