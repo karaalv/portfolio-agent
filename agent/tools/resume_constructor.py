@@ -4,111 +4,120 @@ system and associated utilities. The main
 interface function can be found in the
 `main.py` file in the agent tools package.
 """
-import time
+
 import textwrap
+import time
 from typing import Any
-from common.utils import TerminalColors, Timer, get_timestamp
+
+from agent.memory.schemas import AgentCanvas, AgentMemory
 from agent.tools.schemas import ResearchPlan
-from api.common.socket_manager import SocketManager
-from agent.memory.schemas import AgentMemory, AgentCanvas
-from openai_client.main import normal_response, structured_response
 from agent.tools.utils import researcher
+from api.common.socket_manager import SocketManager
+from api.common.socket_registry import (
+	get_connection_registry,
+)
+from common.utils import (
+	TerminalColors,
+	Timer,
+	get_timestamp,
+)
+from openai_client.main import (
+	normal_response,
+	structured_response,
+)
+from rag.query_executor import (
+	refine_context,
+	retrieve_documents_sequential,
+)
 from rag.query_planner import query_planner
-from rag.query_executor import retrieve_documents_sequential, refine_context
-from api.common.socket_registry import get_connection_registry
+
 
 class ResumeConstructor:
-    """
-    Class to construct resume based 
-    on user input. 
+	"""
+	Class to construct resume based
+	on user input.
 
-    The class manages the construction
-    process and associated state management
-    for the operation.
-    """
-    def __init__(
-        self, 
-        user_id: str,
-        context_seed: str,
-        verbose: bool
-    ):
-        # Input
-        self.user_id = user_id
-        self.context_seed = context_seed
-        self.verbose = verbose
-        # Models
-        self._planner_model = "gpt-4.1-mini"
-        self._refiner_model = "gpt-4.1-nano"
-        self._formatter_model = "gpt-4.1-nano"
-        self._response_model = "gpt-4.1-nano"
-        # Content
-        self.title = ""
-        self.research = ""
-        self.resume = ""
-        self.acknowledgment = ""
-        self.summary = ""
-        # Utils
-        self.message_id = f"streaming_{get_timestamp()}"
-        self.timer = Timer(start=False)
-        self._passthrough_prompt = "Obey the system prompt"
-        # Socket connection
-        socket_connection = get_connection_registry(user_id)
-        if socket_connection is None:
-            raise ValueError(
-                "No active WebSocket connection found for user."
-            )
-        self.socket_manager: SocketManager = socket_connection
+	The class manages the construction
+	process and associated state management
+	for the operation.
+	"""
 
-    # --- Utilities ---
+	def __init__(self, user_id: str, context_seed: str, verbose: bool):
+		# Input
+		self.user_id = user_id
+		self.context_seed = context_seed
+		self.verbose = verbose
+		# Models
+		self._planner_model = 'gpt-4.1-mini'
+		self._refiner_model = 'gpt-4.1-nano'
+		self._formatter_model = 'gpt-4.1-nano'
+		self._response_model = 'gpt-4.1-nano'
+		# Content
+		self.title = ''
+		self.research = ''
+		self.resume = ''
+		self.acknowledgment = ''
+		self.summary = ''
+		# Utils
+		self.message_id = f'streaming_{get_timestamp()}'
+		self.timer = Timer(start=False)
+		self._passthrough_prompt = 'Obey the system prompt'
+		# Socket connection
+		socket_connection = get_connection_registry(user_id)
+		if socket_connection is None:
+			raise ValueError('No active WebSocket connection found for user.')
+		self.socket_manager: SocketManager = socket_connection
 
-    async def _send_message_ws(
-        self,
-        type: str,
-        data: Any,
-        success: bool = True,
-        message: str = "Data sent successfully"
-    ):
-        await self.socket_manager.send_message(
-            type=type,
-            data=data,
-            success=success,
-            message=message
-        )
+	# --- Utilities ---
 
-    async def _update_writing_state_ws(self):
-        """
-        Used to update the client
-        writing state with messages
-        and progress updates.
-        """
-        update = AgentMemory(
-            id=self.message_id,
-            user_id=self.user_id,
-            source="agent",
-            content=self.acknowledgment + self.summary,
-            illusion=True,
-            agent_canvas=AgentCanvas(
-                title=self.title,
-                id=self.message_id + "_canvas",
-                content=self.resume
-            )
-        )
+	async def _send_message_ws(
+		self,
+		type: str,
+		data: Any,
+		success: bool = True,
+		message: str = 'Data sent successfully',
+	):
+		await self.socket_manager.send_message(
+			type=type,
+			data=data,
+			success=success,
+			message=message,
+		)
 
-        await self._send_message_ws(
-            type="agent_writing",
-            data=update.model_dump(),
-        )
+	async def _update_writing_state_ws(self):
+		"""
+		Used to update the client
+		writing state with messages
+		and progress updates.
+		"""
+		update = AgentMemory(
+			id=self.message_id,
+			user_id=self.user_id,
+			source='agent',
+			content=self.acknowledgment + self.summary,
+			illusion=True,
+			agent_canvas=AgentCanvas(
+				title=self.title,
+				id=self.message_id + '_canvas',
+				content=self.resume,
+			),
+		)
 
-    async def _get_research_plan(self) -> ResearchPlan:
-        """
-        Constructs a research plan based on the
-        context seed provided by the user.
-        
-        Returns:
-            ResearchPlan: The constructed research plan.
-        """
+		await self._send_message_ws(
+			type='agent_writing',
+			data=update.model_dump(),
+		)
 
-        system_prompt = textwrap.dedent(f"""
+	async def _get_research_plan(self) -> ResearchPlan:
+		"""
+		Constructs a research plan based on the
+		context seed provided by the user.
+
+		Returns:
+			ResearchPlan: The constructed research plan.
+		"""
+
+		system_prompt = textwrap.dedent(f"""
             You are an expert research planner for a resume
             generation tool. You are part of a pipeline that
             generates targeted research plans from a given
@@ -147,31 +156,31 @@ class ResumeConstructor:
             {self.context_seed}
         """)
 
-        research_plan = await structured_response(
-            system_prompt=system_prompt,
-            user_input=self._passthrough_prompt,
-            response_format=ResearchPlan,
-            model=self._planner_model
-        )
+		research_plan = await structured_response(
+			system_prompt=system_prompt,
+			user_input=self._passthrough_prompt,
+			response_format=ResearchPlan,
+			model=self._planner_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.magenta}"
-                f"Research Plan:\n"
-                f"{TerminalColors.reset}"
-                f"{research_plan}\n"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.magenta}'
+				f'Research Plan:\n'
+				f'{TerminalColors.reset}'
+				f'{research_plan}\n'
+			)
 
-        return research_plan
-    
-    async def _refine_research(self):
-        """
-        Refines the research conducted by the
-        research agent, focusing on extracting
-        the most relevant information for the
-        resume generation task.
-        """
-        system_prompt = textwrap.dedent(f"""
+		return research_plan
+
+	async def _refine_research(self):
+		"""
+		Refines the research conducted by the
+		research agent, focusing on extracting
+		the most relevant information for the
+		resume generation task.
+		"""
+		system_prompt = textwrap.dedent(f"""
             You are an expert research refiner for a resume
             generation tool. Your role is to distill the
             research findings into a concise summary that
@@ -193,125 +202,125 @@ class ResumeConstructor:
             {self.context_seed}
         """)
 
-        refined_research = await normal_response(
-            system_prompt=system_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._refiner_model
-        )
+		refined_research = await normal_response(
+			system_prompt=system_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._refiner_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.cyan}"
-                f"Refined Research:\n"
-                f"{TerminalColors.reset}"
-                f"{refined_research}\n"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.cyan}'
+				f'Refined Research:\n'
+				f'{TerminalColors.reset}'
+				f'{refined_research}\n'
+			)
 
-        self.research = refined_research
+		self.research = refined_research
 
-    async def _perform_research(self):
-        """
-        Performs research based on the
-        research plan, research is added
-        to class instance.
-        """
-        research_plan = await self._get_research_plan()
-        queries: list[str] = research_plan.queries
+	async def _perform_research(self):
+		"""
+		Performs research based on the
+		research plan, research is added
+		to class instance.
+		"""
+		research_plan = await self._get_research_plan()
+		queries: list[str] = research_plan.queries
 
-        if len(queries) > 0:
-            # Set phase
-            await self._send_message_ws(
-                type="agent_writing_phase",
-                data="Researching job description and requirements"
-            )
-            # Set thinking
-            await self._send_message_ws(
-                type="agent_writing_thinking",
-                data=["Online research", "Job Description Analysis"]
-            )
+		if len(queries) > 0:
+			# Set phase
+			await self._send_message_ws(
+				type='agent_writing_phase',
+				data='Researching job description and requirements',
+			)
+			# Set thinking
+			await self._send_message_ws(
+				type='agent_writing_thinking',
+				data=[
+					'Online research',
+					'Job Description Analysis',
+				],
+			)
 
-        if len(queries) > 3:
-            queries = queries[:3]
+		if len(queries) > 3:
+			queries = queries[:3]
 
-        for plan in queries:
-            research = await researcher(plan)
-            
-            if self.verbose:
-                print(
-                    f"{TerminalColors.cyan}"
-                    f"Research Results for '{plan}':\n"
-                    f"{TerminalColors.reset}"
-                    f"{research}\n"
-                )
-            
-            self.research += research
+		for plan in queries:
+			research = await researcher(plan)
 
-        await self._refine_research()
+			if self.verbose:
+				print(
+					f'{TerminalColors.cyan}'
+					f"Research Results for '{plan}':\n"
+					f'{TerminalColors.reset}'
+					f'{research}\n'
+				)
 
-    async def _fetch_context(
-        self, 
-        section_query: str
-    ) -> str:
-        """
-        Fetches context from the RAG system
-        based on the information needed for 
-        the specific section.
-        """
-        plan = await query_planner(section_query)
-        context = await retrieve_documents_sequential(
-            user_id=self.user_id,
-            query_plan=plan,
-            streaming_context="agent_writing_thinking",
-            verbose=self.verbose
-        )
-        refined_context = await refine_context(
-            user_input=section_query,
-            retrieval_results=context
-        )
+			self.research += research
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.green}"
-                f"Context for '{section_query}':\n"
-                f"{TerminalColors.reset}"
-                f"{refined_context}\n"
-            )
+		await self._refine_research()
 
-        return refined_context
-    
-    async def _acknowledge_request(self):
-        """
-        Acknowledges the user's request and provides
-        a brief summary of the information being used
-        to create a resume.
-        """
-        acknowledgment_prompt = textwrap.dedent(f"""
-            You are an acknowledgment model in a resume generation 
+	async def _fetch_context(self, section_query: str) -> str:
+		"""
+		Fetches context from the RAG system
+		based on the information needed for
+		the specific section.
+		"""
+		plan = await query_planner(section_query)
+		context = await retrieve_documents_sequential(
+			user_id=self.user_id,
+			query_plan=plan,
+			streaming_context='agent_writing_thinking',
+			verbose=self.verbose,
+		)
+		refined_context = await refine_context(
+			user_input=section_query,
+			retrieval_results=context,
+		)
+
+		if self.verbose:
+			print(
+				f'{TerminalColors.green}'
+				f"Context for '{section_query}':\n"
+				f'{TerminalColors.reset}'
+				f'{refined_context}\n'
+			)
+
+		return refined_context
+
+	async def _acknowledge_request(self):
+		"""
+		Acknowledges the user's request and provides
+		a brief summary of the information being used
+		to create a resume.
+		"""
+		acknowledgment_prompt = textwrap.dedent(f"""
+            You are an acknowledgment model in a resume generation
             pipeline for my personal portfolio website.
 
-            Your task is to confirm to the user that their resume 
-            request is being processed using the provided context. 
-            Give a brief, clear confirmation summarizing what the 
+            Your task is to confirm to the user that their resume
+            request is being processed using the provided context.
+            Give a brief, clear confirmation summarizing what the
             user requested—no extra details or unrelated content.
 
             Note: You are addressing a visitor on my website,
             so respond in a friendly, professional style such as:
 
-            "Your request to create a resume for <role> at <company> 
-            has been received. I'm now preparing it based on the 
+            "Your request to create a resume for <role> at <company>
+            has been received. I'm now preparing it based on the
             details provided."
 
             Context for request:
             {self.context_seed}
         """)
 
-        response = await normal_response(
-            system_prompt=acknowledgment_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._response_model
-        )
+		response = await normal_response(
+			system_prompt=acknowledgment_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._response_model,
+		)
 
-        title_prompt = textwrap.dedent(f"""
+		title_prompt = textwrap.dedent(f"""
             You are part of a resume generation tool.
             Generate a short, professional title for the resume
             based on the user's request and context.
@@ -329,119 +338,118 @@ class ResumeConstructor:
             {self.context_seed}
         """)
 
-        title = await normal_response(
-            system_prompt=title_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._response_model
-        )
-        self.title = title
+		title = await normal_response(
+			system_prompt=title_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._response_model,
+		)
+		self.title = title
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.magenta}"
-                f"Acknowledgment:\n"
-                f"{TerminalColors.reset}"
-                f"{response}"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.magenta}'
+				f'Acknowledgment:\n'
+				f'{TerminalColors.reset}'
+				f'{response}'
+			)
 
-        self.acknowledgment = response
-        await self._update_writing_state_ws()
+		self.acknowledgment = response
+		await self._update_writing_state_ws()
 
-    async def _summarise_request(self):
-        """
-        Summarises the resume creation process.
-        """
-        summary_prompt = textwrap.dedent(f"""
-            You are part of a resume generation tool. 
-            Your task is to read the generated resume 
-            and produce a very brief summary of its 
+	async def _summarise_request(self):
+		"""
+		Summarises the resume creation process.
+		"""
+		summary_prompt = textwrap.dedent(f"""
+            You are part of a resume generation tool.
+            Your task is to read the generated resume
+            and produce a very brief summary of its
             contents.
 
             Rules:
-            - Base the summary only on what is written 
+            - Base the summary only on what is written
             in the resume.
             - Keep it concise (1-3 sentences max).
             - Do not add new information or commentary.
-            - Address the visitor directly in a friendly, 
+            - Address the visitor directly in a friendly,
             professional tone.
             - Continue to use first person in the response,
             respond as if you are the one who created the
             resume.
 
             Example:
-            "Here's a quick overview of the resume I created 
-            for <role>, highlighting my skills, experience, 
+            "Here's a quick overview of the resume I created
+            for <role>, highlighting my skills, experience,
             and achievements relevant to the position."
 
             The generated resume is as follows:
             {self.resume}
         """)
 
-        response = await normal_response(
-            system_prompt=summary_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._response_model
-        )
+		response = await normal_response(
+			system_prompt=summary_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._response_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.cyan}"
-                f"Summary:\n"
-                f"{TerminalColors.reset}"
-                f"{response}"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.cyan}'
+				f'Summary:\n'
+				f'{TerminalColors.reset}'
+				f'{response}'
+			)
 
-        self.summary = response
-        await self._update_writing_state_ws()
-        
-        # End writing state on client
-        await self._send_message_ws(
-            type="agent_writing_phase",
-            data="<complete>"
-        )
+		self.summary = response
+		await self._update_writing_state_ws()
 
-    # --- Resume Sections ---
+		# End writing state on client
+		await self._send_message_ws(
+			type='agent_writing_phase', data='<complete>'
+		)
 
-    async def _header_section(self):
-        """
-        Constructs the header section of the 
-        resume.
-        """
-        await self._send_message_ws(
-            type="agent_writing_phase",
-            data="Writing header section..."
-        )
+	# --- Resume Sections ---
 
-        header = "<div align='center'><h2>Alvin Karanja</h2></div>\n\n"
-        header += "**Email:** alviinkaranjja@gmail.com - "
-        header += "**LinkedIn:** /in/alvin-n-karanja - "
-        header += "**GitHub:** github.com/karaalv - "
-        header += "**Portfolio:** alvinkaranja.dev"
-        header += "\n\n"
+	async def _header_section(self):
+		"""
+		Constructs the header section of the
+		resume.
+		"""
+		await self._send_message_ws(
+			type='agent_writing_phase',
+			data='Writing header section...',
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.yellow}"
-                f"Header Section:\n"
-                f"{TerminalColors.reset}"
-                f"{header}"
-            )
+		header = "<div align='center'><h2>Alvin Karanja</h2></div>\n\n"
+		header += '**Email:** alviinkaranjja@gmail.com - '
+		header += '**LinkedIn:** /in/alvin-n-karanja - '
+		header += '**GitHub:** github.com/karaalv - '
+		header += '**Portfolio:** alvinkaranja.dev'
+		header += '\n\n'
 
-        self.resume += header
-        await self._update_writing_state_ws()
+		if self.verbose:
+			print(
+				f'{TerminalColors.yellow}'
+				f'Header Section:\n'
+				f'{TerminalColors.reset}'
+				f'{header}'
+			)
 
-    async def _skills_section(self):
-        """
-        Constructs the skills section of the 
-        resume.
-        """
-        await self._send_message_ws(
-            type="agent_writing_phase",
-            data="Writing skills..."
-        )
+		self.resume += header
+		await self._update_writing_state_ws()
 
-        # Input Refinement
-        input_refiner_prompt = textwrap.dedent(f"""
+	async def _skills_section(self):
+		"""
+		Constructs the skills section of the
+		resume.
+		"""
+		await self._send_message_ws(
+			type='agent_writing_phase',
+			data='Writing skills...',
+		)
+
+		# Input Refinement
+		input_refiner_prompt = textwrap.dedent(f"""
             You are part of a resume generation tool, responsible
             for creating the skills section of the resume.
 
@@ -468,24 +476,24 @@ class ResumeConstructor:
             - Job description: {self.context_seed}
         """)
 
-        skills_query = await normal_response(
-            system_prompt=input_refiner_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._refiner_model
-        )
+		skills_query = await normal_response(
+			system_prompt=input_refiner_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._refiner_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.cyan}"
-                f"Skills Section Prompt:\n"
-                f"{TerminalColors.reset}"
-                f"{skills_query}\n"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.cyan}'
+				f'Skills Section Prompt:\n'
+				f'{TerminalColors.reset}'
+				f'{skills_query}\n'
+			)
 
-        skills_context = await self._fetch_context(skills_query)
+		skills_context = await self._fetch_context(skills_query)
 
-        # Formatter
-        formatter_prompt = textwrap.dedent(f"""
+		# Formatter
+		formatter_prompt = textwrap.dedent(f"""
             You are part of a resume generation tool, responsible
             for formatting the skills section.
 
@@ -518,39 +526,38 @@ class ResumeConstructor:
             - Skills context: {skills_context}
         """)
 
-        formatted_skills = await normal_response(
-            system_prompt=formatter_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._formatter_model
-        )
+		formatted_skills = await normal_response(
+			system_prompt=formatter_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._formatter_model,
+		)
 
-        title = "\n\n### Skills\n\n---"
-        skills_section = f"{title}\n\n{formatted_skills}\n\n"
+		title = '\n\n### Skills\n\n---'
+		skills_section = f'{title}\n\n{formatted_skills}\n\n'
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.yellow}"
-                f"Formatted Skills Section:\n"
-                f"{TerminalColors.reset}"
-                f"{skills_section}"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.yellow}'
+				f'Formatted Skills Section:\n'
+				f'{TerminalColors.reset}'
+				f'{skills_section}'
+			)
 
+		self.resume += skills_section
+		await self._update_writing_state_ws()
 
-        self.resume += skills_section
-        await self._update_writing_state_ws()
+	async def _experience_section(self):
+		"""
+		Constructs the experience section of the
+		resume.
+		"""
+		await self._send_message_ws(
+			type='agent_writing_phase',
+			data='Writing relevant experience...',
+		)
 
-    async def _experience_section(self):
-        """
-        Constructs the experience section of the
-        resume.
-        """
-        await self._send_message_ws(
-            type="agent_writing_phase",
-            data="Writing relevant experience..."
-        )
-
-        # Input Refinement
-        input_refiner_prompt = textwrap.dedent(f"""
+		# Input Refinement
+		input_refiner_prompt = textwrap.dedent(f"""
             You are part of a resume generation tool, responsible
             for creating the experience section of the resume.
 
@@ -577,24 +584,24 @@ class ResumeConstructor:
             - Job description: {self.context_seed}
         """)
 
-        experience_query = await normal_response(
-            system_prompt=input_refiner_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._refiner_model
-        )
+		experience_query = await normal_response(
+			system_prompt=input_refiner_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._refiner_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.cyan}"
-                f"Experience Section Prompt:\n"
-                f"{TerminalColors.reset}"
-                f"{experience_query}\n"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.cyan}'
+				f'Experience Section Prompt:\n'
+				f'{TerminalColors.reset}'
+				f'{experience_query}\n'
+			)
 
-        experience_context = await self._fetch_context(experience_query)
+		experience_context = await self._fetch_context(experience_query)
 
-        # Formatter
-        formatter_prompt = textwrap.dedent(f"""
+		# Formatter
+		formatter_prompt = textwrap.dedent(f"""
             You are part of a resume generation tool, responsible
             for formatting the experience section.
 
@@ -641,38 +648,38 @@ class ResumeConstructor:
             - Experience context: {experience_context}
         """)
 
-        formatted_experience = await normal_response(
-            system_prompt=formatter_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._formatter_model
-        )
+		formatted_experience = await normal_response(
+			system_prompt=formatter_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._formatter_model,
+		)
 
-        title = "\n\n### Experience\n\n---"
-        experience_section = f"{title}\n\n{formatted_experience}\n\n"
-        
-        if self.verbose:
-            print(
-                f"{TerminalColors.yellow}"
-                f"Formatted Experience Section:\n"
-                f"{TerminalColors.reset}"
-                f"{experience_section}"
-            )
-        
-        self.resume += experience_section
-        await self._update_writing_state_ws()
+		title = '\n\n### Experience\n\n---'
+		experience_section = f'{title}\n\n{formatted_experience}\n\n'
 
-    async def _projects_section(self):
-        """
-        Constructs the projects section of the
-        resume.
-        """
-        await self._send_message_ws(
-            type="agent_writing_phase",
-            data="Citing notable projects..."
-        )
-        
-        # Input Refinement
-        input_refiner_prompt = textwrap.dedent(f"""
+		if self.verbose:
+			print(
+				f'{TerminalColors.yellow}'
+				f'Formatted Experience Section:\n'
+				f'{TerminalColors.reset}'
+				f'{experience_section}'
+			)
+
+		self.resume += experience_section
+		await self._update_writing_state_ws()
+
+	async def _projects_section(self):
+		"""
+		Constructs the projects section of the
+		resume.
+		"""
+		await self._send_message_ws(
+			type='agent_writing_phase',
+			data='Citing notable projects...',
+		)
+
+		# Input Refinement
+		input_refiner_prompt = textwrap.dedent(f"""
             You are part of a resume generation tool, responsible
             for creating the projects section of the resume.
 
@@ -699,24 +706,24 @@ class ResumeConstructor:
             - Job description: {self.context_seed}
         """)
 
-        projects_query = await normal_response(
-            system_prompt=input_refiner_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._refiner_model
-        )
+		projects_query = await normal_response(
+			system_prompt=input_refiner_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._refiner_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.cyan}"
-                f"Projects Section Prompt:\n"
-                f"{TerminalColors.reset}"
-                f"{projects_query}\n"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.cyan}'
+				f'Projects Section Prompt:\n'
+				f'{TerminalColors.reset}'
+				f'{projects_query}\n'
+			)
 
-        projects_context = await self._fetch_context(projects_query)
+		projects_context = await self._fetch_context(projects_query)
 
-        # Formatter
-        formatter_prompt = textwrap.dedent(f"""
+		# Formatter
+		formatter_prompt = textwrap.dedent(f"""
             You are part of a resume generation tool, responsible
             for formatting the projects section.
 
@@ -747,7 +754,7 @@ class ResumeConstructor:
                 - Exclude unrelated work experience.
                 - Exclude irrelevant coursework unless it
                     directly supports the role.
-                - For each project list a maximum of 3 bullet 
+                - For each project list a maximum of 3 bullet
                 points.
             6. The first token must be the content itself
             (not 'Sure,' 'Here,' 'I will,' etc.). No preamble
@@ -759,37 +766,37 @@ class ResumeConstructor:
             - Projects context: {projects_context}
         """)
 
-        formatted_projects = await normal_response(
-            system_prompt=formatter_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._formatter_model
-        )
+		formatted_projects = await normal_response(
+			system_prompt=formatter_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._formatter_model,
+		)
 
-        title = "\n\n### Projects\n\n---"
-        projects_section = f"{title}\n\n{formatted_projects}\n"
+		title = '\n\n### Projects\n\n---'
+		projects_section = f'{title}\n\n{formatted_projects}\n'
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.yellow}"
-                f"Formatted Projects Section:\n"
-                f"{TerminalColors.reset}"
-                f"{projects_section}"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.yellow}'
+				f'Formatted Projects Section:\n'
+				f'{TerminalColors.reset}'
+				f'{projects_section}'
+			)
 
-        self.resume += projects_section
-        await self._update_writing_state_ws()
+		self.resume += projects_section
+		await self._update_writing_state_ws()
 
-    async def _education_section(self):
-        """
-        Constructs the education section of the
-        resume.
-        """
-        await self._send_message_ws(
-            type="agent_writing_phase",
-            data="Writing education section..."
-        )
-        # Input Refinement
-        input_refiner_prompt = textwrap.dedent(f"""
+	async def _education_section(self):
+		"""
+		Constructs the education section of the
+		resume.
+		"""
+		await self._send_message_ws(
+			type='agent_writing_phase',
+			data='Writing education section...',
+		)
+		# Input Refinement
+		input_refiner_prompt = textwrap.dedent(f"""
             You are part of a resume generation tool, responsible
             for creating the education section of the resume.
 
@@ -819,24 +826,24 @@ class ResumeConstructor:
             - Job description: {self.context_seed}
         """)
 
-        education_query = await normal_response(
-            system_prompt=input_refiner_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._refiner_model
-        )
+		education_query = await normal_response(
+			system_prompt=input_refiner_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._refiner_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.cyan}"
-                f"Education Section Prompt:\n"
-                f"{TerminalColors.reset}"
-                f"{education_query}\n"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.cyan}'
+				f'Education Section Prompt:\n'
+				f'{TerminalColors.reset}'
+				f'{education_query}\n'
+			)
 
-        education_context = await self._fetch_context(education_query)
+		education_context = await self._fetch_context(education_query)
 
-        # Formatter
-        formatter_prompt = textwrap.dedent(f"""
+		# Formatter
+		formatter_prompt = textwrap.dedent(f"""
             You are part of a resume generation tool, responsible
             for formatting the education section.
 
@@ -881,82 +888,82 @@ class ResumeConstructor:
             - Education context: {education_context}
         """)
 
-        formatted_education = await normal_response(
-            system_prompt=formatter_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._formatter_model
-        )
+		formatted_education = await normal_response(
+			system_prompt=formatter_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._formatter_model,
+		)
 
-        title = "\n\n### Education\n\n---"
-        education_section = f"{title}\n\n{formatted_education}\n"
+		title = '\n\n### Education\n\n---'
+		education_section = f'{title}\n\n{formatted_education}\n'
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.cyan}"
-                f"Education Section:\n"
-                f"{TerminalColors.reset}"
-                f"{education_section}\n"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.cyan}'
+				f'Education Section:\n'
+				f'{TerminalColors.reset}'
+				f'{education_section}\n'
+			)
 
-        self.resume += education_section
-        await self._update_writing_state_ws()
+		self.resume += education_section
+		await self._update_writing_state_ws()
 
-    async def construct_resume(self) -> dict[str, str]:
-        """
-        Construct the resume doing each
-        section sequentially, intermediary
-        results are streamed to client, final
-        resume is returned.
-        """
-        # Research phase
-        self.timer.start()
+	async def construct_resume(self) -> dict[str, str]:
+		"""
+		Construct the resume doing each
+		section sequentially, intermediary
+		results are streamed to client, final
+		resume is returned.
+		"""
+		# Research phase
+		self.timer.start()
 
-        await self._acknowledge_request()
-        acknowledgment_time = self.timer.elapsed()
+		await self._acknowledge_request()
+		acknowledgment_time = self.timer.elapsed()
 
-        await self._perform_research()
-        research_time = self.timer.elapsed()
+		await self._perform_research()
+		research_time = self.timer.elapsed()
 
-        # Build resume
-        await self._header_section()
-        header_time = self.timer.elapsed()
-        time.sleep(2)
+		# Build resume
+		await self._header_section()
+		header_time = self.timer.elapsed()
+		time.sleep(2)
 
-        await self._skills_section()
-        skills_time = self.timer.elapsed()
-        time.sleep(2)
+		await self._skills_section()
+		skills_time = self.timer.elapsed()
+		time.sleep(2)
 
-        await self._experience_section()
-        experience_time = self.timer.elapsed()
-        time.sleep(2)
+		await self._experience_section()
+		experience_time = self.timer.elapsed()
+		time.sleep(2)
 
-        await self._projects_section()
-        projects_time = self.timer.elapsed()
-        time.sleep(2)
+		await self._projects_section()
+		projects_time = self.timer.elapsed()
+		time.sleep(2)
 
-        await self._education_section()
-        education_time = self.timer.elapsed()
-        time.sleep(2)
+		await self._education_section()
+		education_time = self.timer.elapsed()
+		time.sleep(2)
 
-        await self._summarise_request()
-        summary_time = self.timer.elapsed()
+		await self._summarise_request()
+		summary_time = self.timer.elapsed()
 
-        total_time = self.timer.stop()
+		total_time = self.timer.stop()
 
-        if self.verbose:
-            print("\n--- Resume generation Time ---\n")
-            print(f"Acknowledgment Time: {acknowledgment_time:.2f} seconds")
-            print(f"Research Time: {research_time:.2f} seconds")
-            print(f"Header Time: {header_time:.2f} seconds")
-            print(f"Skills Time: {skills_time:.2f} seconds")
-            print(f"Experience Time: {experience_time:.2f} seconds")
-            print(f"Projects Time: {projects_time:.2f} seconds")
-            print(f"Education Time: {education_time:.2f} seconds")
-            print(f"Summary Time: {summary_time:.2f} seconds")
-            print(f"Total Time: {total_time:.2f} seconds")
+		if self.verbose:
+			print('\n--- Resume generation Time ---\n')
+			print(f'Acknowledgment Time: {acknowledgment_time:.2f} seconds')
+			print(f'Research Time: {research_time:.2f} seconds')
+			print(f'Header Time: {header_time:.2f} seconds')
+			print(f'Skills Time: {skills_time:.2f} seconds')
+			print(f'Experience Time: {experience_time:.2f} seconds')
+			print(f'Projects Time: {projects_time:.2f} seconds')
+			print(f'Education Time: {education_time:.2f} seconds')
+			print(f'Summary Time: {summary_time:.2f} seconds')
+			print(f'Total Time: {total_time:.2f} seconds')
 
-        return {
-            "resume": self.resume.strip(),
-            "response": self.acknowledgment.strip() + self.summary.strip(),
-            "title": self.title.strip()
-        }
+		return {
+			'resume': self.resume.strip(),
+			'response': self.acknowledgment.strip() + self.summary.strip(),
+			'title': self.title.strip(),
+		}

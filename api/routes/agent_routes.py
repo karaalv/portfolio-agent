@@ -2,194 +2,177 @@
 This module contains agent routes for
 the Agent API.
 """
-from fastapi import APIRouter, Request, Depends
-from fastapi import WebSocket, WebSocketDisconnect
-from api.common.schemas import SocketMessage
-from api.common.utils import api_exception_handler
-from api.common.responses import success_response, error_response
-from agent.main import chat
-from agent.memory.main import retrieve_memory, delete_memory
-from api.common.authentication import verify_frontend_token, verify_jwt
-from api.common.authentication import validate_frontend_token, verify_jwt_ws
-from api.common.socket_registry import add_connection_registry, delete_connection_registry
-from api.common.socket_registry import send_message_ws
-from users.main import does_user_exist
-from monitoring.main import get_usages_remaining
 
-# --- Constants --- 
+from fastapi import (
+	APIRouter,
+	Depends,
+	Request,
+	WebSocket,
+	WebSocketDisconnect,
+)
+
+from agent.main import chat
+from agent.memory.main import delete_memory, retrieve_memory
+from api.common.authentication import (
+	validate_frontend_token,
+	verify_frontend_token,
+	verify_jwt,
+	verify_jwt_ws,
+)
+from api.common.responses import (
+	error_response,
+	success_response,
+)
+from api.common.schemas import SocketMessage
+from api.common.socket_registry import (
+	add_connection_registry,
+	delete_connection_registry,
+	send_message_ws,
+)
+from api.common.utils import api_exception_handler
+from monitoring.main import get_usages_remaining
+from users.main import does_user_exist
+
+# --- Constants ---
 
 router = APIRouter()
 
 # --- Agent Routes ---
 
-@router.websocket(
-    "/ws/chat",
-    dependencies=[
-        Depends(verify_jwt_ws)
-    ]
-)
+
+@router.websocket('/ws/chat', dependencies=[Depends(verify_jwt_ws)])
 async def agent_chat_ws(ws: WebSocket):
-    """
-    WebSocket endpoint for agent chat.
-    """
-    token = ws.query_params.get("ft")
-    if not token:
-        return error_response(
-            "Missing frontend token",
-            status_code=400
-        )
-    
-    # Validate token - HTTP exception raised
-    # on validation
-    validate_frontend_token(token)
-    
-    user_id = ws.cookies.get("UUID")
-    if not user_id:
-        return error_response(
-            "Missing user_id",
-            status_code=400
-        )
+	"""
+	WebSocket endpoint for agent chat.
+	"""
+	token = ws.query_params.get('ft')
+	if not token:
+		return error_response('Missing frontend token', status_code=400)
 
-    if not await does_user_exist(user_id):
-        return error_response(
-            "User does not exist",
-            status_code=404
-        )
-    
-    # Extract info for finger printing
-    ip = ws.headers.get("x-forwarded-for", "").split(",")[0].strip()
-    user_agent = ws.headers.get("user-agent", "")
+	# Validate token - HTTP exception raised
+	# on validation
+	validate_frontend_token(token)
 
-    # Start socket connection
-    await ws.accept()
-    await add_connection_registry(user_id=user_id, ws=ws)
-    
-    try:
-        while True:
-            data: dict = await ws.receive_json()
-            socket_message = SocketMessage(**data)
+	user_id = ws.cookies.get('UUID')
+	if not user_id:
+		return error_response('Missing user_id', status_code=400)
 
-            # Ping for connection
-            if socket_message.type == "ping":
-                await send_message_ws(
-                    user_id=user_id,
-                    type="ping",
-                    data="pong"
-                )
-                continue
+	if not await does_user_exist(user_id):
+		return error_response('User does not exist', status_code=404)
 
-            # Checking usage limits
-            if socket_message.type == "check_usage":
-                remaining = await get_usages_remaining(
-                    user_id=user_id,
-                    ip=ip,
-                    ua=user_agent
-                )
-                await send_message_ws(
-                    user_id=user_id,
-                    type="usage_info",
-                    data=remaining
-                )
-                continue
-            
-            # Chat responses
-            user_input = socket_message.data
+	# Extract info for finger printing
+	ip = ws.headers.get('x-forwarded-for', '').split(',')[0].strip()
+	user_agent = ws.headers.get('user-agent', '')
 
-            response = await chat(
-                user_id=user_id,
-                ip=ip,
-                ua=user_agent,
-                input=str(user_input)
-            )
+	# Start socket connection
+	await ws.accept()
+	await add_connection_registry(user_id=user_id, ws=ws)
 
-            # Handle streamed responses
-            if not response:
-                continue
+	try:
+		while True:
+			data: dict = await ws.receive_json()
+			socket_message = SocketMessage(**data)
 
-            await send_message_ws(
-                user_id=user_id,
-                type="agent_memory",
-                data=response
-            )
-    except WebSocketDisconnect:
-        await delete_connection_registry(user_id=user_id)
+			# Ping for connection
+			if socket_message.type == 'ping':
+				await send_message_ws(
+					user_id=user_id,
+					type='ping',
+					data='pong',
+				)
+				continue
+
+			# Checking usage limits
+			if socket_message.type == 'check_usage':
+				remaining = await get_usages_remaining(
+					user_id=user_id, ip=ip, ua=user_agent
+				)
+				await send_message_ws(
+					user_id=user_id,
+					type='usage_info',
+					data=remaining,
+				)
+				continue
+
+			# Chat responses
+			user_input = socket_message.data
+
+			response = await chat(
+				user_id=user_id,
+				ip=ip,
+				ua=user_agent,
+				input=str(user_input),
+			)
+
+			# Handle streamed responses
+			if not response:
+				continue
+
+			await send_message_ws(
+				user_id=user_id,
+				type='agent_memory',
+				data=response,
+			)
+	except WebSocketDisconnect:
+		await delete_connection_registry(user_id=user_id)
+
 
 # --- HTTP Based Routes ---
 
+
 @router.get(
-    "/memory",
-    dependencies=[
-        Depends(verify_frontend_token),
-        Depends(verify_jwt)
-    ]
+	'/memory',
+	dependencies=[
+		Depends(verify_frontend_token),
+		Depends(verify_jwt),
+	],
 )
-@api_exception_handler("Get user memory")
+@api_exception_handler('Get user memory')
 async def get_memory_api(request: Request):
-    """
-    Retrieves the memory for a user.
-    """
-    cookies = request.cookies
-    user_id = cookies.get("UUID")
+	"""
+	Retrieves the memory for a user.
+	"""
+	cookies = request.cookies
+	user_id = cookies.get('UUID')
 
-    if not user_id:
-        return error_response(
-            "Missing user_id",
-            status_code=400
-        )
+	if not user_id:
+		return error_response('Missing user_id', status_code=400)
 
-    if not await does_user_exist(user_id):
-        return error_response(
-            "User does not exist",
-            status_code=404
-        )
+	if not await does_user_exist(user_id):
+		return error_response('User does not exist', status_code=404)
 
-    memory = await retrieve_memory(
-        user_id,
-        to_str=False
-    )
+	memory = await retrieve_memory(user_id, to_str=False)
 
-    return success_response(
-        message="Successfully retrieved user memory",
-        data=memory
-    )
+	return success_response(
+		message='Successfully retrieved user memory',
+		data=memory,
+	)
+
 
 @router.delete(
-    "/clear-memory", 
-    dependencies=[
-        Depends(verify_frontend_token),
-        Depends(verify_jwt)
-    ]
+	'/clear-memory',
+	dependencies=[
+		Depends(verify_frontend_token),
+		Depends(verify_jwt),
+	],
 )
-@api_exception_handler("Delete user memory")
+@api_exception_handler('Delete user memory')
 async def delete_memory_api(request: Request):
-    """
-    Deletes the memory for a user.
-    """
-    cookies = request.cookies
-    user_id = cookies.get("UUID")
+	"""
+	Deletes the memory for a user.
+	"""
+	cookies = request.cookies
+	user_id = cookies.get('UUID')
 
-    if not user_id:
-        return error_response(
-            "Missing user_id",
-            status_code=400
-        )
+	if not user_id:
+		return error_response('Missing user_id', status_code=400)
 
-    if not await does_user_exist(user_id):
-        return error_response(
-            "User does not exist",
-            status_code=404
-        )
+	if not await does_user_exist(user_id):
+		return error_response('User does not exist', status_code=404)
 
-    result = await delete_memory(
-        user_id=user_id
-    )
+	result = await delete_memory(user_id=user_id)
 
-    if result is False:
-        return error_response(
-            "Failed to delete user memory",
-            status_code=500
-        )
+	if result is False:
+		return error_response('Failed to delete user memory', status_code=500)
 
-    return success_response(
-        message="Successfully deleted user memory"
-    )
+	return success_response(message='Successfully deleted user memory')

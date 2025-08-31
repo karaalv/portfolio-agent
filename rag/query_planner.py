@@ -2,32 +2,39 @@
 This module contains the Input Refiner
 and Query Planner for the RAG system.
 """
+
 import textwrap
-from rag.schemas import QueryPlan
-from common.utils import handle_exceptions_async, TerminalColors
-from openai_client.main import normal_response, structured_response
+
 from agent.memory.compressor import get_user_summarisation
+from common.utils import (
+	TerminalColors,
+	handle_exceptions_async,
+)
+from openai_client.main import (
+	normal_response,
+	structured_response,
+)
+from rag.schemas import QueryPlan
 
 # --- Constants ---
 
-_refiner_model = "gpt-4.1-mini"
-_planner_model = "gpt-4.1"
+_refiner_model = 'gpt-4.1-mini'
+_planner_model = 'gpt-4.1'
 
 # --- Input Refiner ---
 
-@handle_exceptions_async("rag.query_planner: Input Refiner")
-async def input_refiner(
-    user_id: str,
-    user_input: str,
-    verbose: bool = False
-) -> str:
-    """
-    Refine the user input by reformating the
-    original prompt with relevant context.
-    """
-    summary = await get_user_summarisation(user_id)
 
-    system_prompt = textwrap.dedent(f"""
+@handle_exceptions_async('rag.query_planner: Input Refiner')
+async def input_refiner(
+	user_id: str, user_input: str, verbose: bool = False
+) -> str:
+	"""
+	Refine the user input by reformating the
+	original prompt with relevant context.
+	"""
+	summary = await get_user_summarisation(user_id)
+
+	system_prompt = textwrap.dedent(f"""
         You are an expert input refiner for a portfolio site
         with a Retrieval-Augmented Generation (RAG) agent.
         It interacts with visitors, recruiters, and
@@ -65,31 +72,31 @@ async def input_refiner(
         {summary}
     """)
 
-    if verbose:
-        print(
-            f"{TerminalColors.cyan}"
-            f"Refining input with context:\n"
-            f"{TerminalColors.reset}"
-            f"{summary}\n"
-        )
+	if verbose:
+		print(
+			f'{TerminalColors.cyan}'
+			f'Refining input with context:\n'
+			f'{TerminalColors.reset}'
+			f'{summary}\n'
+		)
 
-    return await normal_response(
-        system_prompt=system_prompt,
-        user_input=user_input,
-        model=_refiner_model
-    )
+	return await normal_response(
+		system_prompt=system_prompt,
+		user_input=user_input,
+		model=_refiner_model,
+	)
+
 
 # --- Query Planner ---
 
-@handle_exceptions_async("rag.query_planner: Query Planner")
-async def query_planner(
-    refined_input: str
-) -> QueryPlan:
-    """
-    Plan the query by breaking it down 
-    into sub-queries.
-    """
-    system_prompt = textwrap.dedent(f"""
+
+@handle_exceptions_async('rag.query_planner: Query Planner')
+async def query_planner(refined_input: str) -> QueryPlan:
+	"""
+	Plan the query by breaking it down
+	into sub-queries.
+	"""
+	system_prompt = textwrap.dedent("""
         You are an expert query planner for a portfolio site
         with a Retrieval-Augmented Generation (RAG) agent.
         It interacts with visitors, recruiters, and
@@ -120,11 +127,11 @@ async def query_planner(
         retrieval.
     """)
 
-    query_plan = await structured_response(
-        system_prompt=system_prompt,
-        user_input=refined_input,
-        response_format=QueryPlan,
-        model=_planner_model
-    )
+	query_plan = await structured_response(
+		system_prompt=system_prompt,
+		user_input=refined_input,
+		response_format=QueryPlan,
+		model=_planner_model,
+	)
 
-    return query_plan
+	return query_plan

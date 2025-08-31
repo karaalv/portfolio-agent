@@ -75,3 +75,6 @@ client_secret*.json
 
 **/override.tf
 **/override.tf.*
+
+# Ruff
+.ruff_cache/

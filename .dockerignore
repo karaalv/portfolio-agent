@@ -6,6 +6,7 @@
 # Git files
 .git
 .gitignore
+.github
 
 # Docker files
 Dockerfile
@@ -41,3 +42,11 @@ docker-compose.yml
 
 # Markdown files
 **/*.md
+
+# Ruff
+.ruff_cache/
+
+# Terraform and infra resources
+terraform/
+scripts/
+kubernetes/

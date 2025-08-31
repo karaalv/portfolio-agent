@@ -1,114 +1,123 @@
 """
-This module contains the cover letter 
+This module contains the cover letter
 constructor and associated utilities.
-The main interface function can be found 
+The main interface function can be found
 in the `main.py` file in the agent tool
 package.
 """
-import time
+
 import textwrap
+import time
 from typing import Any
-from common.utils import TerminalColors, Timer, get_timestamp
+
+from agent.memory.schemas import AgentCanvas, AgentMemory
 from agent.tools.schemas import ResearchPlan
-from api.common.socket_manager import SocketManager
-from agent.memory.schemas import AgentMemory, AgentCanvas
-from openai_client.main import normal_response, structured_response
 from agent.tools.utils import researcher
+from api.common.socket_manager import SocketManager
+from api.common.socket_registry import (
+	get_connection_registry,
+)
+from common.utils import (
+	TerminalColors,
+	Timer,
+	get_timestamp,
+)
+from openai_client.main import (
+	normal_response,
+	structured_response,
+)
+from rag.query_executor import (
+	refine_context,
+	retrieve_documents_sequential,
+)
 from rag.query_planner import query_planner
-from rag.query_executor import retrieve_documents_sequential, refine_context
-from api.common.socket_registry import get_connection_registry
+
 
 class LetterConstructor:
-    """
-    Class to construct cover letters
-    on user input.
+	"""
+	Class to construct cover letters
+	on user input.
 
-    Class manages the construction process
-    and associated state management for
-    the operation.
-    """
-    def __init__(
-        self, 
-        user_id: str,
-        context_seed: str,
-        verbose: bool
-    ):
-        # Input
-        self.user_id = user_id
-        self.context_seed = context_seed
-        self.verbose = verbose
-        # Models
-        self._planner_model = "gpt-4.1-mini"
-        self._refiner_model = "gpt-4.1-nano"
-        self._formatter_model = "gpt-4.1-nano"
-        self._response_model = "gpt-4.1-nano"
-        # Content
-        self.title = ""
-        self.research = ""
-        self.letter = ""
-        self.acknowledgment = ""
-        self.summary = ""
-        # Utils
-        self.message_id = f"streaming_{get_timestamp()}"
-        self.timer = Timer(start=False)
-        self._passthrough_prompt = "Obey the system prompt"
-        # Socket connection
-        socket_connection = get_connection_registry(user_id)
-        if socket_connection is None:
-            raise ValueError(
-                "No active WebSocket connection found for user."
-            )
-        self.socket_manager: SocketManager = socket_connection
+	Class manages the construction process
+	and associated state management for
+	the operation.
+	"""
 
-    # --- Utilities ---
+	def __init__(self, user_id: str, context_seed: str, verbose: bool):
+		# Input
+		self.user_id = user_id
+		self.context_seed = context_seed
+		self.verbose = verbose
+		# Models
+		self._planner_model = 'gpt-4.1-mini'
+		self._refiner_model = 'gpt-4.1-nano'
+		self._formatter_model = 'gpt-4.1-nano'
+		self._response_model = 'gpt-4.1-nano'
+		# Content
+		self.title = ''
+		self.research = ''
+		self.letter = ''
+		self.acknowledgment = ''
+		self.summary = ''
+		# Utils
+		self.message_id = f'streaming_{get_timestamp()}'
+		self.timer = Timer(start=False)
+		self._passthrough_prompt = 'Obey the system prompt'
+		# Socket connection
+		socket_connection = get_connection_registry(user_id)
+		if socket_connection is None:
+			raise ValueError('No active WebSocket connection found for user.')
+		self.socket_manager: SocketManager = socket_connection
 
-    async def _send_message_ws(
-        self,
-        type: str,
-        data: Any,
-        success: bool = True,
-        message: str = "Data sent successfully"
-    ):
-        await self.socket_manager.send_message(
-            type=type,
-            data=data,
-            success=success,
-            message=message
-        )
+	# --- Utilities ---
 
-    async def _update_writing_state_ws(self):
-        """
-        Used to update the client
-        writing state with messages
-        and progress updates.
-        """
-        update = AgentMemory(
-            id=self.message_id,
-            user_id=self.user_id,
-            source="agent",
-            content=self.acknowledgment + self.summary,
-            illusion=True,
-            agent_canvas=AgentCanvas(
-                title=self.title,
-                id=self.message_id + "_canvas",
-                content=self.letter
-            )
-        )
+	async def _send_message_ws(
+		self,
+		type: str,
+		data: Any,
+		success: bool = True,
+		message: str = 'Data sent successfully',
+	):
+		await self.socket_manager.send_message(
+			type=type,
+			data=data,
+			success=success,
+			message=message,
+		)
 
-        await self._send_message_ws(
-            type="agent_writing",
-            data=update.model_dump(),
-        )
+	async def _update_writing_state_ws(self):
+		"""
+		Used to update the client
+		writing state with messages
+		and progress updates.
+		"""
+		update = AgentMemory(
+			id=self.message_id,
+			user_id=self.user_id,
+			source='agent',
+			content=self.acknowledgment + self.summary,
+			illusion=True,
+			agent_canvas=AgentCanvas(
+				title=self.title,
+				id=self.message_id + '_canvas',
+				content=self.letter,
+			),
+		)
 
-    async def _get_research_plan(self) -> ResearchPlan:
-        """
-        Constructs a research plan based on the
-        context seed provided by the user.
-        
-        Returns:
-            ResearchPlan: The constructed research plan.
-        """
-        system_prompt = textwrap.dedent(f"""
+		await self._send_message_ws(
+			type='agent_writing',
+			data=update.model_dump(),
+		)
+
+	async def _get_research_plan(self) -> ResearchPlan:
+		"""
+		Constructs a research plan based on the
+		context seed provided by the user.
+
+		Returns:
+			ResearchPlan: The constructed research plan.
+		"""
+		system_prompt = textwrap.dedent(f"""
             You are an expert research planner for a cover letter
             generation tool. You are part of a pipeline that
             generates targeted research plans from a given
@@ -148,171 +157,171 @@ class LetterConstructor:
             {self.context_seed}
         """)
 
-        research_plan = await structured_response(
-            system_prompt=system_prompt,
-            user_input=self._passthrough_prompt,
-            response_format=ResearchPlan,
-            model=self._planner_model
-        )
+		research_plan = await structured_response(
+			system_prompt=system_prompt,
+			user_input=self._passthrough_prompt,
+			response_format=ResearchPlan,
+			model=self._planner_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.magenta}"
-                f"Research Plan:\n"
-                f"{TerminalColors.reset}"
-                f"{research_plan}\n"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.magenta}'
+				f'Research Plan:\n'
+				f'{TerminalColors.reset}'
+				f'{research_plan}\n'
+			)
 
-        return research_plan
-    
-    async def _refine_research(self):
-        """
-        Refines the research conducted by the
-        research agent, focusing on extracting
-        the most relevant information for the
-        cover letter generation task.
-        """
-        system_prompt = textwrap.dedent(f"""
-            You are an expert research refiner for a cover 
-            letter generation tool. Your role is to distill 
-            the research findings into a concise summary 
-            that highlights the most relevant information 
+		return research_plan
+
+	async def _refine_research(self):
+		"""
+		Refines the research conducted by the
+		research agent, focusing on extracting
+		the most relevant information for the
+		cover letter generation task.
+		"""
+		system_prompt = textwrap.dedent(f"""
+            You are an expert research refiner for a cover
+            letter generation tool. Your role is to distill
+            the research findings into a concise summary
+            that highlights the most relevant information
             for the cover letter generation task.
 
             Your output should focus on:
-            - Key skills and experiences that align with 
+            - Key skills and experiences that align with
             the job description
-            - Achievements and contributions that 
+            - Achievements and contributions that
             demonstrate the candidate's value
-            - Key aspects of the entity if named, such as 
+            - Key aspects of the entity if named, such as
             company values, mission statements and culture.
 
-            Ensure your summary is clear, actionable, and 
+            Ensure your summary is clear, actionable, and
             free of irrelevant details.
 
             The research is as follows:
             {self.research}
         """)
 
-        refined_research = await normal_response(
-            system_prompt=system_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._refiner_model
-        )
+		refined_research = await normal_response(
+			system_prompt=system_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._refiner_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.cyan}"
-                f"Refined Research:\n"
-                f"{TerminalColors.reset}"
-                f"{refined_research}\n"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.cyan}'
+				f'Refined Research:\n'
+				f'{TerminalColors.reset}'
+				f'{refined_research}\n'
+			)
 
-        self.research = refined_research
-    
-    async def _perform_research(self):
-        """
-        Performs research based on the
-        research plan, research is added
-        to class instance.
-        """
-        research_plan = await self._get_research_plan()
-        queries: list[str] = research_plan.queries
+		self.research = refined_research
 
-        if len(queries) > 0:
-            # Set phase
-            await self._send_message_ws(
-                type="agent_writing_phase",
-                data="Researching job description and requirements"
-            )
-            # Set thinking
-            await self._send_message_ws(
-                type="agent_writing_thinking",
-                data=["Online research", "Job Description Analysis"]
-            )
+	async def _perform_research(self):
+		"""
+		Performs research based on the
+		research plan, research is added
+		to class instance.
+		"""
+		research_plan = await self._get_research_plan()
+		queries: list[str] = research_plan.queries
 
-        if len(queries) > 3:
-            queries = queries[:3]
+		if len(queries) > 0:
+			# Set phase
+			await self._send_message_ws(
+				type='agent_writing_phase',
+				data='Researching job description and requirements',
+			)
+			# Set thinking
+			await self._send_message_ws(
+				type='agent_writing_thinking',
+				data=[
+					'Online research',
+					'Job Description Analysis',
+				],
+			)
 
-        for plan in queries:
-            research = await researcher(plan)
-            
-            if self.verbose:
-                print(
-                    f"{TerminalColors.cyan}"
-                    f"Research Results for '{plan}':\n"
-                    f"{TerminalColors.reset}"
-                    f"{research}\n"
-                )
-            
-            self.research += research
+		if len(queries) > 3:
+			queries = queries[:3]
 
-        await self._refine_research()
+		for plan in queries:
+			research = await researcher(plan)
 
-    async def _fetch_context(
-        self, 
-        section_query: str
-    ) -> str:
-        """
-        Fetches context from the RAG system
-        based on the information needed for 
-        the specific section.
-        """
-        plan = await query_planner(section_query)
-        context = await retrieve_documents_sequential(
-            user_id=self.user_id,
-            query_plan=plan,
-            streaming_context="agent_writing_thinking",
-            verbose=self.verbose
-        )
-        refined_context = await refine_context(
-            user_input=section_query,
-            retrieval_results=context
-        )
+			if self.verbose:
+				print(
+					f'{TerminalColors.cyan}'
+					f"Research Results for '{plan}':\n"
+					f'{TerminalColors.reset}'
+					f'{research}\n'
+				)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.green}"
-                f"Context for '{section_query}':\n"
-                f"{TerminalColors.reset}"
-                f"{refined_context}\n"
-            )
+			self.research += research
 
-        return refined_context
-    
-    async def _acknowledge_request(self):
-        """
-        Acknowledges the user's request and provides
-        a brief summary of the information being used
-        to create a cover letter.
-        """
-        acknowledgment_prompt = textwrap.dedent(f"""
-            You are an acknowledgment model in a cover letter 
+		await self._refine_research()
+
+	async def _fetch_context(self, section_query: str) -> str:
+		"""
+		Fetches context from the RAG system
+		based on the information needed for
+		the specific section.
+		"""
+		plan = await query_planner(section_query)
+		context = await retrieve_documents_sequential(
+			user_id=self.user_id,
+			query_plan=plan,
+			streaming_context='agent_writing_thinking',
+			verbose=self.verbose,
+		)
+		refined_context = await refine_context(
+			user_input=section_query,
+			retrieval_results=context,
+		)
+
+		if self.verbose:
+			print(
+				f'{TerminalColors.green}'
+				f"Context for '{section_query}':\n"
+				f'{TerminalColors.reset}'
+				f'{refined_context}\n'
+			)
+
+		return refined_context
+
+	async def _acknowledge_request(self):
+		"""
+		Acknowledges the user's request and provides
+		a brief summary of the information being used
+		to create a cover letter.
+		"""
+		acknowledgment_prompt = textwrap.dedent(f"""
+            You are an acknowledgment model in a cover letter
             generation pipeline for my personal portfolio website.
 
-            Your task is to confirm to the user that their cover 
-            letter request is being processed using the provided 
-            context. Give a brief, clear confirmation summarizing 
-            what the user requested—no extra details or unrelated 
+            Your task is to confirm to the user that their cover
+            letter request is being processed using the provided
+            context. Give a brief, clear confirmation summarizing
+            what the user requested—no extra details or unrelated
             content.
-                                                    
-            Note: You are addressing a user on my website, so your 
+
+            Note: You are addressing a user on my website, so your
             response should follow the style:
-                                                    
-            "Thank you for your request, I will now begin writing 
+
+            "Thank you for your request, I will now begin writing
             a cover letter for <role> at <company>."
 
             Context for request:
             {self.context_seed}
         """)
 
-        response = await normal_response(
-            system_prompt=acknowledgment_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._response_model
-        )
+		response = await normal_response(
+			system_prompt=acknowledgment_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._response_model,
+		)
 
-        title_prompt = textwrap.dedent(f"""
+		title_prompt = textwrap.dedent(f"""
             You are part of a cover letter generation tool.
             Generate a short, professional title for the cover
             letter based on the user's request and context.
@@ -330,42 +339,42 @@ class LetterConstructor:
             {self.context_seed}
         """)
 
-        title = await normal_response(
-            system_prompt=title_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._response_model
-        )
-        self.title = title
+		title = await normal_response(
+			system_prompt=title_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._response_model,
+		)
+		self.title = title
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.magenta}"
-                f"Acknowledgment:\n"
-                f"{TerminalColors.reset}"
-                f"{response}"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.magenta}'
+				f'Acknowledgment:\n'
+				f'{TerminalColors.reset}'
+				f'{response}'
+			)
 
-        self.acknowledgment = response
-        await self._update_writing_state_ws()
+		self.acknowledgment = response
+		await self._update_writing_state_ws()
 
-    async def _summarise_request(self):
-        """
-        Summarises the resume creation process.
-        """
-        summary_prompt = textwrap.dedent(f"""
+	async def _summarise_request(self):
+		"""
+		Summarises the resume creation process.
+		"""
+		summary_prompt = textwrap.dedent(f"""
             You are part of a cover letter generation tool.
             Your task is to read the generated cover letter
             and produce a very brief summary of its contents.
 
             Rules:
-            - Base the summary only on what is written in the 
+            - Base the summary only on what is written in the
             cover letter.
             - Keep it concise (1-3 sentences max).
             - Do not add new information or commentary.
             - Continue to use first person in the response,
             respond as if you are the one who created the
             resume.
-                                            
+
             Note: You are addressing a visitor on my website,
             so respond in a friendly, professional style such as:
 
@@ -376,74 +385,73 @@ class LetterConstructor:
             {self.letter}
         """)
 
-        response = await normal_response(
-            system_prompt=summary_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._response_model
-        )
+		response = await normal_response(
+			system_prompt=summary_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._response_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.cyan}"
-                f"Summary:\n"
-                f"{TerminalColors.reset}"
-                f"{response}"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.cyan}'
+				f'Summary:\n'
+				f'{TerminalColors.reset}'
+				f'{response}'
+			)
 
-        self.summary = response
-        await self._update_writing_state_ws()
-        
-        # End writing state on client
-        await self._send_message_ws(
-            type="agent_writing_phase",
-            data="<complete>"
-        )
+		self.summary = response
+		await self._update_writing_state_ws()
 
-    # --- Letter Sections ---
+		# End writing state on client
+		await self._send_message_ws(
+			type='agent_writing_phase', data='<complete>'
+		)
 
-    async def _header_section(self):
-        """
-        Constructs the header section 
-        of the cover letter.
-        """
-        await self._send_message_ws(
-            type="agent_writing_phase",
-            data="Writing header section..."
-        )
+	# --- Letter Sections ---
 
-        header = "<div align='center'><h2>Alvin Karanja</h2></div>\n\n"
-        header += "<br>London, United Kingdom\n\n"
-        header += "**Email:** alviinkaranjja@gmail.com\n\n"
-        header += "**LinkedIn:** /in/alvin-n-karanja\n\n"
-        header += "**Website:** alvinkaranja.dev\n\n"
+	async def _header_section(self):
+		"""
+		Constructs the header section
+		of the cover letter.
+		"""
+		await self._send_message_ws(
+			type='agent_writing_phase',
+			data='Writing header section...',
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.yellow}"
-                f"Header Section:\n"
-                f"{TerminalColors.reset}"
-                f"{header}\n"
-            )
+		header = "<div align='center'><h2>Alvin Karanja</h2></div>\n\n"
+		header += '<br>London, United Kingdom\n\n'
+		header += '**Email:** alviinkaranjja@gmail.com\n\n'
+		header += '**LinkedIn:** /in/alvin-n-karanja\n\n'
+		header += '**Website:** alvinkaranja.dev\n\n'
 
-        self.letter += header
-        await self._update_writing_state_ws()
+		if self.verbose:
+			print(
+				f'{TerminalColors.yellow}'
+				f'Header Section:\n'
+				f'{TerminalColors.reset}'
+				f'{header}\n'
+			)
 
-    async def _address_section(self):
-        """
-        Constructs the address section of 
-        the resume.
-        """
-        await self._send_message_ws(
-            type="agent_writing_phase",
-            data="Writing letter address..."
-        )
+		self.letter += header
+		await self._update_writing_state_ws()
 
-        formatter_prompt = textwrap.dedent(f"""
-            You are part of a cover letter generation tool, 
-            and your task is to refine the address section of 
-            the cover letter. You will be given the research 
-            context for the cover letter and the initial input 
-            context for the cover letter generation task. 
+	async def _address_section(self):
+		"""
+		Constructs the address section of
+		the resume.
+		"""
+		await self._send_message_ws(
+			type='agent_writing_phase',
+			data='Writing letter address...',
+		)
+
+		formatter_prompt = textwrap.dedent(f"""
+            You are part of a cover letter generation tool,
+            and your task is to refine the address section of
+            the cover letter. You will be given the research
+            context for the cover letter and the initial input
+            context for the cover letter generation task.
             Your job is to simply format the address section.
 
             The address section should include:
@@ -452,7 +460,7 @@ class LetterConstructor:
             - the name of the company if present
             - the address of the company if present
             - the contact information for the company if present
-            - the result should be in markdown, with each item 
+            - the result should be in markdown, with each item
             on a new line, thus each item should have a double
             newline character appended to the end.
 
@@ -469,44 +477,44 @@ class LetterConstructor:
 
             Use the following information:
             Current date: {get_timestamp()}
-            
-            job description: 
+
+            job description:
             {self.context_seed}
-            
-            research context: 
+
+            research context:
             {self.research}
-            
-            current cover letter: 
+
+            current cover letter:
             {self.letter}
         """)
 
-        formatted_address = await normal_response(
-            system_prompt=formatter_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._response_model
-        )
+		formatted_address = await normal_response(
+			system_prompt=formatter_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._response_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.yellow}"
-                f"Formatted Address:\n"
-                f"{TerminalColors.reset}"
-                f"{formatted_address}"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.yellow}'
+				f'Formatted Address:\n'
+				f'{TerminalColors.reset}'
+				f'{formatted_address}'
+			)
 
-        self.letter += "<br><br>" +formatted_address
-        await self._update_writing_state_ws()
+		self.letter += '<br><br>' + formatted_address
+		await self._update_writing_state_ws()
 
-    async def _opening_section(self):
-        """
-        Constructs opening paragraph.
-        """
-        await self._send_message_ws(
-            type="agent_writing_phase",
-            data="Writing opening paragraph..."
-        )
+	async def _opening_section(self):
+		"""
+		Constructs opening paragraph.
+		"""
+		await self._send_message_ws(
+			type='agent_writing_phase',
+			data='Writing opening paragraph...',
+		)
 
-        input_refiner_prompt = textwrap.dedent(f"""
+		input_refiner_prompt = textwrap.dedent(f"""
             You are part of a cover letter generation tool, tasked
             with creating a single, precise query to retrieve
             relevant context from a RAG system for the opening
@@ -526,33 +534,31 @@ class LetterConstructor:
             - Include both technical and soft skills if relevant.
 
             Context for generation:
-            - Research findings: 
+            - Research findings:
             {self.research}
-            
-            - Job description: 
+
+            - Job description:
             {self.context_seed}
         """)
 
-        opening_query = await normal_response(
-            system_prompt=input_refiner_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._refiner_model
-        )
+		opening_query = await normal_response(
+			system_prompt=input_refiner_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._refiner_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.cyan}"
-                f"Opening Section Query:\n"
-                f"{TerminalColors.reset}"
-                f"{opening_query}"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.cyan}'
+				f'Opening Section Query:\n'
+				f'{TerminalColors.reset}'
+				f'{opening_query}'
+			)
 
-        opening_section_context = await self._fetch_context(
-            opening_query
-        )
+		opening_section_context = await self._fetch_context(opening_query)
 
-        # Writer 
-        writer_prompt = textwrap.dedent(f"""
+		# Writer
+		writer_prompt = textwrap.dedent(f"""
             You are part of a cover letter generation tool.
             Your task is to write the opening section of the
             cover letter using the provided context.
@@ -580,41 +586,41 @@ class LetterConstructor:
             Information provided:
             - Research context:
             {self.research}
-            
+
             - Current cover letter:
             {self.letter}
-            
+
             - Personal context:
             {opening_section_context}
         """)
 
-        opening_section = await normal_response(
-            system_prompt=writer_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._response_model
-        )
+		opening_section = await normal_response(
+			system_prompt=writer_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._response_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.yellow}"
-                f"Opening Section:\n"
-                f"{TerminalColors.reset}"
-                f"{opening_section}"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.yellow}'
+				f'Opening Section:\n'
+				f'{TerminalColors.reset}'
+				f'{opening_section}'
+			)
 
-        self.letter += "<br><br>" + opening_section
-        await self._update_writing_state_ws()
+		self.letter += '<br><br>' + opening_section
+		await self._update_writing_state_ws()
 
-    async def _body_section(self):
-        """
-        Writes body section of cover letter.
-        """
-        await self._send_message_ws(
-            type="agent_writing_phase",
-            data="Developing main body section..."
-        )
+	async def _body_section(self):
+		"""
+		Writes body section of cover letter.
+		"""
+		await self._send_message_ws(
+			type='agent_writing_phase',
+			data='Developing main body section...',
+		)
 
-        input_refiner_prompt = textwrap.dedent(f"""
+		input_refiner_prompt = textwrap.dedent(f"""
             You are part of a cover letter generation tool.
             Your task is to create a single, precise query to
             retrieve relevant context from a RAG system for the
@@ -643,33 +649,31 @@ class LetterConstructor:
             or explanation.
 
             Context for generation:
-            - Research findings: 
+            - Research findings:
             {self.research}
-            
+
             - Job description:
             {self.context_seed}
         """)
 
-        body_query = await normal_response(
-            system_prompt=input_refiner_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._refiner_model
-        )
+		body_query = await normal_response(
+			system_prompt=input_refiner_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._refiner_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.cyan}"
-                f"Body Section Query:\n"
-                f"{TerminalColors.reset}"
-                f"{body_query}"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.cyan}'
+				f'Body Section Query:\n'
+				f'{TerminalColors.reset}'
+				f'{body_query}'
+			)
 
-        body_context = await self._fetch_context(
-            body_query
-        )
+		body_context = await self._fetch_context(body_query)
 
-        # Writer
-        writer_prompt = textwrap.dedent(f"""
+		# Writer
+		writer_prompt = textwrap.dedent(f"""
             You are part of a cover letter generation tool.
             Your task is to write the body section of the
             cover letter using the provided context.
@@ -703,42 +707,42 @@ class LetterConstructor:
             Information provided:
             - Research context:
             {self.research}
-            
+
             - Current cover letter:
             {self.letter}
-            
+
             - Personal context:
             {body_context}
         """)
 
-        body_section = await normal_response(
-            system_prompt=writer_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._response_model
-        )
+		body_section = await normal_response(
+			system_prompt=writer_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._response_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.yellow}"
-                f"Body Section:\n"
-                f"{TerminalColors.reset}"
-                f"{body_section}"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.yellow}'
+				f'Body Section:\n'
+				f'{TerminalColors.reset}'
+				f'{body_section}'
+			)
 
-        self.letter += "<br><br>" + body_section
-        await self._update_writing_state_ws()
+		self.letter += '<br><br>' + body_section
+		await self._update_writing_state_ws()
 
-    async def _closing_section(self):
-        """
-        Write closing section of the cover
-        letter.
-        """
-        await self._send_message_ws(
-            type="agent_writing_phase",
-            data="Writing closing statement..."
-        )
+	async def _closing_section(self):
+		"""
+		Write closing section of the cover
+		letter.
+		"""
+		await self._send_message_ws(
+			type='agent_writing_phase',
+			data='Writing closing statement...',
+		)
 
-        input_refiner_prompt = textwrap.dedent(f"""
+		input_refiner_prompt = textwrap.dedent(f"""
             You are part of a cover letter generation tool.
             Your task is to create a single, precise query
             to retrieve relevant context from a RAG system
@@ -768,31 +772,29 @@ class LetterConstructor:
             Context for generation:
             - Research findings:
             {self.research}
-            
+
             - Job description:
             {self.context_seed}
         """)
 
-        closing_query = await normal_response(
-            system_prompt=input_refiner_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._refiner_model
-        )
+		closing_query = await normal_response(
+			system_prompt=input_refiner_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._refiner_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.cyan}"
-                f"Closing Section Query:\n"
-                f"{TerminalColors.reset}"
-                f"{closing_query}"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.cyan}'
+				f'Closing Section Query:\n'
+				f'{TerminalColors.reset}'
+				f'{closing_query}'
+			)
 
-        closing_context = await self._fetch_context(
-            closing_query
-        )
+		closing_context = await self._fetch_context(closing_query)
 
-        # Writer
-        writer_prompt = textwrap.dedent(f"""
+		# Writer
+		writer_prompt = textwrap.dedent(f"""
             You are part of a cover letter generation tool.
             Your task is to write the closing section of the
             cover letter using the provided context.
@@ -823,116 +825,116 @@ class LetterConstructor:
                or explanation.
 
             Information provided:
-            - Research context: 
+            - Research context:
             {self.research}
-            
-            - Current cover letter: 
+
+            - Current cover letter:
             {self.letter}
-            
-            - Personal context: 
+
+            - Personal context:
             {closing_context}
         """)
 
-        closing_section = await normal_response(
-            system_prompt=writer_prompt,
-            user_input=self._passthrough_prompt,
-            model=self._response_model
-        )
+		closing_section = await normal_response(
+			system_prompt=writer_prompt,
+			user_input=self._passthrough_prompt,
+			model=self._response_model,
+		)
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.yellow}"
-                f"Closing Section:\n"
-                f"{TerminalColors.reset}"
-                f"{closing_section}"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.yellow}'
+				f'Closing Section:\n'
+				f'{TerminalColors.reset}'
+				f'{closing_section}'
+			)
 
-        self.letter += "<br><br>" + closing_section
-        await self._update_writing_state_ws()
+		self.letter += '<br><br>' + closing_section
+		await self._update_writing_state_ws()
 
-    async def _signature(self):
-        """
-        Write signature section of
-        the cover letter.
-        """
-        await self._send_message_ws(
-            type="agent_writing_phase",
-            data="Signing off letter..."
-        )
+	async def _signature(self):
+		"""
+		Write signature section of
+		the cover letter.
+		"""
+		await self._send_message_ws(
+			type='agent_writing_phase',
+			data='Signing off letter...',
+		)
 
-        signature = "\n\n<br>\n\n"
-        signature += "Kind regards,\n\n"
-        signature += "Alvin Karanja (AI)"
+		signature = '\n\n<br>\n\n'
+		signature += 'Kind regards,\n\n'
+		signature += 'Alvin Karanja (AI)'
 
-        if self.verbose:
-            print(
-                f"{TerminalColors.yellow}"
-                f"Signature Section:\n"
-                f"{TerminalColors.reset}"
-                f"{signature}"
-            )
+		if self.verbose:
+			print(
+				f'{TerminalColors.yellow}'
+				f'Signature Section:\n'
+				f'{TerminalColors.reset}'
+				f'{signature}'
+			)
 
-        self.letter += signature + "<br><br>"
-        await self._update_writing_state_ws()
+		self.letter += signature + '<br><br>'
+		await self._update_writing_state_ws()
 
-    async def construct_letter(self) -> dict[str, str]:
-        """
-        Construct cover letter by doing
-        each section sequentially.
-        """
-        self.timer.start()
+	async def construct_letter(self) -> dict[str, str]:
+		"""
+		Construct cover letter by doing
+		each section sequentially.
+		"""
+		self.timer.start()
 
-        await self._acknowledge_request()
-        acknowledgment_time = self.timer.elapsed()
+		await self._acknowledge_request()
+		acknowledgment_time = self.timer.elapsed()
 
-        await self._perform_research()
-        research_time = self.timer.elapsed()
+		await self._perform_research()
+		research_time = self.timer.elapsed()
 
-        # Build cover letter
-        await self._header_section()
-        header_time = self.timer.elapsed()
-        time.sleep(2)
+		# Build cover letter
+		await self._header_section()
+		header_time = self.timer.elapsed()
+		time.sleep(2)
 
-        await self._address_section()
-        address_time = self.timer.elapsed()
-        time.sleep(2)
+		await self._address_section()
+		address_time = self.timer.elapsed()
+		time.sleep(2)
 
-        await self._opening_section()
-        opening_time = self.timer.elapsed()
-        time.sleep(2)
+		await self._opening_section()
+		opening_time = self.timer.elapsed()
+		time.sleep(2)
 
-        await self._body_section()
-        body_time = self.timer.elapsed()
-        time.sleep(2)
+		await self._body_section()
+		body_time = self.timer.elapsed()
+		time.sleep(2)
 
-        await self._closing_section()
-        closing_time = self.timer.elapsed()
-        time.sleep(2)
+		await self._closing_section()
+		closing_time = self.timer.elapsed()
+		time.sleep(2)
 
-        await self._signature()
-        signature_time = self.timer.elapsed()
-        time.sleep(2)
+		await self._signature()
+		signature_time = self.timer.elapsed()
+		time.sleep(2)
 
-        await self._summarise_request()
-        summarise_time = self.timer.elapsed()
+		await self._summarise_request()
+		summarise_time = self.timer.elapsed()
 
-        total_time = self.timer.stop()
+		total_time = self.timer.stop()
 
-        if self.verbose:
-            print("\n--- Cover Letter generation Time ---\n")
-            print(f"Acknowledgment Time: {acknowledgment_time:.2f} seconds")
-            print(f"Research Time: {research_time:.2f} seconds")
-            print(f"Header Time: {header_time:.2f} seconds")
-            print(f"Address Time: {address_time:.2f} seconds")
-            print(f"Opening Time: {opening_time:.2f} seconds")
-            print(f"Body Time: {body_time:.2f} seconds")
-            print(f"Closing Time: {closing_time:.2f} seconds")
-            print(f"Signature Time: {signature_time:.2f} seconds")
-            print(f"Summarise Time: {summarise_time:.2f} seconds")
-            print(f"Total Time: {total_time:.2f} seconds")
+		if self.verbose:
+			print('\n--- Cover Letter generation Time ---\n')
+			print(f'Acknowledgment Time: {acknowledgment_time:.2f} seconds')
+			print(f'Research Time: {research_time:.2f} seconds')
+			print(f'Header Time: {header_time:.2f} seconds')
+			print(f'Address Time: {address_time:.2f} seconds')
+			print(f'Opening Time: {opening_time:.2f} seconds')
+			print(f'Body Time: {body_time:.2f} seconds')
+			print(f'Closing Time: {closing_time:.2f} seconds')
+			print(f'Signature Time: {signature_time:.2f} seconds')
+			print(f'Summarise Time: {summarise_time:.2f} seconds')
+			print(f'Total Time: {total_time:.2f} seconds')
 
-        return {
-            "letter": self.letter.strip(),
-            "response": self.acknowledgment.strip() + self.summary.strip(),
-            "title": self.title.strip()
-        }
+		return {
+			'letter': self.letter.strip(),
+			'response': self.acknowledgment.strip() + self.summary.strip(),
+			'title': self.title.strip(),
+		}
