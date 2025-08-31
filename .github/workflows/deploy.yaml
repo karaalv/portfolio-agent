@@ -1,13 +1,11 @@
-# Deploy application with new image
-# on successful build
+# Deploy application on new
+# release
 name: Deploy Application
 
 on:
-  workflow_run:
-    workflows: ["Build and Push"]
-    branches: [main]
+  release:
     types:
-      - completed
+      - published
 
 permissions:
   id-token: write
@@ -16,7 +14,6 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
@@ -24,14 +21,33 @@ jobs:
           role-to-assume: ${{ secrets.OIDC_ROLE }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Trigger deploy script via SSM
+      - name: Upload deploy script to S3
+        run: |
+          aws s3 cp scripts/deploy.sh \
+          s3://${{ secrets.AWS_ACCOUNT_ID }}-portfolio-deploy-scripts/
+
+      - name: Trigger rollout deployment from s3 script via SSM
         id: ssm_deploy
         run: |
           INSTANCE="${{ secrets.INSTANCE_ID }}"
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE" \
             --document-name "AWS-RunShellScript" \
-            --parameters commands='["chmod +x scripts/deploy.sh","scripts/deploy.sh"]' \
+            --parameters "commands=[
+                'set -euo pipefail',
+                'set -x',
+                'echo \"1. Creating deployment-scripts folder\"',
+                'mkdir -p ~/deployment-scripts',
+                'echo \"2. Pulling script from S3\"',
+                'aws s3 cp s3://$AWS_ACCOUNT_ID-portfolio-deploy-scripts/deploy.sh ~/deployment-scripts/deploy.sh',
+                'echo \"3. Making script executable\"',
+                'chmod +x ~/deployment-scripts/deploy.sh',
+                'echo \"4. Running script\"',
+                '~/deployment-scripts/deploy.sh',
+                'echo \"5. Cleaning up\"',
+                'rm -rf ~/deployment-scripts'
+              ]" \
             --query "Command.CommandId" --output text)
           echo "Command ID: $COMMAND_ID"
 

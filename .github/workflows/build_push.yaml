@@ -1,4 +1,5 @@
-# Build new Docker image and push to ECR
+# Build new Docker image and 
+# push to ECR
 name: Build and Push
 
 on:

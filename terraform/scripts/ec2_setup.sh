@@ -53,6 +53,9 @@ sudo ln -sf /usr/local/bin/kubectl /usr/bin/kubectl
 # TODO: Find more secure way of handling access to k3s
 sudo chmod 644 /etc/rancher/k3s/k3s.yaml # For now this works but not the best
 
+echo "alias kubectl='sudo k3s kubectl'" >> ~/.bashrc
+source ~/.bashrc
+
 # Wait for the node to appear in kubectl
 for i in {1..30}; do
   NODE_NAME=$(hostname)

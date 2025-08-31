@@ -24,6 +24,11 @@ variable "mongodb_atlas_org_id" {
 
 # Variables for AWS Infrastructure
 
+variable "aws_account_id" {
+  description = "The AWS account ID to deploy resources in"
+  type        = string
+}
+
 variable "aws_region" {
   description = "The AWS region to deploy resources in"
   type        = string

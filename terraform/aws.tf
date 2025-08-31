@@ -118,6 +118,12 @@ resource "aws_iam_role_policy_attachment" "ssm_managed" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+# S3 access
+resource "aws_iam_role_policy_attachment" "ec2_s3_readonly" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+}
+
 # Profile
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "ec2-access-profile"
@@ -178,6 +184,11 @@ data "aws_ami" "ubuntu_arm_latest" {
     values = ["hvm"]
   }
   owners = ["099720109477"] # Canonical
+}
+
+# Elastic IP
+resource "aws_eip" "ec2_eip" {
+  instance = aws_instance.ec2_instance.id
 }
 
 # EC2 Instance
@@ -312,6 +323,20 @@ resource "aws_cloudfront_distribution" "cloudfront_main" {
   }
 }
 
+# - S3 -
+
+resource "aws_s3_bucket" "deploy_scripts" {
+  bucket = "${var.aws_account_id}-portfolio-deploy-scripts"
+}
+
+resource "aws_s3_bucket_versioning" "deploy_scripts_versioning" {
+  bucket = aws_s3_bucket.deploy_scripts.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 # --- IAM Policy Permissions ---
 
 # IAM OIDC for Github 
@@ -376,4 +401,30 @@ resource "aws_iam_policy" "github_actions_ssm_policy" {
 resource "aws_iam_role_policy_attachment" "github_ssm_attach" {
   role       = aws_iam_role.github_actions.name
   policy_arn = aws_iam_policy.github_actions_ssm_policy.arn
+}
+
+# S3 Access
+data "aws_iam_policy_document" "github_s3_access" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "s3:PutObject",
+      "s3:GetObject",
+      "s3:DeleteObject",
+      "s3:ListBucket"
+    ]
+    resources = [
+      "${aws_s3_bucket.deploy_scripts.arn}/*"
+    ]
+  }
+}
+
+resource "aws_iam_policy" "github_deploy" {
+  name   = "github-deploy-s3-access"
+  policy = data.aws_iam_policy_document.github_s3_access.json
+}
+
+resource "aws_iam_role_policy_attachment" "github_s3_attach" {
+  role       = aws_iam_role.github_actions.name
+  policy_arn = aws_iam_policy.github_deploy.arn
 }

@@ -160,6 +160,13 @@ async def delete_memory(
     # Delete original messages
     result = await collection.delete_many({"user_id": user_id})
 
+    # Clear user summarisation
+    collection = get_collection("users")
+    await collection.update_one(
+        {"user_id": user_id},
+        {"$unset": {"conversation_summary": ""}}
+    )
+
     if result.deleted_count > 0:
         return True
 
