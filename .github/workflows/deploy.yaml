@@ -21,6 +21,9 @@ jobs:
           role-to-assume: ${{ secrets.OIDC_ROLE }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Upload deploy script to S3
         run: |
           aws s3 cp scripts/deploy.sh \

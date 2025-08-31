@@ -334,7 +334,7 @@ resource "aws_s3_bucket_versioning" "deploy_scripts_versioning" {
 
 # --- IAM Policy Permissions ---
 
-# IAM OIDC for Github 
+# IAM OIDC for Github
 resource "aws_iam_openid_connect_provider" "github" {
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
@@ -355,7 +355,7 @@ resource "aws_iam_role" "github_actions" {
         Action = "sts:AssumeRoleWithWebIdentity",
         Condition = {
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:karaalv/portfolio-agent:ref:refs/heads/main"
+            "token.actions.githubusercontent.com:sub" = "repo:karaalv/portfolio-agent:*"
           }
         }
       }
