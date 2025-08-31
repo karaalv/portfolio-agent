@@ -186,11 +186,6 @@ data "aws_ami" "ubuntu_arm_latest" {
   owners = ["099720109477"] # Canonical
 }
 
-# Elastic IP
-resource "aws_eip" "ec2_eip" {
-  instance = aws_instance.ec2_instance.id
-}
-
 # EC2 Instance
 resource "aws_instance" "ec2_instance" {
   ami           = data.aws_ami.ubuntu_arm_latest.id
@@ -283,7 +278,7 @@ resource "aws_cloudfront_response_headers_policy" "cors_policy" {
 # Main distribution
 resource "aws_cloudfront_distribution" "cloudfront_main" {
   enabled = true
-  comment = "CloudFront for api.alvinkaranja.dev - Vercel + API routing"
+  comment = "CloudFront for api.alvinkaranja.dev"
 
   aliases = ["api.alvinkaranja.dev"]
 
