@@ -1,78 +1,87 @@
 # --- MongoDB Atlas Infrastructure ---
 
-# --- Config and Providers ---  
+# --- Config and Providers ---
 
 provider "mongodbatlas" {
-  public_key  = var.mongodb_atlas_public_key
-  private_key = var.mongodb_atlas_private_key
+  client_id     = var.mongodb_atlas_client_id
+  client_secret = var.mongodb_atlas_client_secret
 }
 
-# --- Development Project ---
+# --- Environment Configuration ---
 
-resource "mongodbatlas_project" "portfolio_dev" {
-  name   = "Portfolio-Development"
+locals {
+  mongodb_environments = {
+    dev = {
+      environment   = "development"
+      project_name  = "Portfolio-Development"
+      cluster_name  = "portfolio-development-cluster"
+      cidr          = "0.0.0.0/0"
+      ip_comment    = "Allow connections from anywhere for development"
+      region_name   = "US_EAST_1"
+      instance_size = "M0"
+    }
+    prod = {
+      environment   = "production"
+      project_name  = "Portfolio-Production"
+      cluster_name  = "portfolio-production-cluster"
+      cidr          = "18.170.57.91/32"
+      ip_comment    = "Allow connections from EC2 instance"
+      region_name   = "US_EAST_1"
+      instance_size = "M0"
+    }
+  }
+}
+
+# --- Projects ---
+
+resource "mongodbatlas_project" "projects" {
+  for_each = local.mongodb_environments
+
+  name   = each.value.project_name
   org_id = var.mongodb_atlas_org_id
 
   tags = {
-    environment = "development"
+    environment = each.value.environment
   }
 }
 
-# Cluster Configuration
-resource "mongodbatlas_cluster" "portfolio_dev_cluster" {
-  project_id = mongodbatlas_project.portfolio_dev.id
-  name       = "portfolio-development-cluster"
+# --- Clusters ---
 
-  # Provider Settings
-  provider_name               = "TENANT"
-  backing_provider_name       = "AWS"
-  provider_region_name        = "US_EAST_1"
-  provider_instance_size_name = "M0"
+resource "mongodbatlas_advanced_cluster" "clusters" {
+  for_each = local.mongodb_environments
 
-  labels {
-    key   = "environment"
-    value = "development"
+  project_id = mongodbatlas_project.projects[each.key].id
+  name       = each.value.cluster_name
+
+  cluster_type = "REPLICASET"
+  labels = {
+    environment = each.value.environment
   }
+
+  replication_specs = [
+    {
+      region_configs = [
+        {
+          priority              = 7
+          region_name           = each.value.region_name
+          provider_name         = "TENANT"
+          backing_provider_name = "AWS"
+
+          electable_specs = {
+            instance_size = each.value.instance_size
+          }
+        }
+      ]
+    }
+  ]
 }
 
-# Network access 
-resource "mongodbatlas_project_ip_access_list" "portfolio_dev_ip_access" {
-  project_id = mongodbatlas_project.portfolio_dev.id
-  cidr_block = "0.0.0.0/0"
-  comment    = "Allow connections from anywhere for development"
-}
+# --- Network Access ---
 
-# --- Production Project ---
+resource "mongodbatlas_project_ip_access_list" "ip_access" {
+  for_each = local.mongodb_environments
 
-resource "mongodbatlas_project" "portfolio_prod" {
-  name   = "Portfolio-Production"
-  org_id = var.mongodb_atlas_org_id
-
-  tags = {
-    environment = "production"
-  }
-}
-
-# Cluster Configuration
-resource "mongodbatlas_cluster" "portfolio_prod_cluster" {
-  project_id = mongodbatlas_project.portfolio_prod.id
-  name       = "portfolio-production-cluster"
-
-  # Provider Settings
-  provider_name               = "TENANT"
-  backing_provider_name       = "AWS"
-  provider_region_name        = "US_EAST_1"
-  provider_instance_size_name = "M0"
-
-  labels {
-    key   = "environment"
-    value = "production"
-  }
-}
-
-# Network access
-resource "mongodbatlas_project_ip_access_list" "production_project_ec2_access" {
-  project_id = mongodbatlas_project.portfolio_prod.id
-  cidr_block = "${aws_instance.ec2_instance.public_ip}/32"
-  comment    = "Allow connections from EC2 instance"
+  project_id = mongodbatlas_project.projects[each.key].id
+  cidr_block = each.value.cidr
+  comment    = each.value.ip_comment
 }

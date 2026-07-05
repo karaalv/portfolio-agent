@@ -7,13 +7,13 @@ variable "admin_ip_cidr" {
 
 # Variables for MongoDB Atlas Infrastructure
 
-variable "mongodb_atlas_public_key" {
-  description = "Environment variable for MongoDB Atlas public key"
+variable "mongodb_atlas_client_id" {
+  description = "MongoDB Atlas service account client ID"
   type        = string
 }
 
-variable "mongodb_atlas_private_key" {
-  description = "Environment variable for MongoDB Atlas private key"
+variable "mongodb_atlas_client_secret" {
+  description = "MongoDB Atlas service account client secret"
   type        = string
 }
 

@@ -11,14 +11,14 @@ provider "aws" {
 
 # - Route 53 Hosted Zone -
 
-resource "aws_route53_zone" "alvinkaranja_dev" {
-  comment = "Hosted zone for portfolio."
+data "aws_route53_zone" "alvinkaranja_dev" {
+  private_zone = false
   name    = "alvinkaranja.dev"
 }
 
 # Cloudfront Record
 resource "aws_route53_record" "api_domain" {
-  zone_id = aws_route53_zone.alvinkaranja_dev.zone_id
+  zone_id = data.aws_route53_zone.alvinkaranja_dev.zone_id
   name    = "api.alvinkaranja.dev"
   type    = "A"
 
