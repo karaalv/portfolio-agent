@@ -43,7 +43,9 @@ class LetterConstructor:
 	the operation.
 	"""
 
-	def __init__(self, user_id: str, context_seed: str, verbose: bool):
+	def __init__(
+		self, user_id: str, context_seed: str, verbose: bool
+	):
 		# Input
 		self.user_id = user_id
 		self.context_seed = context_seed
@@ -66,7 +68,9 @@ class LetterConstructor:
 		# Socket connection
 		socket_connection = get_connection_registry(user_id)
 		if socket_connection is None:
-			raise ValueError('No active WebSocket connection found for user.')
+			raise ValueError(
+				'No active WebSocket connection found for user.'
+			)
 		self.socket_manager: SocketManager = socket_connection
 
 	# --- Utilities ---
@@ -419,7 +423,9 @@ class LetterConstructor:
 			data='Writing header section...',
 		)
 
-		header = "<div align='center'><h2>Alvin Karanja</h2></div>\n\n"
+		header = (
+			"<div align='center'><h2>Alvin Karanja</h2></div>\n\n"
+		)
 		header += '<br>London, United Kingdom\n\n'
 		header += '**Email:** alviinkaranjja@gmail.com\n\n'
 		header += '**LinkedIn:** /in/alvin-n-karanja\n\n'
@@ -555,7 +561,9 @@ class LetterConstructor:
 				f'{opening_query}'
 			)
 
-		opening_section_context = await self._fetch_context(opening_query)
+		opening_section_context = await self._fetch_context(
+			opening_query
+		)
 
 		# Writer
 		writer_prompt = textwrap.dedent(f"""
@@ -922,7 +930,9 @@ class LetterConstructor:
 
 		if self.verbose:
 			print('\n--- Cover Letter generation Time ---\n')
-			print(f'Acknowledgment Time: {acknowledgment_time:.2f} seconds')
+			print(
+				f'Acknowledgment Time: {acknowledgment_time:.2f} seconds'
+			)
 			print(f'Research Time: {research_time:.2f} seconds')
 			print(f'Header Time: {header_time:.2f} seconds')
 			print(f'Address Time: {address_time:.2f} seconds')
@@ -935,6 +945,7 @@ class LetterConstructor:
 
 		return {
 			'letter': self.letter.strip(),
-			'response': self.acknowledgment.strip() + self.summary.strip(),
+			'response': self.acknowledgment.strip()
+			+ self.summary.strip(),
 			'title': self.title.strip(),
 		}

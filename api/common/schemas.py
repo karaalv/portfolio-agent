@@ -82,7 +82,9 @@ class SocketMessage(BaseModel):
 	websocket clients.
 	"""
 
-	type: str = Field(..., description='The type of message being sent.')
+	type: str = Field(
+		..., description='The type of message being sent.'
+	)
 	data: str | None = Field(
 		None,
 		description='The actual data being sent in the message.',

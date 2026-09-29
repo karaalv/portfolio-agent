@@ -112,7 +112,9 @@ async def server_fetch(
 
 	# Simulate a request to the server
 	async with httpx.AsyncClient() as client:
-		response = await client.request(method, url, headers=header, json=body)
+		response = await client.request(
+			method, url, headers=header, json=body
+		)
 
 	if not parsed:
 		return response

@@ -46,7 +46,9 @@ def _package_item(item: CorpusItem) -> str:
 # --- Retriever ---
 
 
-@handle_exceptions_async('rag.query_executor: Retrieve Documents Sequential')
+@handle_exceptions_async(
+	'rag.query_executor: Retrieve Documents Sequential'
+)
 async def retrieve_documents_sequential(
 	user_id: str,
 	query_plan: QueryPlan,
@@ -105,7 +107,9 @@ async def retrieve_documents_sequential(
 
 		items = [CorpusItem(**doc) for doc in docs]
 		headers = [item.header for item in items]
-		items_str = '\n'.join(item.model_dump_json(indent=2) for item in items)
+		items_str = '\n'.join(
+			item.model_dump_json(indent=2) for item in items
+		)
 
 		# Send headers to client
 		await send_message_ws(
@@ -133,7 +137,9 @@ async def retrieve_documents_sequential(
 # implement a locking mechanism or use a more robust data structure
 
 
-@handle_exceptions_async('rag.query_executor: Retrieve Documents Parallel')
+@handle_exceptions_async(
+	'rag.query_executor: Retrieve Documents Parallel'
+)
 async def _retrieve_documents_parallel(
 	query_plan: QueryPlan,
 ) -> str:
@@ -207,7 +213,9 @@ async def _retrieve_documents_parallel(
 
 
 @handle_exceptions_async('rag.query_executor: Refine Context')
-async def refine_context(user_input: str, retrieval_results: str) -> str:
+async def refine_context(
+	user_input: str, retrieval_results: str
+) -> str:
 	"""
 	Refines the context of the retrieved documents
 	using the context of the refined user input to

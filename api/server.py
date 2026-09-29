@@ -1,23 +1,6 @@
-"""
-Main entry point for the API,
-other routes are imported.
-"""
+"""Configure the FastAPI application and its lifecycle."""
 
 import os
-
-from dotenv import load_dotenv
-
-# Load environment
-if os.getenv('ENVIRONMENT') == 'test':
-	# Load test environment variables
-	load_dotenv(
-		override=True,
-		dotenv_path=os.path.abspath('.env.test'),
-	)
-else:
-	# Load default environment variables
-	load_dotenv(override=True, dotenv_path=os.path.abspath('.env'))
-
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
@@ -41,10 +24,7 @@ from database.mongodb.config import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-	"""
-	Lifecycle management for the FastAPI app,
-	manages startup and shutdown events.
-	"""
+	"""Open the database on startup and close it on shutdown."""
 	# Startup
 	print(
 		f'Starting '
@@ -67,7 +47,7 @@ async def lifespan(app: FastAPI):
 		f'{TerminalColors.reset}'
 		f'Listening on port: '
 		f'{TerminalColors.cyan}'
-		f'{os.getenv("PORT")}'
+		f'{os.getenv("PORTFOLIO_AGENT_PORT")}'
 		f'{TerminalColors.reset}'
 	)
 
@@ -117,10 +97,7 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-	"""
-	Global exception handler for the API.
-	Returns a standardized error response.
-	"""
+	"""Return a standard response for unhandled exceptions."""
 	return error_response(
 		message='An unexpected error occurred.',
 		status_code=500,
@@ -133,13 +110,7 @@ async def global_exception_handler(request, exc):
 
 @app.get('/health')
 async def health_check():
-	"""
-	Health check endpoint to verify
-	the API is running.
-
-	Returns:
-		dict: A simple health check response.
-	"""
+	"""Report whether the API is running."""
 	return JSONResponse(content={'status': 'ok'}, status_code=200)
 
 
@@ -157,55 +128,3 @@ app.include_router(
 	router=agent_routes.router,
 	prefix='/agent',
 )
-
-# --- Run Server ---
-
-if __name__ == '__main__':
-	import uvicorn
-
-	env = os.getenv('ENVIRONMENT')
-	MAIN_PORT = 3001
-	TEST_PORT = 9001
-
-	if env == 'development':
-		uvicorn.run(
-			app='api.main:app',
-			host='0.0.0.0',
-			port=int(os.getenv('PORT', MAIN_PORT)),
-			log_level='debug',
-			reload=True,
-			workers=1,
-		)
-	elif env == 'production':
-		uvicorn.run(
-			app='api.main:app',
-			host='0.0.0.0',
-			port=int(os.getenv('PORT', MAIN_PORT)),
-			log_level='info',
-			reload=False,
-			workers=1,
-		)
-	elif env == 'test':
-		uvicorn.run(
-			app='api.main:app',
-			host='0.0.0.0',
-			port=int(os.getenv('PORT', TEST_PORT)),
-			reload=False,
-			workers=1,
-		)
-	elif env == 'staging':
-		uvicorn.run(
-			app='api.main:app',
-			host='0.0.0.0',
-			port=int(os.getenv('PORT', MAIN_PORT)),
-			log_level='debug',
-			reload=False,
-			workers=1,
-		)
-	else:
-		print(
-			f'{TerminalColors.red}'
-			f'Invalid environment: {env}'
-			f'{TerminalColors.reset}'
-		)
-		exit(1)

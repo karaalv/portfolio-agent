@@ -112,7 +112,9 @@ def get_timestamp() -> str:
 	Returns the current timestamp in
 	ISO 8601 format.
 	"""
-	return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+	return (
+		datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+	)
 
 
 def get_datetime(

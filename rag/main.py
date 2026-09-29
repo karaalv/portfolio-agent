@@ -59,12 +59,17 @@ async def fetch_context(
 	augmentation_time = timer.elapsed()
 
 	total_time = (
-		refinement_time + planning_time + retrieval_time + augmentation_time
+		refinement_time
+		+ planning_time
+		+ retrieval_time
+		+ augmentation_time
 	)
 
 	if verbose:
 		print('\n--- RAG Pipeline Statistics ---\n')
-		print(f'{TerminalColors.yellow}Pipeline Timing\n{TerminalColors.reset}')
+		print(
+			f'{TerminalColors.yellow}Pipeline Timing\n{TerminalColors.reset}'
+		)
 		print(f'Refinement Time: {refinement_time:.4f} seconds')
 		print(f'Planning Time: {planning_time:.4f} seconds')
 		print(f'Retrieval Time: {retrieval_time:.4f} seconds')

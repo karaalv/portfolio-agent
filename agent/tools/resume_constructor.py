@@ -42,7 +42,9 @@ class ResumeConstructor:
 	for the operation.
 	"""
 
-	def __init__(self, user_id: str, context_seed: str, verbose: bool):
+	def __init__(
+		self, user_id: str, context_seed: str, verbose: bool
+	):
 		# Input
 		self.user_id = user_id
 		self.context_seed = context_seed
@@ -65,7 +67,9 @@ class ResumeConstructor:
 		# Socket connection
 		socket_connection = get_connection_registry(user_id)
 		if socket_connection is None:
-			raise ValueError('No active WebSocket connection found for user.')
+			raise ValueError(
+				'No active WebSocket connection found for user.'
+			)
 		self.socket_manager: SocketManager = socket_connection
 
 	# --- Utilities ---
@@ -420,7 +424,9 @@ class ResumeConstructor:
 			data='Writing header section...',
 		)
 
-		header = "<div align='center'><h2>Alvin Karanja</h2></div>\n\n"
+		header = (
+			"<div align='center'><h2>Alvin Karanja</h2></div>\n\n"
+		)
 		header += '**Email:** alviinkaranjja@gmail.com - '
 		header += '**LinkedIn:** /in/alvin-n-karanja - '
 		header += '**GitHub:** github.com/karaalv - '
@@ -598,7 +604,9 @@ class ResumeConstructor:
 				f'{experience_query}\n'
 			)
 
-		experience_context = await self._fetch_context(experience_query)
+		experience_context = await self._fetch_context(
+			experience_query
+		)
 
 		# Formatter
 		formatter_prompt = textwrap.dedent(f"""
@@ -952,7 +960,9 @@ class ResumeConstructor:
 
 		if self.verbose:
 			print('\n--- Resume generation Time ---\n')
-			print(f'Acknowledgment Time: {acknowledgment_time:.2f} seconds')
+			print(
+				f'Acknowledgment Time: {acknowledgment_time:.2f} seconds'
+			)
 			print(f'Research Time: {research_time:.2f} seconds')
 			print(f'Header Time: {header_time:.2f} seconds')
 			print(f'Skills Time: {skills_time:.2f} seconds')
@@ -964,6 +974,7 @@ class ResumeConstructor:
 
 		return {
 			'resume': self.resume.strip(),
-			'response': self.acknowledgment.strip() + self.summary.strip(),
+			'response': self.acknowledgment.strip()
+			+ self.summary.strip(),
 			'title': self.title.strip(),
 		}

@@ -142,7 +142,9 @@ async def _execute_tool(
 
 
 @handle_exceptions_async('agent.main: Getting system prompt')
-async def _get_system_prompt(user_id: str, verbose: bool = False) -> str:
+async def _get_system_prompt(
+	user_id: str, verbose: bool = False
+) -> str:
 	"""
 	Constructs the system prompt for the agent
 	using the context of the conversation history
@@ -155,7 +157,9 @@ async def _get_system_prompt(user_id: str, verbose: bool = False) -> str:
 		str: The constructed system prompt.
 	"""
 
-	memory = await retrieve_memory(user_id, to_str=True, drop_canvas=True)
+	memory = await retrieve_memory(
+		user_id, to_str=True, drop_canvas=True
+	)
 
 	if verbose:
 		print(
@@ -238,14 +242,18 @@ async def chat(
 	# Push user input to memory on
 	# initial pass, update timestamp
 	if recursion_count == 0:
-		await push_memory(user_id=user_id, source='user', content=input)
+		await push_memory(
+			user_id=user_id, source='user', content=input
+		)
 
 		asyncio.create_task(update_last_active(user_id))
 
 	# Get system prompt, if call is
 	# recursive, add context from
 	# tool result
-	system_prompt = await _get_system_prompt(user_id=user_id, verbose=verbose)
+	system_prompt = await _get_system_prompt(
+		user_id=user_id, verbose=verbose
+	)
 
 	if recursive_prompt:
 		system_prompt += f'\n\n{recursive_prompt}'
@@ -261,7 +269,9 @@ async def chat(
 	if response.type == 'message':
 		message = response.content[0].text.strip()  # type: ignore
 
-		await push_memory(user_id=user_id, source='agent', content=message)
+		await push_memory(
+			user_id=user_id, source='agent', content=message
+		)
 
 		# Update user summarisation in background
 		# DO NOT AWAIT
@@ -274,8 +284,13 @@ async def chat(
 		tool_args: dict[str, Any] = json.loads(response.arguments)
 
 		# Check if user has exceeded usage limit
-		if tool_name == 'generate_resume' or tool_name == 'generate_letter':
-			if not await check_usage_limit(user_id=user_id, ip=ip, ua=ua):
+		if (
+			tool_name == 'generate_resume'
+			or tool_name == 'generate_letter'
+		):
+			if not await check_usage_limit(
+				user_id=user_id, ip=ip, ua=ua
+			):
 				usage_response = await inform_user_usage_limit()
 				return usage_response
 
@@ -286,7 +301,10 @@ async def chat(
 			verbose=verbose,
 		)
 
-		if tool_name == 'generate_resume' or tool_name == 'generate_letter':
+		if (
+			tool_name == 'generate_resume'
+			or tool_name == 'generate_letter'
+		):
 			return ''
 
 		return await chat(

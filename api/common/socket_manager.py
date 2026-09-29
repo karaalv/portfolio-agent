@@ -40,7 +40,9 @@ class SocketManager:
 		try:
 			await self.ws.send_json(response.model_dump())
 		except WebSocketDisconnect:
-			await self.close_on_code(code=1006, reason='Unexpected closure')
+			await self.close_on_code(
+				code=1006, reason='Unexpected closure'
+			)
 		except Exception as e:
 			await self.close_on_code(code=1006, reason=str(e))
 

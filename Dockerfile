@@ -15,4 +15,7 @@ COPY . .
 
 EXPOSE 3001
 
-CMD ["python", "-m", "api.main"]
+ENV PORTFOLIO_AGENT_ENV=production \
+    PORTFOLIO_AGENT_PORT=3001
+
+CMD ["python", "run.py"]

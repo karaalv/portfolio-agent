@@ -41,7 +41,9 @@ async def generate_resume(
 
 
 @handle_exceptions_async('agent.tools.main: Generate Letter')
-async def generate_letter(user_id: str, context_seed: str, verbose: bool):
+async def generate_letter(
+	user_id: str, context_seed: str, verbose: bool
+):
 	"""
 	Generate a cover letter for the user based
 	on their context and research.

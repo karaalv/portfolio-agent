@@ -45,7 +45,9 @@ async def setup_user_session():
 		UUID = cookies.get('UUID')
 		JWT = cookies.get('JWT')
 	else:
-		pytest.fail(f'Failed to set up user session: {response.status_code}')
+		pytest.fail(
+			f'Failed to set up user session: {response.status_code}'
+		)
 	# Create test message for deletion
 	await connect_mongo()
 	await push_memory(
@@ -75,7 +77,9 @@ async def test_frontend_auth():
 
 	status_code: int = response.status_code
 
-	assert status_code == 403, f'Expected status code 403, got {status_code}'
+	assert status_code == 403, (
+		f'Expected status code 403, got {status_code}'
+	)
 
 
 async def test_jwt_auth():
@@ -91,7 +95,9 @@ async def test_jwt_auth():
 
 	status_code: int = response.status_code
 
-	assert status_code == 401, f'Expected status code 401, got {status_code}'
+	assert status_code == 401, (
+		f'Expected status code 401, got {status_code}'
+	)
 
 
 async def test_agent_chat():
@@ -106,7 +112,9 @@ async def test_agent_chat():
 	url = f'ws://127.0.0.1:9001/api/agent/ws/chat?ft={create_frontend_token()}'
 	headers = {'Cookie': f'JWT={JWT};UUID={UUID}'}
 
-	async with websockets.connect(url, additional_headers=headers) as websocket:
+	async with websockets.connect(
+		url, additional_headers=headers
+	) as websocket:
 		await websocket.send(json.dumps(body))
 		response = await websocket.recv()
 
@@ -116,7 +124,9 @@ async def test_agent_chat():
 		'Expected response to be of type SocketResponse'
 	)
 
-	assert response.data is not None, 'Expected response data to be present'
+	assert response.data is not None, (
+		'Expected response data to be present'
+	)
 
 
 async def test_agent_memory_retrieval():
@@ -131,7 +141,9 @@ async def test_agent_memory_retrieval():
 		parsed=True,
 	)
 
-	assert response.data is not None, 'Expected response data to be present'
+	assert response.data is not None, (
+		'Expected response data to be present'
+	)
 
 
 async def test_agent_memory_deletion():

@@ -47,7 +47,8 @@ class Maintainer:
 			# Implement the cleanup logic here
 			user_collection = get_collection('users')
 			cutoff = (
-				datetime.now(timezone.utc) - timedelta(days=self.retention_time)
+				datetime.now(timezone.utc)
+				- timedelta(days=self.retention_time)
 			).isoformat() + 'Z'
 
 			pipeline = [

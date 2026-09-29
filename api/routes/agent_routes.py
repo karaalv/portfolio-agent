@@ -47,7 +47,9 @@ async def agent_chat_ws(ws: WebSocket):
 	"""
 	token = ws.query_params.get('ft')
 	if not token:
-		return error_response('Missing frontend token', status_code=400)
+		return error_response(
+			'Missing frontend token', status_code=400
+		)
 
 	# Validate token - HTTP exception raised
 	# on validation
@@ -173,6 +175,10 @@ async def delete_memory_api(request: Request):
 	result = await delete_memory(user_id=user_id)
 
 	if result is False:
-		return error_response('Failed to delete user memory', status_code=500)
+		return error_response(
+			'Failed to delete user memory', status_code=500
+		)
 
-	return success_response(message='Successfully deleted user memory')
+	return success_response(
+		message='Successfully deleted user memory'
+	)

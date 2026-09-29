@@ -55,14 +55,20 @@ def _load_file(file_name: str) -> list[CorpusItem]:
 	cleaned = re.sub(r'---', ' ', cleaned, flags=re.DOTALL)
 
 	# Extract Sections
-	sections = re.findall(r'<section>(.*?)</section>', cleaned, re.DOTALL)
+	sections = re.findall(
+		r'<section>(.*?)</section>', cleaned, re.DOTALL
+	)
 
 	# Load content within sections into CorpusItems
 	corpus_items = []
 	for section in sections:
 		id = re.findall(r'<id>(.*?)</id>', section, re.DOTALL)
-		header = re.findall(r'<header>(.*?)</header>', section, re.DOTALL)
-		context = re.findall(r'<context>(.*?)</context>', section, re.DOTALL)
+		header = re.findall(
+			r'<header>(.*?)</header>', section, re.DOTALL
+		)
+		context = re.findall(
+			r'<context>(.*?)</context>', section, re.DOTALL
+		)
 		document = re.findall(
 			r'<document>(.*?)</document>',
 			section,
@@ -95,10 +101,12 @@ def _analyse_corpus_item(corpus_item: CorpusItem) -> dict:
 		dict: A dictionary containing analysis
 		results.
 	"""
-	token_count = _get_token_count(corpus_item.document) + _get_token_count(
-		corpus_item.context
+	token_count = _get_token_count(
+		corpus_item.document
+	) + _get_token_count(corpus_item.context)
+	print(
+		f'{TerminalColors.blue}{corpus_item.id}{TerminalColors.reset}'
 	)
-	print(f'{TerminalColors.blue}{corpus_item.id}{TerminalColors.reset}')
 	print(f'  Token count: {token_count}')
 	analysis = {
 		'id': corpus_item.id,
@@ -130,7 +138,9 @@ if __name__ == '__main__':
 			f'{TerminalColors.reset}'
 		)
 		corpus_items = _load_file(file)
-		analysis = [_analyse_corpus_item(item) for item in corpus_items]
+		analysis = [
+			_analyse_corpus_item(item) for item in corpus_items
+		]
 
 		# Get summary statistics
 		total_tokens = sum(item['token_count'] for item in analysis)

@@ -6,6 +6,7 @@ pydantic
 pymongo
 PyJWT
 python-dotenv
+rich
 uvicorn
 
 # Corpus tooling

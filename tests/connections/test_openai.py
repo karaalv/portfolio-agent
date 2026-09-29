@@ -44,7 +44,9 @@ async def test_structured_response():
 	"""
 
 	class TestOpenAIClient(BaseModel):
-		response: str = Field(..., description='Response to the user query.')
+		response: str = Field(
+			..., description='Response to the user query.'
+		)
 
 	response = await structured_response(
 		system_prompt='You are a helpful assistant.',
@@ -86,7 +88,9 @@ async def test_agent_response():
 		tools=tools,
 	)
 
-	assert response.type == 'message', "Response type should be 'message'."
+	assert response.type == 'message', (
+		"Response type should be 'message'."
+	)
 	assert response.content[0].text is not None, (  # type: ignore
 		'Response content should not be None.'
 	)

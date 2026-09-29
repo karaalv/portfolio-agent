@@ -8,7 +8,9 @@ from pydantic import BaseModel, Field
 
 class UserUsage(BaseModel):
 	user_id: str = Field(..., description='Identifier for the user.')
-	usage_id: str = Field(..., description='Identifier for the usage record.')
+	usage_id: str = Field(
+		..., description='Identifier for the usage record.'
+	)
 	ip: str = Field(..., description='IP address of the user.')
 	generation_count: int = Field(
 		..., description='Number of generations performed.'

@@ -49,12 +49,16 @@ async def _load_file(file_name: str) -> list[dict]:
 	cleaned = re.sub(r'---', ' ', cleaned, flags=re.DOTALL)
 
 	# Extract Sections
-	sections = re.findall(r'<section>(.*?)</section>', cleaned, re.DOTALL)
+	sections = re.findall(
+		r'<section>(.*?)</section>', cleaned, re.DOTALL
+	)
 
 	# Load content within sections into CorpusItems
 	corpus_items: list[CorpusItem] = []
 	for section in sections:
-		id: list[str] = re.findall(r'<id>(.*?)</id>', section, re.DOTALL)
+		id: list[str] = re.findall(
+			r'<id>(.*?)</id>', section, re.DOTALL
+		)
 		header: list[str] = re.findall(
 			r'<header>(.*?)</header>', section, re.DOTALL
 		)
@@ -87,7 +91,9 @@ async def _load_file(file_name: str) -> list[dict]:
 async def main():
 	await connect_mongo()
 
-	print(f'{TerminalColors.yellow}Starting Corpus Push{TerminalColors.reset}')
+	print(
+		f'{TerminalColors.yellow}Starting Corpus Push{TerminalColors.reset}'
+	)
 
 	collection = get_collection('corpus')
 
@@ -116,7 +122,9 @@ async def main():
 
 	await close_mongo()
 
-	print(f'{TerminalColors.yellow}Finished Corpus Push{TerminalColors.reset}')
+	print(
+		f'{TerminalColors.yellow}Finished Corpus Push{TerminalColors.reset}'
+	)
 
 
 if __name__ == '__main__':

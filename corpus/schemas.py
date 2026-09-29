@@ -25,7 +25,9 @@ class CorpusItem(BaseModel):
 		None,
 		description='The embedding vector for the corpus item.',
 	)
-	context: str = Field(..., description='The context for the corpus item.')
+	context: str = Field(
+		..., description='The context for the corpus item.'
+	)
 	document: str = Field(
 		...,
 		description='The document text for the corpus item.',

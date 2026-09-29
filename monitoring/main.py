@@ -42,7 +42,9 @@ def generate_usage_id(
 
 
 @handle_exceptions_async('monitoring.main: Create User Usage')
-async def _create_user_usage(user_id: str, ip: str, ua: str) -> UserUsage:
+async def _create_user_usage(
+	user_id: str, ip: str, ua: str
+) -> UserUsage:
 	"""
 	Create a new user usage record.
 	"""
@@ -62,7 +64,9 @@ async def _create_user_usage(user_id: str, ip: str, ua: str) -> UserUsage:
 	return user_usage
 
 
-@handle_exceptions_async('monitoring.main: Create User Usage Fallback')
+@handle_exceptions_async(
+	'monitoring.main: Create User Usage Fallback'
+)
 async def create_user_usage_fallback(
 	user_id: str,
 ) -> UserUsage:
@@ -138,7 +142,9 @@ async def check_usage_limit(user_id: str, ip: str, ua: str) -> bool:
 	# Check time since last generation
 	data = await get_user_usage(usage_id)
 	usage_record = UserUsage.model_validate(data)
-	delta = get_datetime() - get_datetime(usage_record.latest_generation)
+	delta = get_datetime() - get_datetime(
+		usage_record.latest_generation
+	)
 
 	if delta > timedelta(weeks=1):
 		# Reset the usage count

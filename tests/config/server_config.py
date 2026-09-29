@@ -1,12 +1,9 @@
-"""
-This module defines server configuration
-code for testing, this is used to run and
-close the server during tests.
-"""
+"""Start and stop the API server for integration tests."""
 
 import os
 import signal
 import subprocess
+import sys
 import time
 
 import pytest
@@ -31,11 +28,16 @@ def start_server():
 		)
 
 		process = subprocess.Popen(
-			['python', '-m', 'api.main'],
+			[sys.executable, 'run.py'],
 			stdout=subprocess.PIPE,
 			stderr=subprocess.PIPE,
 			preexec_fn=os.setsid,
-			env={**os.environ, 'ENVIRONMENT': 'test'},
+			env={
+				**os.environ,
+				'ENVIRONMENT': 'test',
+				'PORTFOLIO_AGENT_ENV': 'testing',
+				'PORTFOLIO_AGENT_PORT': '9001',
+			},
 		)
 
 		with open(SERVER_PID_FILE, 'w') as f:

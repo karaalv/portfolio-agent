@@ -17,7 +17,9 @@ _researcher_model = 'gpt-4.1-mini'
 
 
 @handle_exceptions_async('agent.tools.utils: Researcher')
-async def researcher(orchestrator_input: str, verbose: bool = False) -> str:
+async def researcher(
+	orchestrator_input: str, verbose: bool = False
+) -> str:
 	"""
 	Perform research based on the user's input.
 	This function uses the researcher model to

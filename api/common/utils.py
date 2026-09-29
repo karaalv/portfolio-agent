@@ -63,4 +63,6 @@ def create_jwt_token(user_id: str) -> str:
 		'exp': datetime.now(timezone.utc)
 		+ timedelta(seconds=COOKIE_EXPIRY_SECONDS),
 	}
-	return jwt.encode(payload, os.getenv('JWT_SECRET'), algorithm='HS256')
+	return jwt.encode(
+		payload, os.getenv('JWT_SECRET'), algorithm='HS256'
+	)

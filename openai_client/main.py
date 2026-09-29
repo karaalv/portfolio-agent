@@ -141,7 +141,9 @@ async def agent_response(
 
 
 @handle_exceptions_async('OpenAI: Web Search')
-async def agent_search(search_query: str, model: str = 'gpt-4.1-mini') -> str:
+async def agent_search(
+	search_query: str, model: str = 'gpt-4.1-mini'
+) -> str:
 	"""
 	Performs a web search using the specified model.
 	"""

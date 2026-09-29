@@ -1,7 +1,4 @@
-"""
-This module is used to configure
-the connection to the MongoDB database.
-"""
+"""Configure MongoDB connections for the selected environment."""
 
 import os
 
@@ -35,12 +32,10 @@ MONGO_CLIENT: AsyncMongoClient | None = None
 
 
 def resolve_cluster() -> str:
-	"""
-	Resolves cluster based on environment.
-	"""
-	env = os.getenv('ENVIRONMENT')
+	"""Return the MongoDB URI for the selected environment."""
+	env = os.getenv('PORTFOLIO_AGENT_ENV')
 
-	if env == 'test':
+	if env == 'testing':
 		return str(os.getenv('MONGO_DEVELOPMENT'))
 	elif env == 'production':
 		return str(os.getenv('MONGO_PRODUCTION'))
@@ -49,15 +44,7 @@ def resolve_cluster() -> str:
 
 
 async def connect_mongo() -> bool:
-	"""
-	Connects to the MongoDB database using
-	the connection string, if connection
-	fails exception is raised.
-
-	Returns:
-		bool: True if connection is successful,
-		False otherwise.
-	"""
+	"""Connect to MongoDB and return whether its ping succeeds."""
 	global MONGO_CLIENT
 
 	try:
@@ -71,7 +58,9 @@ async def connect_mongo() -> bool:
 		response = await MONGO_CLIENT.admin.command('ping')
 
 		if response.get('ok') != 1:
-			raise Exception('Ping failed, connection not established.')
+			raise Exception(
+				'Ping failed, connection not established.'
+			)
 
 		print(
 			f'{TerminalColors.green}'
@@ -79,7 +68,7 @@ async def connect_mongo() -> bool:
 			f'{TerminalColors.reset}'
 			f' client: '
 			f'{TerminalColors.yellow}'
-			f'{os.getenv("ENVIRONMENT")}'
+			f'{os.getenv("PORTFOLIO_AGENT_ENV")}'
 			f'{TerminalColors.reset}'
 			f' cluster'
 		)
@@ -177,7 +166,8 @@ def get_mongo_client() -> AsyncMongoClient:
 
 	if MONGO_CLIENT is None:
 		raise Exception(
-			'MongoDB client is not initialized. Call connect_mongo() first.'
+			'MongoDB client is not initialised. '
+			'Call connect_mongo() first.'
 		)
 
 	return MONGO_CLIENT
