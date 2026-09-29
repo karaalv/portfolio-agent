@@ -3,8 +3,6 @@ This module contains the schemas for
 agent memory management
 """
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 from common.utils import get_timestamp
@@ -21,7 +19,7 @@ class AgentCanvas(BaseModel):
 		description="The unique identifier for the agent's canvas",
 	)
 	title: str = Field(..., description='The title of the canvas')
-	content: Optional[str] = Field(
+	content: str | None = Field(
 		default=None,
 		description='The content of the canvas, if any',
 	)
@@ -56,7 +54,7 @@ class AgentMemory(BaseModel):
 		description='Illusion flag to indicate if message '
 		'is should be "streamed" in UI',
 	)
-	agent_canvas: Optional[AgentCanvas] = Field(
+	agent_canvas: AgentCanvas | None = Field(
 		default=None,
 		description='The canvas associated with the memory',
 	)

@@ -1,0 +1,19 @@
+# Application
+APScheduler
+fastapi
+openai
+pydantic
+pymongo
+PyJWT
+python-dotenv
+uvicorn
+
+# Corpus tooling
+tiktoken
+
+# Tests
+httpx
+pytest
+pytest-asyncio
+requests
+websockets

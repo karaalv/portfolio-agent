@@ -3,7 +3,7 @@ This module contains the schemas used for
 the API.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -47,7 +47,7 @@ class APIResponse(BaseModel):
 		..., description='Metadata about the API response.'
 	)
 
-	data: Optional[Any] = Field(
+	data: Any | None = Field(
 		None,
 		description='The actual data returned by the API.',
 	)
@@ -70,7 +70,7 @@ class SocketResponse(BaseModel):
 		...,
 		description='The type of data passed inthe socket response.',
 	)
-	data: Optional[Any] = Field(
+	data: Any | None = Field(
 		None,
 		description='The actual data returned by the websocket.',
 	)
@@ -83,7 +83,7 @@ class SocketMessage(BaseModel):
 	"""
 
 	type: str = Field(..., description='The type of message being sent.')
-	data: Optional[str] = Field(
+	data: str | None = Field(
 		None,
 		description='The actual data being sent in the message.',
 	)

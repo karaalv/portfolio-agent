@@ -4,7 +4,6 @@ the connection to the MongoDB database.
 """
 
 import os
-from typing import Optional
 
 from pymongo import AsyncMongoClient
 
@@ -32,7 +31,7 @@ database_mappings: dict[str, str] = {
 
 # --- Connection Management ---
 
-MONGO_CLIENT: Optional[AsyncMongoClient] = None
+MONGO_CLIENT: AsyncMongoClient | None = None
 
 
 def resolve_cluster() -> str:

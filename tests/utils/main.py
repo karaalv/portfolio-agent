@@ -4,7 +4,7 @@ Main module for utility functions used in tests.
 
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Any, Literal, Optional, overload
+from typing import Any, Literal, overload
 
 import httpx
 import jwt
@@ -62,9 +62,9 @@ async def server_fetch(
 	endpoint: str,
 	method: str,
 	parsed: Literal[True],
-	user_id: Optional[str] = None,
-	jwt: Optional[str] = None,
-	body: Optional[Any] = None,
+	user_id: str | None = None,
+	jwt: str | None = None,
+	body: Any | None = None,
 ) -> APIResponse: ...
 
 
@@ -73,9 +73,9 @@ async def server_fetch(
 	endpoint: str,
 	method: str,
 	parsed: Literal[False],
-	user_id: Optional[str] = None,
-	jwt: Optional[str] = None,
-	body: Optional[Any] = None,
+	user_id: str | None = None,
+	jwt: str | None = None,
+	body: Any | None = None,
 ) -> Response: ...
 
 
@@ -83,9 +83,9 @@ async def server_fetch(
 	endpoint: str,
 	method: str,
 	parsed: bool = True,
-	user_id: Optional[str] = None,
-	jwt: Optional[str] = None,
-	body: Optional[Any] = None,
+	user_id: str | None = None,
+	jwt: str | None = None,
+	body: Any | None = None,
 ) -> Response | APIResponse:
 	"""
 	Fetch data from the server for testing.

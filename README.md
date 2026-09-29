@@ -24,7 +24,7 @@ See the [NOTICE](./NOTICE) file for attribution and additional details.
 
 - This repository also contains user management functionality that manages users and their sessions. It uses JWTs to secure the API endpoints and manage user sessions.
 
-## 🗂️ Project Structure 
+## 🗂️ Project Structure
 
 The project is structured into the following packages to make things easier for myself:
 

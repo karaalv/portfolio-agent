@@ -7,7 +7,7 @@ and components into a cohesive system.
 import asyncio
 import json
 import textwrap
-from typing import Any, Optional
+from typing import Any
 
 from agent.memory.compressor import (
 	update_user_summarisation,
@@ -211,7 +211,7 @@ async def chat(
 	ip: str,
 	ua: str,
 	input: str,
-	recursive_prompt: Optional[str] = None,
+	recursive_prompt: str | None = None,
 	recursion_count: int = 0,
 	verbose: bool = False,
 ) -> str:

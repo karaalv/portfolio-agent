@@ -3,7 +3,7 @@ This module contains response constructors
 for the API.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from fastapi.responses import JSONResponse
 
@@ -14,7 +14,7 @@ from api.common.schemas import APIResponse, MetaData
 
 def success_response(
 	message: str,
-	data: Optional[Any] = None,
+	data: Any | None = None,
 	status_code: int = 200,
 ) -> JSONResponse:
 	"""
@@ -42,7 +42,7 @@ def success_response(
 def error_response(
 	message: str,
 	status_code: int = 500,
-	errors: Optional[Any] = None,
+	errors: Any | None = None,
 ) -> JSONResponse:
 	"""
 	Constructs an error API response.

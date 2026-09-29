@@ -4,9 +4,10 @@ used across the backend.
 """
 
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from functools import wraps
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, TypeVar
 
 # --- Terminal Colors ---
 
@@ -115,7 +116,7 @@ def get_timestamp() -> str:
 
 
 def get_datetime(
-	timestamp: Optional[str] = None,
+	timestamp: str | None = None,
 ) -> datetime:
 	"""
 	Converts a timestamp string (ISO 8601
