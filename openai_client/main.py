@@ -1,155 +1,199 @@
 """
-This module acts as a client for
-interacting with the OpenAI API.
+Main module for interacting with the OpenAI API.
 """
 
-import os
+from collections.abc import AsyncGenerator
 from typing import TypeVar
 
-from openai import AsyncOpenAI
-from openai.types.responses import (
-	ResponseOutputItem,
-	ToolParam,
-)
+from openai.types.responses import ResponseStreamEvent, ToolParam
 from pydantic import BaseModel
 
-from common.utils import handle_exceptions_async
+from exceptions.openai import OpenAIException
+from openai_client.config import get_openai_client
+from openai_client.limits import (
+	get_openai_embedding_limiter,
+	get_openai_response_limiter,
+	get_openai_response_timeout,
+	get_openai_semaphore,
+)
+from openai_client.model_settings import (
+	OpenAILanguageModelReasoning,
+	OpenAILanguageModelVerbosity,
+)
+from openai_client.models import (
+	OpenAIEmbeddingModel,
+	OpenAILanguageModel,
+)
 
-# --- Setup and Configuration ---
+# Generic type for response models
+T = TypeVar('T', bound=BaseModel)
 
-client = AsyncOpenAI(api_key=os.getenv('OPENAI_KEY'))
+# --- Embedding Functionality ---
 
-# Generic type for pydantic models
-PYDANTIC = TypeVar('PYDANTIC', bound=BaseModel)
-
-# --- OpenAI Client Functions ---
-
-
-@handle_exceptions_async('OpenAI: Get Embedding')
-async def get_embedding(input: str) -> list[float]:
+async def get_embedding(
+    input: str,
+    model: OpenAIEmbeddingModel = \
+        OpenAIEmbeddingModel.TEXT_EMBEDDING_3_LARGE
+) -> list[float]:
 	"""
-	Returns the embedding for the given input
-	using OpenAI's text-embedding-3-large model.
+	Get the embedding for the given 
+	input using the specified OpenAI 
+	embedding model.
 	"""
-	response = await client.embeddings.create(
-		model='text-embedding-3-large', input=input
-	)
+	client = get_openai_client()
+	semaphore = get_openai_semaphore()
+	limiter = get_openai_embedding_limiter()
+	timeout = get_openai_response_timeout()
+	
+	async with limiter:
+		async with semaphore:
+			response = await client.embeddings.create(
+				model=model.value,
+				input=input,
+				timeout=timeout
+			)
+
+			if not response.data or not response.data[0].embedding:
+				raise OpenAIException(
+					message=(
+						"Failed to retrieve embedding"
+						"from OpenAI response."
+					),
+					module='openai_client.main',
+					operation='get_embedding'
+				)
 	return response.data[0].embedding
 
+# --- Language Model Functionality ---
 
-@handle_exceptions_async('OpenAI: Normal Response')
-async def normal_response(
+async def text_response(
 	system_prompt: str,
-	user_input: str,
-	model: str = 'gpt-4.1-nano',
+	user_prompt: str,
+	model: OpenAILanguageModel = \
+        OpenAILanguageModel.GPT_6_LUNA,
+    reasoning: OpenAILanguageModelReasoning = \
+        OpenAILanguageModelReasoning.MEDIUM,
+    verbosity: OpenAILanguageModelVerbosity = \
+		OpenAILanguageModelVerbosity.MEDIUM
 ) -> str:
 	"""
-	Constructs a normal response from OpenAI.
-
-	Args:
-		system_prompt (str): The system prompt to guide the model.
-		user_input (str): The user's input to the model.
-		model (str): The model to use for the response.
-
-	Returns:
-		str: The response from the OpenAI client.
+	Generates a text response from the OpenAI language
+	model based on the system and user prompts.
 	"""
-	response = await client.responses.create(
-		model=model,
-		instructions=system_prompt,
-		input=user_input,
-	)
-	return response.output_text.strip()
+	client = get_openai_client()
+	semaphore = get_openai_semaphore()
+	limiter = get_openai_response_limiter()
+	timeout = get_openai_response_timeout()
 
+	async with limiter:
+		async with semaphore:
+			response = await client.responses.create(
+				model=model,
+				instructions=system_prompt,
+				input=user_prompt,
+				reasoning={'effort': reasoning.value},
+				text={'verbosity': verbosity.value},
+				timeout=timeout
+			)
 
-@handle_exceptions_async('OpenAI: Structured Response')
+			text = response.output_text.strip()
+			if not text:
+				raise OpenAIException(
+					message=(
+						"Failed to retrieve text response"
+						"from OpenAI response."
+					),
+					module='openai_client.main',
+					operation='text_response'
+				)
+	return text
+
 async def structured_response(
 	system_prompt: str,
-	user_input: str,
-	response_format: type[PYDANTIC],
-	model: str = 'gpt-4.1-mini',
-) -> PYDANTIC:
+	user_prompt: str,
+	response_format: type[T],
+	model: OpenAILanguageModel = \
+		OpenAILanguageModel.GPT_6_1_SOL,
+	reasoning: OpenAILanguageModelReasoning = \
+		OpenAILanguageModelReasoning.MEDIUM,
+) -> T:
 	"""
-	Constructs a structured response from OpenAI.
-
-	Args:
-		system_prompt (str): The system prompt to guide the model.
-		user_input (str): The user's input to the model.
-		response_format (Type[PYDANTIC]): The Pydantic model to
-		structure the response.
-		model (str): The model to use for the response.
-
-	Returns:
-		PYDANTIC: The structured response from the OpenAI client.
+	Generates a structured response from the OpenAI language
+	model based on the system and user prompts, and parses it
+	into the specified response format.
 	"""
-	response = await client.responses.parse(
-		model=model,
-		text_format=response_format,
-		input=[
-			{'role': 'system', 'content': system_prompt},
-			{'role': 'user', 'content': user_input},
-		],
-	)
 
-	if not response.output_parsed:
-		raise ValueError(
-			'Response parsing failed,Response from model is empty.'
-		)
+	client = get_openai_client()
+	semaphore = get_openai_semaphore()
+	limiter = get_openai_response_limiter()
+	timeout = get_openai_response_timeout()
 
-	# Validate the response against the Pydantic model
-	if not isinstance(response.output_parsed, response_format):
-		raise ValueError(
-			f'Response does not match expected'
-			f' format: {response_format.__name__}'
-		)
+	async with limiter:
+		async with semaphore:
+			response = await client.responses.parse(
+				model=model,
+				instructions=system_prompt,
+				input=user_prompt,
+				reasoning={'effort': reasoning.value},
+				text_format=response_format,
+				timeout=timeout
+			)
 
-	return response.output_parsed
+			parsed_response = response.output_parsed
+			if not parsed_response:
+				raise OpenAIException(
+					message=(
+						"Failed to retrieve structured response"
+						"from OpenAI response."
+					),
+					module='openai_client.main',
+					operation='structured_response'
+				)
 
+			# Check if the parsed response matches
+			# expected schema
+			if not isinstance(parsed_response, response_format):
+				raise OpenAIException(
+					message=(
+						"Parsed response does not"
+						"match the expected schema."
+					),
+					module='openai_client.main',
+					operation='structured_response'
+				)
+	return parsed_response
 
-@handle_exceptions_async('OpenAI: Agent Response')
-async def agent_response(
+async def stream_response(
 	system_prompt: str,
-	user_input: str,
-	tools: list[ToolParam],
-	model: str = 'gpt-4.1-nano',
-) -> ResponseOutputItem:
+	user_prompt: str,
+	model: OpenAILanguageModel = \
+		OpenAILanguageModel.GPT_6_1_SOL,
+	reasoning: OpenAILanguageModelReasoning = \
+		OpenAILanguageModelReasoning.MEDIUM,
+	tools: list[ToolParam] | None = None,
+	verbosity: OpenAILanguageModelVerbosity = \
+		OpenAILanguageModelVerbosity.MEDIUM,
+) -> AsyncGenerator[ResponseStreamEvent, None]:
 	"""
-	Constructs an agent response from OpenAI.
-
-	Args:
-		system_prompt (str): The system prompt to guide the model.
-		user_input (str): The user's input to the model.
-		tools (List[ToolParam]): The tools available to the agent.
-		model (str): The model to use for the response.
-
-	Returns:
-		Response: The response from the OpenAI client.
+	Yield response events while holding the OpenAI concurrency permit.
+	Close the generator if consumption stops before the stream ends.
 	"""
-	response = await client.responses.create(
-		model=model,
-		instructions=system_prompt,
-		input=user_input,
-		tools=tools,
-	)
+	client = get_openai_client()
+	semaphore = get_openai_semaphore()
+	limiter = get_openai_response_limiter()
+	timeout = get_openai_response_timeout()
 
-	if not response.output:
-		raise ValueError(
-			'Agent response is empty. Ensure the model is configured correctly.'
+	async with limiter, semaphore:
+		stream = await client.responses.create(
+			model=model,
+			instructions=system_prompt,
+			input=user_prompt,
+			tools=tools or [],
+			reasoning={'effort': reasoning.value},
+			text={'verbosity': verbosity.value},
+			timeout=timeout,
+			stream=True
 		)
-
-	return response.output[0]
-
-
-@handle_exceptions_async('OpenAI: Web Search')
-async def agent_search(
-	search_query: str, model: str = 'gpt-4.1-mini'
-) -> str:
-	"""
-	Performs a web search using the specified model.
-	"""
-	response = await client.responses.create(
-		model=model,
-		tools=[{'type': 'web_search_preview'}],
-		input=search_query,
-	)
-	return response.output_text
+		async with stream:
+			async for event in stream:
+				yield event

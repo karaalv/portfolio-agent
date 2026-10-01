@@ -1,10 +1,50 @@
-# 🏗️ Terraform Configuration
+# Terraform
 
-This directory contains Terraform configuration files for provisioning and managing infrastructure resources.
+Each folder is an independent Terraform root with its own state. AWS and MongoDB Atlas use different S3 state keys. `terraform-state` creates their shared S3 bucket and keeps its own bootstrap state locally.
 
-## Overview
+| Root | Manages | State |
+| --- | --- | --- |
+| `terraform-state/` | S3 state bucket | Local `terraform.tfstate` |
+| `aws/` | Portfolio agent AWS infrastructure | `aws/terraform.tfstate` in S3 |
+| `mongodb/` | Atlas projects, clusters and access lists | `mongodb/terraform.tfstate` in S3 |
 
-The Terraform configuration files in this directory are used to set up and manage the infrastructure required for the application. This includes resources such as virtual machines, networking components, and storage solutions.
+## Before any AWS or Terraform command
 
-- `aws.tf`: Contains Terraform configurations for AWS resources.
-- `mongodb.tf`: Contains Terraform configurations for MongoDB resources.
+Export the sandbox profile in each shell session. Do not depend on a profile saved in Terraform files:
+
+```sh
+export AWS_PROFILE=karaalv-sandbox
+export AWS_REGION=eu-west-2
+aws sts get-caller-identity
+```
+
+Confirm that the returned account is the intended sandbox account before planning or applying. The AWS profile was not available in the environment used to prepare this configuration, so no cloud operations have been run.
+
+## Bootstrap the state bucket
+
+1. Choose a globally unique S3 bucket name and put it in `terraform/terraform-state/terraform.tfvars`. Start from `terraform.tfvars.example`.
+2. Initialise, review and apply the state root:
+
+```sh
+terraform -chdir=terraform/terraform-state init
+terraform -chdir=terraform/terraform-state plan
+terraform -chdir=terraform/terraform-state apply
+```
+
+Preserve the resulting local bootstrap `terraform.tfstate`. It manages the bucket and is ignored by Git. The bucket has versioning, AES-256 server-side encryption, public access blocking and S3 lockfile support. See [terraform-state/README.md](terraform-state/README.md).
+
+## Configure the service roots
+
+Set the same bucket name in `TF_STATE_BUCKET`, then initialise the AWS and Atlas backends separately. Their backend blocks are partial: `bucket` is required by S3 and is supplied through `-backend-config` at initialisation. The `key` is the state object path inside that bucket. MongoDB also sets `bucket = var.state_bucket_name` in its separate `terraform_remote_state` data source so it can read the AWS state object at `aws/terraform.tfstate`.
+
+```sh
+export TF_STATE_BUCKET="$(terraform -chdir=terraform/terraform-state output -raw state_bucket_name)"
+terraform -chdir=terraform/aws init -backend-config="bucket=$TF_STATE_BUCKET"
+terraform -chdir=terraform/mongodb init -backend-config="bucket=$TF_STATE_BUCKET"
+```
+
+Copy each root's `terraform.tfvars.example` to `terraform.tfvars` and supply the required values before planning. The MongoDB root also needs `state_bucket_name` set to that same bucket. Apply in this order: `terraform-state`, `aws`, then `mongodb`. MongoDB reads the EC2 public IP from the AWS state for its production access list. The S3 backend uses native S3 lockfiles, not a DynamoDB lock table.
+
+Do not run `terraform apply` against the old repository-root configuration. Its state was removed after the previous infrastructure was torn down. The old, ignored `terraform.tfvars.legacy` was retained only so account-specific values can be reviewed before they are replaced. No scope uses it automatically.
+
+See [infrastructure architecture](../docs/architecture/infrastructure.md) for the resource inventory and current limitations.
