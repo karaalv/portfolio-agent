@@ -4,28 +4,28 @@ related to database interactions
 for user management.
 """
 
-from common.utils import (
-	get_timestamp,
-	handle_exceptions_async,
-)
+from datetime import datetime, timezone
+
+from common.utils import handle_exceptions_async
+from database.mongodb.collections import MongoDBCollection
 from database.mongodb.main import get_collection
-from users.schemas import User
+from schemas.users.anonymous import AnonymousUser
 
 # --- Creation ---
 
 
 @handle_exceptions_async('users.database: Pushing User')
-async def push_user(user: User) -> User:
+async def push_user(user: AnonymousUser) -> AnonymousUser:
 	"""
 	Pushes a user to the MongoDB database.
 
 	Args:
-		user (User): The user object to be stored.
+		user (AnonymousUser): The user object to be stored.
 
 	Returns:
-		User: The user object that was stored.
+		AnonymousUser: The user object that was stored.
 	"""
-	collection = get_collection('users')
+	collection = get_collection(MongoDBCollection.USERS)
 
 	if collection is None:
 		raise ConnectionError('MongoDB client is not connected.')
@@ -38,7 +38,7 @@ async def push_user(user: User) -> User:
 
 
 @handle_exceptions_async('users.database: Retrieving User')
-async def get_user(user_id: str) -> User:
+async def get_user(user_id: str) -> AnonymousUser:
 	"""
 	Retrieves a user from the MongoDB database
 	by user ID.
@@ -48,10 +48,10 @@ async def get_user(user_id: str) -> User:
 		for the user.
 
 	Returns:
-		User: The user object retrieved from
+		AnonymousUser: The user object retrieved from
 		the database.
 	"""
-	collection = get_collection('users')
+	collection = get_collection(MongoDBCollection.USERS)
 
 	if collection is None:
 		raise ConnectionError('MongoDB client is not connected.')
@@ -61,7 +61,7 @@ async def get_user(user_id: str) -> User:
 	if user_data is None:
 		raise ValueError(f'User with ID {user_id} not found.')
 
-	return User(**user_data)
+	return AnonymousUser(**user_data)
 
 
 # --- Inspection ---
@@ -79,7 +79,7 @@ async def does_user_exist_db(user_id: str) -> bool:
 	Returns:
 		bool: True if the user exists, False otherwise.
 	"""
-	collection = get_collection('users')
+	collection = get_collection(MongoDBCollection.USERS)
 
 	if collection is None:
 		raise ConnectionError('MongoDB client is not connected.')
@@ -105,14 +105,14 @@ async def update_last_active(user_id: str) -> bool:
 		bool: True if the update was successful,
 		False otherwise.
 	"""
-	collection = get_collection('users')
+	collection = get_collection(MongoDBCollection.USERS)
 
 	if collection is None:
 		raise ConnectionError('MongoDB client is not connected.')
 
 	result = await collection.update_one(
 		{'user_id': user_id},
-		{'$set': {'last_active': get_timestamp()}},
+		{'$set': {'last_active_at': datetime.now(timezone.utc)}},
 	)
 
 	return result.modified_count > 0
@@ -135,7 +135,7 @@ async def delete_user(user_id: str) -> bool:
 		bool: True if the deletion was successful,
 		False otherwise.
 	"""
-	collection = get_collection('users')
+	collection = get_collection(MongoDBCollection.USERS)
 
 	if collection is None:
 		raise ConnectionError('MongoDB client is not connected.')

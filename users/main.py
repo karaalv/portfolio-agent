@@ -4,35 +4,34 @@ for handling user-related operations.
 """
 
 import uuid
+from datetime import datetime, timezone
 
-from common.utils import (
-	get_timestamp,
-	handle_exceptions_async,
-)
+from common.utils import handle_exceptions_async
+from schemas.users.anonymous import AnonymousUser
 from users.database import does_user_exist_db, push_user
-from users.schemas import User
 
 # --- User Creation ---
 
 
 @handle_exceptions_async('users.main: Create User')
-async def create_user() -> User:
+async def create_user() -> AnonymousUser:
 	"""
 	Creates a new user by generating a
 	unique user ID
 
 	Returns:
-		User: A unique identifier for the user.
+		AnonymousUser: The created user record.
 	"""
 	user_id = str(uuid.uuid4())
 
 	if await does_user_exist_db(user_id):
 		raise ValueError(f'User with ID {user_id} already exists.')
 
-	user = User(
+	now = datetime.now(timezone.utc)
+	user = AnonymousUser(
 		user_id=user_id,
-		last_active=get_timestamp(),
-		conversation_summary='',
+		last_active_at=now,
+		created_at=now,
 	)
 	await push_user(user)
 	return user

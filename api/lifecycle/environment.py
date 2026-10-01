@@ -70,3 +70,6 @@ def _check_environment() -> None:
 	"""Validate the settings needed to start the server."""
 	_check_environment_variable_str('PORTFOLIO_AGENT_ENV')
 	_check_environment_variable_int('PORTFOLIO_AGENT_PORT')
+	_check_environment_variable_str('CORS_ORIGINS')
+	_check_environment_variable_str('MONGODB_URI')
+	_check_environment_variable_str('OPENAI_KEY')

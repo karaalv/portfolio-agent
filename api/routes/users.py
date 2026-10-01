@@ -17,7 +17,7 @@ from api.common.utils import (
 	create_jwt_token,
 )
 from users.main import create_user, does_user_exist
-from users.schemas import User
+from schemas.users.anonymous import AnonymousUser
 
 # --- Constants ---
 
@@ -36,7 +36,7 @@ async def set_session(request: Request):
 	user_id: str = request.cookies.get('UUID', '')
 
 	if not user_id:
-		user: User = await create_user()
+		user: AnonymousUser = await create_user()
 
 		response = success_response(
 			message='User session created successfully.',

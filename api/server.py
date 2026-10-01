@@ -1,130 +1,138 @@
 """Configure the FastAPI application and its lifecycle."""
 
-import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from api.common.authentication import verify_frontend_token
-from api.common.maintainer import Maintainer
-from api.common.responses import error_response
-
-# Routes
-from api.routes import agent_routes, user_routes
-from common.utils import TerminalColors
-from database.mongodb.config import (
-	close_mongo,
-	connect_mongo,
+from api.lifecycle.config import (
+	start_api_lifecycle,
+	stop_api_lifecycle,
 )
+from api.maintenance.maintenance_manager import MaintenanceManager
+from api.routes import agent, users
+from api.routes.system import system_router
+from api.utils.cors import get_allowed_origins
+from api.utils.requests import get_request_id
+from api.utils.responses import create_http_response
+from exceptions.core import PortfolioAgentException
 
 # --- Lifecycle Management ---
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-	"""Open the database on startup and close it on shutdown."""
-	# Startup
-	print(
-		f'Starting '
-		f'{TerminalColors.blue}'
-		f'Portfolio Agent API'
-		f'{TerminalColors.reset}'
-		f'...'
-	)
-
-	# 1. Connect to MongoDB
-	if not await connect_mongo():
-		exit(1)
-
-	# 2. Start the maintainer
-	_ = Maintainer()
-
-	print(
-		f'{TerminalColors.green}'
-		f'Portfolio Agent API '
-		f'{TerminalColors.reset}'
-		f'Listening on port: '
-		f'{TerminalColors.cyan}'
-		f'{os.getenv("PORTFOLIO_AGENT_PORT")}'
-		f'{TerminalColors.reset}'
-	)
-
-	yield
-
-	# Shutdown
-	print(
-		f'Shutting down '
-		f'{TerminalColors.blue}'
-		f'Portfolio Agent API'
-		f'{TerminalColors.reset}'
-		f'...'
-	)
-
-	# 1. Close MongoDB connection
-	if not await close_mongo():
-		exit(1)
-
-	print(
-		f'{TerminalColors.green}'
-		f'Portfolio Agent API '
-		f'{TerminalColors.reset}'
-		f'Shutdown complete.'
-	)
+	"""Start clients and maintenance, then stop both on shutdown."""
+	maintenance_manager = MaintenanceManager()
+	await start_api_lifecycle()
+	try:
+		maintenance_manager.start()
+		yield
+	finally:
+		try:
+			await maintenance_manager.stop()
+		finally:
+			await stop_api_lifecycle()
 
 
 # --- FastAPI App Initialization ---
 
 app = FastAPI(
-	title='Portfolio Agent API',
-	description='API for managing portfolio agents.',
+	title='Portfolio Backend API',
+	description='API for managing portfolio backend.',
 	lifespan=lifespan,
 	root_path='/api',
+	version='2.0.0',
 )
 
 # --- Middleware ---
-origins = os.getenv('CORS_ORIGIN', '').split(',')
+
+# - Exception Handling -
+
+@app.exception_handler(PortfolioAgentException)
+async def PORTFOLIO_AGENT_exception_handler(
+	request: Request, exc: PortfolioAgentException
+) -> JSONResponse:
+	# Handle PortfolioAgentException
+	request_id = get_request_id(request)
+	return create_http_response(
+		request_id=request_id,
+		success=False,
+		message=exc.message,
+		data=None,
+		status_code=400
+	)
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(
+	request: Request, exc: HTTPException
+) -> JSONResponse:
+	# Handle HTTPException
+	request_id = get_request_id(request)
+	exc_message = (
+		str(exc.detail) if hasattr(exc, 'detail')
+		else str(exc)
+	)
+	exc_code = (
+		exc.status_code if hasattr(exc, 'status_code')
+		else 500
+	)
+	return create_http_response(
+		request_id=request_id,
+		success=False,
+		message=exc_message,
+		data=None,
+		status_code=exc_code
+	)
+
+@app.exception_handler(Exception)
+async def general_exception_handler(
+	request: Request, exc: Exception
+) -> JSONResponse:
+	# Handle general exceptions
+	request_id = get_request_id(request)
+	return create_http_response(
+		request_id=request_id,
+		success=False,
+		message=str(exc),
+		data=None,
+		status_code=500
+	)
+
+# - CORS Configuration -
 
 app.add_middleware(
 	CORSMiddleware,
-	allow_origins=[o.strip() for o in origins if o.strip()],
+	allow_origins=get_allowed_origins(),
 	allow_credentials=True,
 	allow_methods=['*'],
 	allow_headers=['*'],
 )
 
 
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-	"""Return a standard response for unhandled exceptions."""
-	return error_response(
-		message='An unexpected error occurred.',
-		status_code=500,
-		errors=str(exc),
-	)
-
-
 # Health Check Endpoint
-
-
-@app.get('/health')
-async def health_check():
-	"""Report whether the API is running."""
-	return JSONResponse(content={'status': 'ok'}, status_code=200)
-
 
 # --- Routes ---
 
 app.include_router(
-	router=user_routes.router,
+	router=system_router,
+	prefix='/system',
+	tags=['System']
+)
+
+app.include_router(
+	router=users.router,
 	prefix='/users',
+	tags=['Users'],
 	dependencies=[Depends(verify_frontend_token)],
 )
 
 # HTTP and Websocket dependencies handled
 # on a per-route basis
 app.include_router(
-	router=agent_routes.router,
+	router=agent.router,
 	prefix='/agent',
+	tags=['Agent'],
 )

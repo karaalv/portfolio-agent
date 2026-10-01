@@ -40,4 +40,4 @@ def get_collection(
 		)
 
 	db = MONGODB_COLLECTION_TO_DATABASE[collection]
-	return client[db][collection]
+	return client[db.value][collection.value]

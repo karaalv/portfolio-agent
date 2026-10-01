@@ -2,15 +2,15 @@
 Module for managing OpenAI model settings.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class OpenAILanguageModelReasoning(str, Enum):
+class OpenAILanguageModelReasoning(StrEnum):
 	LOW = 'low'
 	MEDIUM = 'medium'
 	HIGH = 'high'
 
-class OpenAILanguageModelVerbosity(str, Enum):
+class OpenAILanguageModelVerbosity(StrEnum):
 	LOW = 'low'
 	MEDIUM = 'medium'
 	HIGH = 'high'

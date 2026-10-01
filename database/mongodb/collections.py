@@ -1,10 +1,10 @@
 """MongoDB collections for the Portfolio Agent application."""
 
-from enum import Enum
+from enum import StrEnum
 
 # --- MongoDB Database and Collection Enumerations ---
 
-class MongoDBDatabase(str, Enum):
+class MongoDBDatabase(StrEnum):
     """
     Enumeration of MongoDB databases 
     for the Portfolio Agent application.
@@ -12,7 +12,7 @@ class MongoDBDatabase(str, Enum):
     APPLICATION = "application"
     ANALYTICS = "analytics"
 
-class MongoDBCollection(str, Enum):
+class MongoDBCollection(StrEnum):
     """
     Enumeration of MongoDB collections 
     for the Portfolio Agent application.

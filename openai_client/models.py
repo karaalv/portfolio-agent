@@ -2,10 +2,10 @@
 Models for interacting with the OpenAI API.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class OpenAIEmbeddingModel(str, Enum):
+class OpenAIEmbeddingModel(StrEnum):
     """
     Enumeration of OpenAI embedding models.
     """
@@ -13,7 +13,7 @@ class OpenAIEmbeddingModel(str, Enum):
     TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
 
 
-class OpenAILanguageModel(str, Enum):
+class OpenAILanguageModel(StrEnum):
     """
     Enumeration of OpenAI LLM models.
     """
