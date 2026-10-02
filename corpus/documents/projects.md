@@ -6,7 +6,7 @@
 
 <!-- Portfolio Agent -->
 <section>
-    <id>projects_portfolio_agent</id>
+    <label>projects_portfolio_agent</label>
     <header>Project: Portfolio Agent</header>
     <context>
         AI-powered portfolio assistant using a custom RAG 
@@ -55,7 +55,7 @@
 
 <!-- Formula Student -->
 <section>
-    <id>projects_formula_student</id>
+    <label>projects_formula_student</label>
     <header>Formula Student</header>
     <context>
         Details of my project Formula Student, addressing skills 
@@ -97,7 +97,7 @@
 
 <!-- Gatsby -->
 <section>
-    <id>projects_gatsby</id>
+    <label>projects_gatsby</label>
     <header>Project: Gatsby</header>
     <context>
         Details of my project Gatsby, addressing skills such as 
@@ -138,7 +138,7 @@
 
 <!-- Machine Learning Research -->
 <section>
-    <id>projects_machine_learning_research</id>
+    <label>projects_machine_learning_research</label>
     <header>Machine Learning Research</header>
     <context>
         Details of my project Machine Learning Research, 
@@ -178,7 +178,7 @@
 
 <!-- Getaway -->
 <section>
-    <id>projects_getaway</id>
+    <label>projects_getaway</label>
     <header>Project: Getaway</header>
     <context>
         Details of my project Getaway, addressing skills such as 

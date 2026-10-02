@@ -1,136 +1,83 @@
-"""
-This module is used to push the corpus
-data to the MongoDB collection.
-"""
+"""Embed and upload corpus documents to MongoDB file by file."""
 
 import asyncio
-import os
-import re
 
-from common.utils import TerminalColors
-from corpus.schemas import CorpusItem
+from api.lifecycle.environment import load_environment_variables
+from corpus.helpers import (
+	get_corpus_files,
+	load_corpus_from_file,
+)
+from database.mongodb.collections import MongoDBCollection
 from database.mongodb.config import (
-	close_mongo,
-	connect_mongo,
+	is_mongo_connected,
+	start_mongo_client,
+	stop_mongo_client,
 )
 from database.mongodb.main import get_collection
+from openai_client.config import (
+	start_openai_client,
+	stop_openai_client,
+)
+from schemas.corpus.item import CorpusItem
+from shared.logging import LogStyle, rich_print
 
-# --- File Processing ---
+
+async def main() -> None:
+	"""Upload each corpus file and close clients on exit."""
+	try:
+		await _startup()
+		rich_print('Starting corpus upload...', LogStyle.INFO)
+		for file in get_corpus_files():
+			rich_print(
+				f'Processing file: {file.file_path}',
+				LogStyle.INFO,
+			)
+			items = await load_corpus_from_file(
+				file.file_path,
+				embeddings=True,
+			)
+			inserted_count = await _insert_corpus_items(items)
+			rich_print(
+				f'Inserted {inserted_count} items '
+				f'from {file.label}.',
+				LogStyle.SUCCESS,
+			)
+		rich_print('Corpus upload complete.', LogStyle.SUCCESS)
+	finally:
+		await _shutdown()
 
 
-async def _load_file(file_name: str) -> list[dict]:
+async def _startup() -> None:
+	"""Load the environment and start MongoDB and OpenAI."""
+	load_environment_variables()
+	await start_mongo_client()
+	while not await is_mongo_connected():
+		await asyncio.sleep(1)
+	start_openai_client()
+
+
+async def _shutdown() -> None:
+	"""Attempt to close both process-local clients."""
+	try:
+		await stop_openai_client()
+	finally:
+		await stop_mongo_client()
+
+
+async def _insert_corpus_items(items: list[CorpusItem]) -> int:
+	"""Insert one file's items and return the inserted count.
+
+	Skip empty files. Existing records are retained, so repeat
+	uploads append new records with fresh item IDs.
 	"""
-	Load a file and return a list of CorpusItems.
-
-	Args:
-		file_name (str): The name of the file to load.
-
-	Returns:
-		list[CorpusItem]: The loaded corpus items.
-	"""
-	# Import embedding function here to get around
-	# import issues
-	from openai_client.main import get_embedding
-
-	current_dir = os.path.dirname(os.path.abspath(__file__))
-	file_path = os.path.join(current_dir, file_name)
-
-	with open(file_path, encoding='utf-8') as file:
-		content = file.read()
-
-	# Clean comments
-	cleaned = re.sub(r'<!--.*?-->', '', content, flags=re.DOTALL)
-	cleaned = re.sub(r'\n\s*\n', '\n', cleaned)
-
-	# Clean trailing spaces
-	cleaned = re.sub(r'\s*\n\s*', ' ', cleaned, flags=re.MULTILINE)
-
-	# Clear separators
-	cleaned = re.sub(r'---', ' ', cleaned, flags=re.DOTALL)
-
-	# Extract Sections
-	sections = re.findall(
-		r'<section>(.*?)</section>', cleaned, re.DOTALL
+	if not items:
+		return 0
+	collection = get_collection(MongoDBCollection.CORPUS)
+	result = await collection.insert_many(
+		[item.model_dump() for item in items],
 	)
-
-	# Load content within sections into CorpusItems
-	corpus_items: list[CorpusItem] = []
-	for section in sections:
-		id: list[str] = re.findall(
-			r'<id>(.*?)</id>', section, re.DOTALL
-		)
-		header: list[str] = re.findall(
-			r'<header>(.*?)</header>', section, re.DOTALL
-		)
-		context: list[str] = re.findall(
-			r'<context>(.*?)</context>', section, re.DOTALL
-		)
-		document: list[str] = re.findall(
-			r'<document>(.*?)</document>',
-			section,
-			re.DOTALL,
-		)
-
-		# Create a CorpusItem from the extracted content
-		context_str: str = context[0].strip()
-		corpus_item = CorpusItem(
-			id=id[0].strip(),
-			header=header[0].strip(),
-			context=context_str,
-			document=document[0].strip(),
-			embedding=await get_embedding(context_str),
-		)
-		corpus_items.append(corpus_item)
-
-	return [c.model_dump() for c in corpus_items]
-
-
-# --- Main ---
-
-
-async def main():
-	await connect_mongo()
-
-	print(
-		f'{TerminalColors.yellow}Starting Corpus Push{TerminalColors.reset}'
-	)
-
-	collection = get_collection('corpus')
-
-	files = [
-		'documents/personal.md',
-		'documents/education.md',
-		'documents/skills.md',
-		'documents/projects.md',
-		'documents/experience.md',
-		'documents/meta_reflection.md',
-	]
-
-	for file in files:
-		print(
-			f'{TerminalColors.blue}'
-			f'Processing file: {file}'
-			f'{TerminalColors.reset}'
-		)
-		corpus_items = await _load_file(file)
-		await collection.insert_many(corpus_items)
-		print(
-			f'{TerminalColors.magenta}'
-			f'Inserted {len(corpus_items)} items from {file}'
-			f'{TerminalColors.reset}'
-		)
-
-	await close_mongo()
-
-	print(
-		f'{TerminalColors.yellow}Finished Corpus Push{TerminalColors.reset}'
-	)
+	return len(result.inserted_ids)
 
 
 if __name__ == '__main__':
-	import os
-
-	from dotenv import load_dotenv
-
-	load_dotenv(override=True, dotenv_path=os.path.abspath('.env'))
 	asyncio.run(main())

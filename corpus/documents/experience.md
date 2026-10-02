@@ -6,7 +6,7 @@
 
 <!-- Tracom -->
 <section>
-    <id>experience_tracom</id>
+    <label>experience_tracom</label>
     <header>Tracom Internship</header>
     <context>
         Internship experience in generative AI, vector search, 
@@ -50,7 +50,7 @@
 
 <!-- Fintech -->
 <section>
-    <id>experience_fintech_backend_intern</id>
+    <label>experience_fintech_backend_intern</label>
     <header>Fintech Internship</header>
     <context>
         Internship experience in backend development, data 

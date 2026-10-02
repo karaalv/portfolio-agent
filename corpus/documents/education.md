@@ -6,7 +6,7 @@
 
 <!-- Masters Degree -->
 <section>
-    <id>education_masters</id>
+    <label>education_masters</label>
     <header>Masters Degree Information</header>
     <context>
         Master's degree in Business Analytics at Imperial 
@@ -43,7 +43,7 @@
 
 <!-- Undergraduate Degree -->
 <section>
-    <id>education_undergraduate</id>
+    <label>education_undergraduate</label>
     <header>Undergraduate Degree Information</header>
     <context>
         Bachelor's degree in Computer Systems Engineering at 

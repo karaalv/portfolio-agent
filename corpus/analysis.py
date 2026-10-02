@@ -1,152 +1,79 @@
-"""
-This module contains the main processing
-logic for corpus data. This file is mainly
-used to transform and analyze the text data
-within the corpus.
-"""
+"""Report token counts for corpus items, files and the corpus."""
 
-import os
-import re
+import asyncio
 
-import tiktoken
-
-from common.utils import TerminalColors
-from corpus.schemas import CorpusItem
-
-# --- Utils ---
-
-
-def _get_token_count(text: str) -> int:
-	"""
-	Get the number of tokens in a text string.
-	"""
-	encoding = tiktoken.get_encoding('o200k_base')
-	tokens = encoding.encode(text)
-	return len(tokens)
+from corpus.helpers import (
+	get_corpus_files,
+	get_token_count,
+	load_corpus_from_file,
+)
+from schemas.corpus.analysis import (
+	CorpusDocumentAnalysis,
+	CorpusItemAnalysis,
+)
+from schemas.corpus.file import CorpusFile
+from schemas.corpus.item import CorpusItem
+from shared.logging import LogStyle, rich_print
 
 
-# --- Processing Functions ---
-
-
-def _load_file(file_name: str) -> list[CorpusItem]:
-	"""
-	Load a file and return a list of CorpusItems.
-
-	Args:
-		file_name (str): The name of the file to load.
-
-	Returns:
-		list[CorpusItem]: The loaded corpus items.
-	"""
-	current_dir = os.path.dirname(os.path.abspath(__file__))
-	file_path = os.path.join(current_dir, file_name)
-
-	with open(file_path, encoding='utf-8') as file:
-		content = file.read()
-
-	# Clean comments
-	cleaned = re.sub(r'<!--.*?-->', '', content, flags=re.DOTALL)
-	cleaned = re.sub(r'\n\s*\n', '\n', cleaned)
-
-	# Clean trailing spaces
-	cleaned = re.sub(r'\s*\n\s*', ' ', cleaned, flags=re.MULTILINE)
-
-	# Clear separators
-	cleaned = re.sub(r'---', ' ', cleaned, flags=re.DOTALL)
-
-	# Extract Sections
-	sections = re.findall(
-		r'<section>(.*?)</section>', cleaned, re.DOTALL
-	)
-
-	# Load content within sections into CorpusItems
-	corpus_items = []
-	for section in sections:
-		id = re.findall(r'<id>(.*?)</id>', section, re.DOTALL)
-		header = re.findall(
-			r'<header>(.*?)</header>', section, re.DOTALL
-		)
-		context = re.findall(
-			r'<context>(.*?)</context>', section, re.DOTALL
-		)
-		document = re.findall(
-			r'<document>(.*?)</document>',
-			section,
-			re.DOTALL,
-		)
-
-		# Create a CorpusItem from the extracted content
-		corpus_item = CorpusItem(
-			id=id[0],
-			header=header[0],
-			context=context[0],
-			document=document[0],
-			embedding=[0.0],  # Placeholder for embedding
-		)
-		corpus_items.append(corpus_item)
-
-	return corpus_items
-
-
-def _analyse_corpus_item(corpus_item: CorpusItem) -> dict:
-	"""
-	Analyse a single CorpusItem and return
-	relevant metrics.
-
-	Args:
-		corpus_item (CorpusItem): The CorpusItem to
-		analyse.
-
-	Returns:
-		dict: A dictionary containing analysis
-		results.
-	"""
-	token_count = _get_token_count(
-		corpus_item.document
-	) + _get_token_count(corpus_item.context)
-	print(
-		f'{TerminalColors.blue}{corpus_item.id}{TerminalColors.reset}'
-	)
-	print(f'  Token count: {token_count}')
-	analysis = {
-		'id': corpus_item.id,
-		'token_count': token_count,
-	}
-	return analysis
-
-
-if __name__ == '__main__':
-	"""
-    Main entry point for corpus
-    analysis.
-    """
-	files = [
-		'documents/personal.md',
-		'documents/education.md',
-		'documents/skills.md',
-		'documents/projects.md',
-		'documents/experience.md',
-		'documents/meta_reflection.md',
-	]
-
+async def main() -> None:
+	"""Print file summaries and the combined corpus total."""
+	files = get_corpus_files()
 	corpus_tokens = 0
 
 	for file in files:
-		print(
-			f'{TerminalColors.green}'
-			f'Processing file: {file} ...'
-			f'{TerminalColors.reset}'
+		rich_print(
+			f'Processing file: {file.file_path} ...',
+			LogStyle.INFO,
 		)
-		corpus_items = _load_file(file)
-		analysis = [
-			_analyse_corpus_item(item) for item in corpus_items
-		]
+		analysis = await _analyse_corpus_file(file)
+		corpus_tokens += analysis.total_token_count
+		rich_print(
+			f'Summary for {file.file_path}:', LogStyle.INFO
+		)
+		print(analysis.model_dump_json(indent=4))
+		rich_print('-' * 20, LogStyle.DEFAULT)
 
-		# Get summary statistics
-		total_tokens = sum(item['token_count'] for item in analysis)
-		corpus_tokens += total_tokens
-		print('\nSummary Statistics:')
-		print(f'Total tokens: {total_tokens}')
-		print('-' * 20)
+	rich_print(
+		f'\nTotal corpus tokens: {corpus_tokens}', LogStyle.INFO
+	)
 
-	print(f'\nTotal corpus tokens: {corpus_tokens}')
+
+def _analyse_corpus_item(
+	corpus_item: CorpusItem,
+) -> CorpusItemAnalysis:
+	"""Count context and document tokens using o200k_base."""
+	context_token_count = get_token_count(corpus_item.context)
+	document_token_count = get_token_count(corpus_item.document)
+	return CorpusItemAnalysis(
+		item_label=corpus_item.label,
+		context_token_count=context_token_count,
+		document_token_count=document_token_count,
+		total_token_count=context_token_count
+		+ document_token_count,
+	)
+
+
+async def _analyse_corpus_file(
+	corpus_file: CorpusFile,
+) -> CorpusDocumentAnalysis:
+	"""Analyse file sections without generating embeddings."""
+	corpus_items = await load_corpus_from_file(
+		corpus_file.file_path
+	)
+	corpus_items_analysis = [
+		_analyse_corpus_item(item) for item in corpus_items
+	]
+	return CorpusDocumentAnalysis(
+		file_label=corpus_file.label,
+		section_count=len(corpus_items),
+		total_token_count=sum(
+			item.total_token_count
+			for item in corpus_items_analysis
+		),
+		corpus_items=corpus_items_analysis,
+	)
+
+
+if __name__ == '__main__':
+	asyncio.run(main())

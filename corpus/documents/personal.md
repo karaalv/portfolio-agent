@@ -6,7 +6,7 @@
 
 <!-- Hobbies -->
 <section>
-    <id>personal_hobbies</id>
+    <label>personal_hobbies</label>
     <header>Personal Hobbies</header>
     <context>
         Details on personal hobbies and activities, providing 
@@ -46,7 +46,7 @@
 
 <!-- Character -->
 <section>
-    <id>personal_character</id>
+    <label>personal_character</label>
     <header>Character Traits</header>
     <context>
         Details on personality traits, work style, and 
@@ -93,7 +93,7 @@
 
 <!-- Interests -->
 <section>
-    <id>personal_interests</id>
+    <label>personal_interests</label>
     <header>Personal Interests</header>
     <context>
         Details on interests and passions, providing insight 
@@ -134,7 +134,7 @@
 
 <!-- Opinions -->
 <section>
-    <id>personal_opinions</id>
+    <label>personal_opinions</label>
     <header>Personal Opinions</header>
     <context>
         Details on personal beliefs, values, and perspectives, 
@@ -177,7 +177,7 @@
 
 <!-- Strengths -->
 <section>
-    <id>personal_strengths</id>
+    <label>personal_strengths</label>
     <header>Strengths</header>
     <context>
         Key strengths including adaptability, resilience, 
@@ -220,7 +220,7 @@
 
 <!-- Weaknesses -->
 <section>
-    <id>personal_weaknesses</id>
+    <label>personal_weaknesses</label>
     <header>Weaknesses</header>
     <context>
         Key weaknesses including delegation, workload 
@@ -265,7 +265,7 @@
 
 <!-- Background -->
 <section>
-    <id>personal_background</id>
+    <label>personal_background</label>
     <header>Personal Background</header>
     <context>
         Information about personal background, such as my nationality,

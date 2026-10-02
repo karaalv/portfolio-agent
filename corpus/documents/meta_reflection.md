@@ -6,7 +6,7 @@
 
 <!-- Challenges -->
 <section>
-    <id>meta_challenges</id>
+    <label>meta_challenges</label>
     <header>Personal Challenges</header>
     <context>
         Most notable challenge and how I overcame it, focusing on 
@@ -42,7 +42,7 @@
 
 <!-- Motivation -->
 <section>
-    <id>meta_motivation</id>
+    <label>meta_motivation</label>
     <header>What Drives Me</header>
     <context>
         Motivations for my degree choices and career direction, 
@@ -79,7 +79,7 @@
 
 <!-- Career Goals -->
 <section>
-    <id>meta_career_goals</id>
+    <label>meta_career_goals</label>
     <header>Career Goals</header>
     <context>
         Long-term career goals focused on tackling complex 
@@ -125,7 +125,7 @@
 
 <!-- Approach to problems -->
 <section>
-    <id>approach_problem_solving</id>
+    <label>approach_problem_solving</label>
     <header>Approach to Problem Solving</header>
     <context>
         A detailed description of my methodology for tackling 

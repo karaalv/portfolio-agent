@@ -6,7 +6,7 @@
 
 <!-- Technical Skills -->
 <section>
-    <id>skills_technical</id>
+    <label>skills_technical</label>
     <header>Technical Skills</header>
     <context>
         Details on technical skills, including programming 
@@ -45,7 +45,7 @@
 
 <!-- Product Management -->
 <section>
-    <id>skills_product_management</id>
+    <label>skills_product_management</label>
     <header>Product Management Skills</header>
     <context>
         Details on product management skills, including 
@@ -87,7 +87,7 @@
 
 <!-- Quantitative Mindset -->
 <section>
-    <id>skills_quantitative_mindset</id>
+    <label>skills_quantitative_mindset</label>
     <header>Quantitative Mindset</header>
     <context>
         Details on quantitative skills, including data analysis, 
