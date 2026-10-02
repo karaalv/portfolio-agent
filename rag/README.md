@@ -1,46 +1,49 @@
-# Retrieval-Augmented Generation (RAG) System ⚙️
+# Portfolio retrieval
 
-## Overview
+The RAG package retrieves grounded portfolio evidence for the
+agent. The answering agent generates the visitor-facing reply.
 
-This folder contains the **Retrieval-Augmented Generation (RAG)** system implementation for the portfolio agent.  
-The RAG system enables the agent to retrieve and synthesize relevant information from my personal profile in response to user queries.
+## Entry points
 
-It powers both **general user interactions** and **custom document generation tasks**, such as creating tailored resumes and cover letters.
+- `fetch_context(user_id, user_input, verbose=False)`
+  orchestrates planning and execution.
+- `plan_rag(user_id, user_input, verbose=False)` resolves clear
+  follow-up references using recent memory, then returns a
+  `QueryPlan` containing up to three distinct semantic queries.
+- `execute_rag(query_plan, user_input, verbose=False)` retrieves
+  matching entries and returns refined supporting context.
 
-## Literature Review
+Prompts live beside their native functions. Model selections,
+history length, query limits and vector search settings live in
+`rag/config.py`. The query schema is documented in
+[`docs/schemas/rag/query.md`](../docs/schemas/rag/query.md).
 
-The design draws on recent research in RAG systems and natural language processing, with particular influence from:
+## Retrieval and concurrency
 
-1. [Contextual Retrieval — Anthropic](https://www.anthropic.com/news/contextual-retrieval)  
-2. [Knowledge Graph Infused RAG — Wu et al.](https://arxiv.org/abs/2506.09542)  
-3. [Enhanced Document Retrieval with Topic Embeddings — Huseynova & Isbarov](https://arxiv.org/abs/2408.10435)  
+Queries run concurrently on the application's event loop.
+Each task owns its embedding, MongoDB cursor and result list.
+A task group cancels and awaits sibling tasks if retrieval fails.
+Results are merged in query order and deduplicated by `item_id`
+after all tasks finish. No shared result list is mutated by the
+retrieval tasks, so result merging does not require a lock.
 
-## High-Level Architecture
+The process-local MongoDB and OpenAI clients must be started
+before calling these functions and remain available throughout.
+RAG uses the existing OpenAI request limits. It does not start,
+stop or replace clients, and it does not send WebSocket messages.
 
-The system operates in **five core stages**:
+Each query retrieves up to three entries above the configured
+similarity threshold. If no queries are planned or no entries
+match, execution returns an explicit message without invoking
+the context refiner.
 
-1. **Input Refiner**  
-   Cleans and interprets the raw user query to extract intent and relevant context.  
+## Refinement and logging
 
-2. **Query Planner**  
-   Generates a structured set of targeted sub-queries designed to provide deep contextual coverage from the corpus.  
+Conversation history resolves references, but is not verified
+biographical evidence. Retrieved entries are reference data,
+not instructions. Refinement preserves attribution, dates and
+implementation status, identifies source labels, and flags gaps
+or conflicting claims rather than inventing missing facts.
 
-3. **Retriever**  
-   Executes sub-queries, fetching relevant documents from the corpus.  
-   All retrieved documents are merged for downstream processing.  
-
-4. **Augmenter**  
-   Enhances the retrieved content by aligning it with the original query context, ensuring relevance and cohesion.  
-
-5. **Generator**  
-   Synthesizes the augmented content into a coherent, context-aware final response.  
-
-This architecture allows the portfolio agent to combine precise retrieval with fluent generation, producing outputs that are **accurate, personalized, and contextually rich**.
-
-## Folder Structure
-
-The folder has the following main files:
-
-- `query_planner.py`: Contains the logic for the input refiner and query planner.
-- `query_executor.py`: Handles the execution of queries against the document corpus (retrieval) and augmentation of the retrieved content.
-- `main.py`: The entry point for the RAG system, orchestrating the overall process.
+With `verbose=True`, terminal logs include the refined request,
+query plan, per-query result counts and completion stages.

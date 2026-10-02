@@ -8,3 +8,4 @@ scope as `schemas/`.
 - [WebSocket schemas](api/ws/README.md)
 - [User schemas](users/anonymous.md)
 - [Agent schemas](agent/README.md)
+- [RAG query plan](rag/query.md)
