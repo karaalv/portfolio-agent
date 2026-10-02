@@ -1,76 +1,13 @@
-<metadata>
-    This document contains information about
-    my education, modules chosen, and notable
-    coursework.
-</metadata>
-
-<!-- Masters Degree -->
 <section>
-    <label>education_masters</label>
-    <header>Masters Degree Information</header>
-    <context>
-        Master's degree in Business Analytics at Imperial 
-        College London (Aug 2024 - Aug 2025), covering machine 
-        learning, statistical modelling, data visualisation, 
-        and industry applications.
-    </context>
-    <document>
-        I completed my Master's degree at Imperial College 
-        London between August 2024 and August 2025, earning an 
-        MSc in Business Analytics. I was awarded the Africa 
-        Regional Scholarship in recognition of my academic 
-        potential and achievements.  
-        ---
-        The course covered areas such as machine learning, data 
-        visualisation, and statistical modelling. It emphasised 
-        practical applications of data science techniques in 
-        industries including finance, retail, digital marketing, 
-        social media, energy, and supply chain. This programme 
-        strengthened my ability to work with complex datasets 
-        and extract actionable insights, particularly in 
-        quantitative research and applied machine learning.  
-        ---
-        The modules I completed included: Data Structures and 
-        Algorithms, Maths and Statistics for Analysis, Database 
-        Technologies, Statistics and Econometrics, Optimisation 
-        and Decision Models, Network Analytics, Machine Learning, 
-        Advanced Machine Learning, Financial Analytics, Data 
-        Wrangling and Visualisation, Text Analysis for Business, 
-        Digital Marketing Analytics, Data Management and Ethics, 
-        and Generative AI and Large Language Models.
-    </document>
+<label>education_imperial_msc_business_analytics</label>
+<header>Reviewing Alvin's Business Analytics MSc</header>
+<context>Alvin Karanja's Imperial College London MSc Business Analytics, Distinction, Africa Regional Scholarship, August 2024 to August 2025, and relevant data science modules.</context>
+<document>Alvin completed an MSc in Business Analytics at Imperial College London from August 2024 to August 2025, graduating with Distinction. He was an Africa Regional Scholar. His studies included Advanced Machine Learning, Generative AI and Large Language Models, Data Management and Ethics, Text Analysis for Business, Network Analytics, and Optimisation and Decision Models. The degree developed his use of statistics, machine learning and optimisation in business problems.</document>
 </section>
 
-<!-- Undergraduate Degree -->
 <section>
-    <label>education_undergraduate</label>
-    <header>Undergraduate Degree Information</header>
-    <context>
-        Bachelor's degree in Computer Systems Engineering at 
-        the University of Warwick (Sep 2021 - Jul 2024), combining 
-        computer science, electronic engineering, and hardware-
-        software integration.
-    </context>
-    <document>
-        I completed my Bachelor's degree in Computer Systems 
-        Engineering at the University of Warwick between 
-        September 2021 and July 2024, graduating with Upper 
-        Second-Class Honours. The degree combined computer 
-        science and electronic engineering, with a focus on 
-        designing computer systems and integrating hardware 
-        with software. This gave me the ability to work on 
-        complex engineering projects requiring expertise in 
-        both domains, and positioned me with a deep, holistic 
-        understanding of computer systems.  
-        ---
-        The modules I completed included: Electrical and 
-        Electronic Circuits, Systems Modelling Simulation and 
-        Computation, Operating Systems and Computer Networks, 
-        Advanced Computer Architecture, Electromechanical 
-        System Design, Engineering Mathematics and Data 
-        Analysis, Engineering Business Management, Mobile 
-        Robotics, High Performance Embedded Systems Design, 
-        Neural Computing, and Fundamentals of Modern VLSI 
-        Design.
-    </document>
+<label>education_warwick_beng_computer_systems_engineering</label>
+<header>Reading about Alvin's Computer Systems Engineering degree</header>
+<context>Alvin Karanja's University of Warwick BEng Computer Systems Engineering, Upper Second Class Honours, September 2021 to July 2024, and interdisciplinary hardware and software study.</context>
+<document>Alvin completed a BEng in Computer Systems Engineering at the University of Warwick from September 2021 to July 2024, graduating with Upper Second Class Honours. The degree combined software engineering, computer hardware and electrical engineering. Modules highlighted in his CV include Neural Computing, Operating Systems and Computer Networks, Advanced Computer Architecture, Mobile Robotics, and High Performance Embedded Systems Design. His final year dissertation concerned Gatsby, a blockchain based ticketing application.</document>
 </section>

@@ -1,176 +1,20 @@
-<metadata>
-    This document contains reflections on my
-    learning experiences, challenges faced,
-    and skills acquired throughout my journey.
-</metadata>
-
-<!-- Challenges -->
 <section>
-    <label>meta_challenges</label>
-    <header>Personal Challenges</header>
-    <context>
-        Most notable challenge and how I overcame it, focusing on 
-        resilience, teamwork, and balancing academic and project 
-        commitments.
-    </context>
-    <document>
-        During my tenure as Co-Chief Electrical Systems Engineer 
-        at Warwick Racing, developing the race car was a major 
-        challenge. I had to balance my academic workload as a 
-        final-year student completing my dissertation with the 
-        demands of preparing the car for competition at 
-        Silverstone.  
-        ---
-        This required long hours in the library to meet academic 
-        deadlines, and extensive time in the workshop to meet 
-        team commitments, which was difficult to sustain. I 
-        relied on my team, who did outstanding work to cover for 
-        me when academic tasks took priority. Similarly, I 
-        collaborated closely with coursemates to understand 
-        material and revise for exams when I felt stuck working 
-        alone.  
-        ---
-        This period taught me the value of teamwork in achieving 
-        ambitious goals that would be impossible alone. I learned 
-        that I am highly resilient, capable of handling extreme 
-        pressure while meeting tight deadlines, and able to work 
-        effectively even under sustained challenges. This 
-        resilience has prepared me to tackle increasingly complex 
-        projects.
-    </document>
+<label>approach_problem_solving_and_product_building</label>
+<header>Reflecting on Alvin's approach to building</header>
+<context>Alvin Karanja's stated approach to understanding a problem, clarifying the user need, using evidence, testing assumptions and designing maintainable systems.</context>
+<document>Alvin's earlier account of his approach starts with understanding a domain and its constraints, then clarifying the underlying job a product must do. He values testing assumptions, working with people who bring different perspectives and building systems that can be revised as requirements change. His current projects reflect a mix of product definition and implementation, from collecting structured public data for Mwalika to specifying Persona's experience and Sarai's accounting workflows. This is a description of his working approach, not a claim that every project follows the same process or has reached launch.</document>
 </section>
 
-<!-- Motivation -->
 <section>
-    <label>meta_motivation</label>
-    <header>What Drives Me</header>
-    <context>
-        Motivations for my degree choices and career direction, 
-        highlighting fascination with technology and integration 
-        of technical and business skills.
-    </context>
-    <document>
-        I have always been fascinated by technology and driven to 
-        create machines and systems that solve real problems. 
-        Much of this inspiration came from watching Iron Man as a 
-        child, being captivated by his ability to build gadgets 
-        to overcome challenges.  
-        ---
-        I chose to study Computer Systems Engineering for my 
-        bachelor’s degree to gain skills in both hardware and 
-        software development, enabling me to integrate them into 
-        cohesive systems. This interest also motivated my 
-        involvement in Formula Student at Warwick Racing, where I 
-        sought to help build something tangible and impactful.  
-        ---
-        After completing my bachelor’s, I felt confident in my 
-        technical abilities but recognised a gap in applying them 
-        in a business context. This led me to pursue a master’s 
-        degree in Business Analytics, where I learned to apply 
-        quantitative disciplines from engineering to business 
-        planning, optimisation, and strategic decision-making.  
-        ---
-        Ultimately, I aim to use my abilities to work on 
-        innovative projects that apply an engineering mindset 
-        across domains such as artificial intelligence and 
-        quantitative finance.
-    </document>
+<label>reflection_warwick_racing_teamwork_and_pressure</label>
+<header>Revisiting Alvin's Warwick Racing lessons</header>
+<context>Alvin Karanja's reflection on balancing final year study, the Gatsby dissertation and Warwick Racing's Formula Student competition deadlines.</context>
+<document>Alvin's earlier reflection identifies the 2023 to 2024 Warwick Racing season as a demanding period because car development coincided with his final year university work and dissertation. He credits teammates with covering work when academic deadlines took priority and coursemates with helping him work through difficult material. The lesson he draws is the value of relying on others and coordinating under pressure, rather than treating a demanding project as a solo achievement.</document>
 </section>
 
-<!-- Career Goals -->
 <section>
-    <label>meta_career_goals</label>
-    <header>Career Goals</header>
-    <context>
-        Long-term career goals focused on tackling complex 
-        technical challenges, driving innovation, and creating 
-        impactful technologies.
-    </context>
-    <document>
-        I aspire to work on challenging projects that push me to 
-        think creatively and learn continuously while developing 
-        new systems. As a technologist at heart, I aim to 
-        contribute to innovations in emerging fields of 
-        technology, creating products with real-world impact and 
-        lasting value. 
-        ---
-        In the short term, my focus is on gaining deep expertise 
-        in data science, machine learning, and software 
-        engineering, while working in high-impact environments 
-        that demand both technical excellence and strategic 
-        thinking. I am particularly drawn to industries such as 
-        finance, artificial intelligence, and SaaS, where the 
-        intersection of data, algorithms, and systems design 
-        offers opportunities for innovation.
-        ---
-        Over the long term, I envision myself as an entrepreneur 
-        building ventures that solve pressing global challenges. 
-        My goal is to design scalable products and platforms that 
-        improve accessibility, efficiency, and fairness across 
-        industries—from financial technology to education and 
-        beyond. I am motivated by the challenge of 
-        deconstructing complex problems, crafting elegant 
-        solutions, and leading teams that can turn ambitious 
-        ideas into reality.
-        ---
-        At the core of my career ambitions is a desire to keep 
-        pushing boundaries, whether through advancing technical 
-        research, applying novel technologies in new domains, or 
-        shaping the future of digital infrastructure. I want my 
-        career to be defined not only by technical achievements 
-        but also by the positive, lasting impact of the systems I 
-        help create.
-    </document>
-</section>
-
-<!-- Approach to problems -->
-<section>
-    <label>approach_problem_solving</label>
-    <header>Approach to Problem Solving</header>
-    <context>
-        A detailed description of my methodology for tackling 
-        complex challenges, highlighting how I break down 
-        problems, collaborate, and build scalable solutions.
-    </context>
-    <document>
-        My approach to problem solving is rooted in a balance of 
-        rigorous analysis, creativity, and adaptability. I 
-        believe that effective solutions emerge from combining 
-        strong technical foundations with a clear understanding 
-        of the context in which a problem exists. 
-        ---
-        I begin by developing deep domain knowledge, immersing 
-        myself in the subject area to fully understand its 
-        nuances, constraints, and opportunities. This ensures 
-        that solutions are not only technically sound but also 
-        tailored to the specific realities of the domain. 
-        ---
-        I place strong emphasis on understanding the "job to be 
-        done"—clarifying the underlying need or purpose a system 
-        must fulfill. This perspective keeps solutions focused 
-        on delivering real value rather than just addressing 
-        surface-level symptoms. 
-        ---
-        Collaboration with others is a central part of my 
-        process. I seek out diverse perspectives, knowing that 
-        complex challenges are best solved through collective 
-        intelligence. By fostering open communication, I help 
-        align stakeholders and unlock innovative approaches that 
-        may not emerge in isolation. 
-        ---
-        Testing is another critical pillar of my approach. I 
-        believe in validating assumptions early and often, using 
-        structured experimentation to identify weaknesses and 
-        refine solutions. A test-driven mindset enables me to 
-        build confidence in both the functionality and 
-        reliability of systems. 
-        ---
-        Finally, I design with modularity in mind. By 
-        structuring systems into flexible and adaptable 
-        components, I make it easier to refactor, extend, and 
-        scale solutions over time. This ensures that my work can 
-        evolve alongside changing requirements and new 
-        opportunities, maintaining long-term relevance and 
-        impact.
-    </document>
+<label>aspirations_technology_and_entrepreneurship</label>
+<header>Exploring Alvin's career ambitions</header>
+<context>Alvin Karanja's earlier career ambitions in software, AI, data, entrepreneurship and useful products, distinguished from completed achievements.</context>
+<document>Alvin's earlier corpus describes an ambition to build useful technology, develop depth in software engineering and data science, and eventually build ventures with practical impact. His current CV shows that he is already taking founder and technical lead roles on Persona, Sarai and Mwalika. These are current projects and career directions; they do not establish commercial success, public launch, or a permanent commitment to a particular industry.</document>
 </section>

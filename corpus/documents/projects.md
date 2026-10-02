@@ -1,214 +1,41 @@
-<metadata>
-    This document contains information about my
-    projects, including descriptions, technologies used,
-    and key contributions.
-</metadata>
-
-<!-- Portfolio Agent -->
 <section>
-    <label>projects_portfolio_agent</label>
-    <header>Project: Portfolio Agent</header>
-    <context>
-        AI-powered portfolio assistant using a custom RAG 
-        pipeline, contextual retrieval, and web development, 
-        built with Python, Kubernetes, and AWS.
-    </context>
-    <document>
-        I developed Portfolio Agent, an AI-powered assistant 
-        designed to help visitors engage with my portfolio 
-        website by providing interactive, context-aware 
-        responses about my background, skills, and projects. 
-        The agent leverages a custom retrieval-augmented 
-        generation (RAG) pipeline to deliver personalised 
-        content and streamline user interactions. 
-        ---
-        I implemented a variation of Anthropic’s contextual 
-        retrieval framework, adapting it to improve the agent’s 
-        ability to surface relevant information and respond with 
-        greater nuance. Future development plans include 
-        integrating knowledge graph capabilities to enhance 
-        contextual reasoning and multi-hop retrieval. 
-        ---
-        A key feature of the agent is its ability to construct 
-        tailored application materials. By combining structured 
-        retrieval with generative outputs, it can create 
-        role-specific resumes and cover letters for users, 
-        making it a practical demonstration of applied AI for 
-        personal branding and career support. 
-        ---
-        From a technical perspective, the agent is production-
-        ready. It is developed in Python with robust unit tests 
-        written in pytest, ensuring reliability and stability. 
-        The system is fully containerised and deployed on a 
-        Kubernetes cluster hosted on a custom EC2 configuration 
-        in AWS. A CI/CD pipeline manages updates and 
-        maintenance, enabling seamless iteration and 
-        improvements. 
-        ---
-        This project demonstrates my ability to combine AI 
-        research concepts with full-stack engineering and 
-        cloud-native deployment, creating a practical, 
-        user-facing system that bridges innovation and 
-        functionality. 
-    </document>
+<label>projects_portfolio_agent_retrieval_assistant</label>
+<header>Exploring Alvin's Portfolio Agent</header>
+<context>Alvin Karanja's Portfolio Agent, a Python retrieval augmented generation assistant for questions about his background, experience, skills and projects, with historical CV and cover letter generation and AWS deployment.</context>
+<document>Alvin built the Portfolio Agent as an AI assistant connected to his portfolio. Its corpus and custom retrieval augmented generation pipeline support answers about his background, experience, skills and projects. He also used it to generate tailored CVs and cover letters for job applications. Alvin says this reduced his time preparing those two documents for one job from over an hour to about ten minutes. This is his own workflow comparison, not a measured result across other users. The backend was previously deployed using Terraform and Kubernetes on AWS. The portfolio technical audit dated September 2026 says that infrastructure had been torn down because of running cost, leaving the public chat unable to connect at that point. Restoring the agent is part of the portfolio's planned v3 work; its earlier deployment should not be described as a currently available service.</document>
 </section>
 
-<!-- Formula Student -->
 <section>
-    <label>projects_formula_student</label>
-    <header>Formula Student</header>
-    <context>
-        Details of my project Formula Student, addressing skills 
-        such as electrical systems engineering, PCB design, 
-        Fusion 360, circuit design, soldering, and prototyping.
-    </context>
-    <document>
-        I served as Co-Chief Electrical Systems Engineer for 
-        Warwick Racing, where I led the design and development 
-        of the team’s third-generation electric race car. The 
-        project successfully passed scrutineering and competed 
-        at FSUK 2024, achieving 9th place in the EV class at 
-        Silverstone. 
-        ---
-        In this role, I co-led a team of seven engineering 
-        students, overseeing the design and implementation of 
-        critical electrical systems. These included a high-
-        voltage junction box, a power distribution network, and 
-        a DC-DC conversion system to reliably power low-voltage 
-        electronics from the high-voltage tractive system. My 
-        responsibilities extended to PCB design, circuit 
-        modelling, prototyping, and hands-on tasks such as 
-        soldering and hardware assembly. 
-        ---
-        Beyond the technical aspects, I managed relationships 
-        with stakeholders and collaborated with cross-functional 
-        teams to ensure seamless integration of electrical 
-        components within the broader vehicle architecture. I 
-        also played a role in promoting the project, helping 
-        Warwick Racing gain visibility — including a feature on 
-        BBC Midlands. 
-        ---
-        This experience strengthened my expertise in electrical 
-        systems engineering while also developing my leadership, 
-        project management, and communication skills within a 
-        high-performance, competitive engineering environment. 
-    </document>
+<label>projects_mwalika_government_service_discovery</label>
+<header>Reading about Alvin's Mwalika project</header>
+<context>Alvin Karanja's Mwalika project, a conversational guide to Kenyan government services and eCitizen discovery, using structured public data, retrieval and agent workflows.</context>
+<document>Alvin founded and led Mwalika, a conversational assistant intended to help people find relevant Kenyan government services. His CV credits him with work across data acquisition, system design, frontend and backend implementation, conversational workflows and launch strategy. The project uses structured information about publicly listed eCitizen services to identify relevant services, explain the responsible agency or ministry and point users to official service pages. The Mwalika agent repository describes retrieval, orchestration and an event based streaming architecture. The portfolio's September 2026 content lists the Mwalika website as offline, with code and documentation available. Do not describe proposed capabilities in the Mwalika specification, such as full service execution, as delivered features without separate implementation evidence.</document>
 </section>
 
-<!-- Gatsby -->
 <section>
-    <label>projects_gatsby</label>
-    <header>Project: Gatsby</header>
-    <context>
-        Details of my project Gatsby, addressing skills such as 
-        React Native, Solidity, TypeScript, Firebase, Express.js, 
-        Truffle Suite, Web3.js, and Expo.
-    </context>
-    <document>
-        I founded Gatsby, a Web3-based ticket distribution 
-        platform that leverages blockchain and decentralised 
-        storage to improve fairness and security in event 
-        ticketing. The system encapsulates tickets as non-
-        fungible digital assets, enabling transparent 
-        authentication and ownership tracking. 
-        ---
-        I designed a custom RESTful architecture that integrated 
-        the Ethereum blockchain, IPFS for distributed file 
-        storage, and a back-end system built with Express.js and 
-        Firebase. To combat ticket fraud, I developed a novel 
-        authentication algorithm that strengthened validation 
-        mechanisms and ensured trust in peer-to-peer transfers. 
-        ---
-        On the front end, I built a production-grade UI/UX using 
-        React Native and Expo for both iOS and Android. The 
-        application achieved an 80% user approval rating for 
-        visual design and usability, reflecting the success of 
-        user-centred design decisions. 
-        ---
-        Beyond technical development, I conducted extensive 
-        research into blockchain applications for ticketing. I 
-        formalised these findings in my undergraduate 
-        dissertation, which achieved a first-class 
-        classification. This work deepened my expertise in 
-        Solidity, smart contract design, and decentralised 
-        architectures, while also showcasing my ability to 
-        translate research into a practical, impactful product. 
-    </document>
+<label>projects_kenya_ecitizen_services_dataset</label>
+<header>Exploring Alvin's Kenya eCitizen Services Dataset</header>
+<context>Alvin Karanja's Kenya eCitizen Services Dataset, a 14 February 2026 snapshot of public eCitizen listings with 5,489 services, agencies, departments, ministries and FAQs, plus scraping and validation methodology.</context>
+<document>Alvin published the Kenya eCitizen Services Dataset as a structured snapshot of publicly accessible eCitizen listings observed on 14 February 2026. It contains 5,489 services, 286 agencies, 54 departments, 27 ministries and 15 FAQs. The collection pipeline used Playwright for browser navigation, BeautifulSoup for parsing and Pydantic for validation, then produced related CSV and JSON datasets with deterministic synthetic identifiers. The repository documents its schema, methodology, data quality and limitations. The 5,489 figure covers services directly discoverable through the public ministry, department and agency hierarchy; it is not a count of every possible eCitizen transaction or an official government total. The snapshot is not continuously updated, and users should verify time sensitive details against official sources.</document>
 </section>
 
-<!-- Machine Learning Research -->
 <section>
-    <label>projects_machine_learning_research</label>
-    <header>Machine Learning Research</header>
-    <context>
-        Details of my project Machine Learning Research, 
-        addressing skills such as MATLAB, data science, linear 
-        algebra, and multivariable calculus.
-    </context>
-    <document>
-        I conducted research in machine learning focused on 
-        developing non-linear prediction models and evaluating 
-        cost functions under different optimisation frameworks. 
-        I implemented and compared algorithms such as Linear 
-        Regression, Logistic Regression, and Newtonian Descent, 
-        building a strong foundation in supervised learning 
-        methods. 
-        ---
-        My work required mastery of core machine learning 
-        concepts, including gradient-based optimisation, 
-        regularisation techniques, and convergence analysis. 
-        I applied principles of linear algebra and multivariable 
-        calculus to derive update rules, evaluate model 
-        stability, and improve training efficiency. 
-        ---
-        I engineered MATLAB scripts to conduct regression 
-        analysis, construct statistical models, and minimise 
-        cost function errors with high precision—achieving error 
-        thresholds as low as 10^(-5). This process involved 
-        iterative testing, debugging, and validation to ensure 
-        robust model performance. 
-        ---
-        This research not only strengthened my practical coding 
-        ability in MATLAB but also deepened my conceptual 
-        understanding of the mathematical foundations of machine 
-        learning, preparing me to apply these principles across 
-        more advanced models and frameworks. 
-    </document>
+<label>projects_warwick_racing_electrical_systems</label>
+<header>Reviewing Alvin's Warwick Racing work</header>
+<context>Alvin Karanja's Warwick Racing Formula Student electric car work as Co-Chief Electrical Systems Engineer, leadership of seven engineers, fitted DC-DC converter and Formula Student UK 2024 result.</context>
+<document>Alvin served as Co-Chief Electrical Systems Engineer for Warwick Racing's third generation Formula Student electric car. His CV says he led seven engineers delivering electrical systems and coordinated their integration with mechanical and control teams. The team competed at Formula Student UK 2024 at Silverstone and placed ninth in the EV class. Alvin designed a DC-DC converter circuit to let the high voltage accumulator power high demand low voltage systems, and he has confirmed that the converter was fitted to the car. His project portfolio explains component selection, protection, pre-charge sequencing and galvanic isolation, and includes schematic and PCB layout material.</document>
 </section>
 
-<!-- Getaway -->
 <section>
-    <label>projects_getaway</label>
-    <header>Project: Getaway</header>
-    <context>
-        Details of my project Getaway, addressing skills such as 
-        Three.js, HTML, CSS, JavaScript, Blender, and Vite.
-    </context>
-    <document>
-        I developed Getaway, an interactive 3D web-based game 
-        built with Three.js and WebGL, inspired by classic arcade 
-        driving titles. The game challenges players to navigate 
-        obstacles and avoid NPC-controlled vehicles while 
-        progressing through increasingly difficult levels. 
-        ---
-        A key feature of the project was my use of mathematical 
-        methods to enhance gameplay. I implemented deterministic 
-        spawning algorithms that leveraged trigonometric 
-        functions to calculate NPC positions, paths, and timing. 
-        This created a balanced yet challenging difficulty curve, 
-        ensuring the game remained engaging without relying on 
-        randomness. 
-        ---
-        I further optimised state management in JavaScript by 
-        designing a custom garbage collection routine for 
-        dynamically loaded assets, improving performance in 
-        densely populated levels. In addition, I designed and 
-        modelled custom voxel-style assets in Blender, 
-        contributing to the game’s 1980s-inspired aesthetic. 
-        ---
-        Getaway reflects both my creativity in game design and 
-        my ability to apply mathematical reasoning to gameplay 
-        mechanics, demonstrating a blend of technical precision 
-        and user-focused design. 
-    </document>
+<label>projects_gatsby_blockchain_ticketing</label>
+<header>Exploring Alvin's Gatsby project</header>
+<context>Alvin Karanja's Gatsby final year dissertation and Web3 mobile ticketing MVP, using React Native, Ethereum smart contracts, IPFS, Express and Firebase for ticket minting and validation.</context>
+<document>Alvin founded and developed Gatsby as a blockchain based ticketing platform for his University of Warwick final year dissertation. His current projects CV describes a working product implementation and a first class dissertation. The project portfolio describes a React Native mobile client, an Express backend, Firebase services, Ethereum smart contracts written in Solidity, and IPFS storage. Its ticket design separates ticket data stored on IPFS from ownership events logged on chain, then checks authenticity and ownership during validation. The portfolio was written while the dissertation MVP was being built and labels broader social and resale ideas as intentions; those ideas should not be presented as shipped features. There is no evidence here of a commercial launch or proven reduction in ticket fraud.</document>
+</section>
+
+<section>
+<label>projects_getaway_browser_driving_game</label>
+<header>Reading about Alvin's Getaway game</header>
+<context>Alvin Karanja's Getaway, a Three.js browser driving game developed at Warwick, with Blender voxel models, obstacle avoidance, first and third person views and deterministic NPC spawning.</context>
+<document>Alvin built Getaway for a University of Warwick computer graphics module. It is an interactive browser driving game made with Three.js, with vehicle and environment models created in Blender. Players avoid oncoming vehicles and other obstacles to reach a level goal; the game supports first and third person views. Alvin replaced random NPC placement with a timed, deterministic spawning approach using frame counts and a sine function to control road side placement. His project portfolio reports a mark of 90% for the coursework. The game is coursework rather than a commercially released title.</document>
 </section>
