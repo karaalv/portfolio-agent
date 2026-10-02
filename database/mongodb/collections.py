@@ -18,7 +18,7 @@ class MongoDBCollection(StrEnum):
     for the Portfolio Agent application.
     """
     USERS = "users"
-    MESSAGES = "messages"
+    MEMORIES = "memories"
     CORPUS = "corpus"
     MONITORING = "monitoring"
 
@@ -27,7 +27,7 @@ class MongoDBCollection(StrEnum):
 MONGODB_COLLECTION_TO_DATABASE = {
     # Application Database Collections
     MongoDBCollection.USERS: MongoDBDatabase.APPLICATION,
-    MongoDBCollection.MESSAGES: MongoDBDatabase.APPLICATION,
+    MongoDBCollection.MEMORIES: MongoDBDatabase.APPLICATION,
     MongoDBCollection.CORPUS: MongoDBDatabase.APPLICATION,
     # Analytics Database Collections
     MongoDBCollection.MONITORING: MongoDBDatabase.ANALYTICS,

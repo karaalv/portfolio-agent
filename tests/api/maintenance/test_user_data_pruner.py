@@ -49,7 +49,7 @@ async def test_prunes_only_still_inactive_users(monkeypatch) -> None:
     messages = Messages()
     collections = {
         MongoDBCollection.USERS: users,
-        MongoDBCollection.MESSAGES: messages,
+        MongoDBCollection.MEMORIES: messages,
     }
     monkeypatch.setattr(
         user_data_pruner,
@@ -76,7 +76,7 @@ async def test_cutoff_is_seven_days(monkeypatch) -> None:
 
     collections = {
         MongoDBCollection.USERS: Users(),
-        MongoDBCollection.MESSAGES: object(),
+        MongoDBCollection.MEMORIES: object(),
     }
     monkeypatch.setattr(
         user_data_pruner,
@@ -111,7 +111,7 @@ async def test_failed_message_deletion_keeps_user_for_retry(monkeypatch) -> None
 
     collections = {
         MongoDBCollection.USERS: Users(),
-        MongoDBCollection.MESSAGES: Messages(),
+        MongoDBCollection.MEMORIES: Messages(),
     }
     monkeypatch.setattr(
         user_data_pruner,
@@ -162,7 +162,7 @@ async def test_prunes_in_batches_of_thirty(monkeypatch) -> None:
 
     collections = {
         MongoDBCollection.USERS: Users(),
-        MongoDBCollection.MESSAGES: Messages(),
+        MongoDBCollection.MEMORIES: Messages(),
     }
     monkeypatch.setattr(
         user_data_pruner,

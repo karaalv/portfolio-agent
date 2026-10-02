@@ -46,9 +46,15 @@ class UserDataPruner:
         """Delete inactive user records and their messages."""
         cutoff = datetime.now(timezone.utc) - timedelta(days=7)
         users = get_collection(MongoDBCollection.USERS)
-        messages = get_collection(MongoDBCollection.MESSAGES)
+        messages = get_collection(MongoDBCollection.MEMORIES)
 
         ids = await self._get_inactive_users(users, cutoff)
+
+        rich_print(
+            f'Found {len(ids)} inactive users to prune...',
+            style=LogStyle.INFO,
+            prefix='api.maintenance',
+        )
 
         for batch in batched(tuple(ids), self._batch_size):
             results = await asyncio.gather(
@@ -63,6 +69,12 @@ class UserDataPruner:
             for result in results:
                 if isinstance(result, BaseException):
                     raise result
+
+        rich_print(
+            f'Finished pruning {len(ids)} inactive users.',
+            style=LogStyle.INFO,
+            prefix='api.maintenance',
+        )
 
     async def _get_inactive_users(
         self, users: AsyncCollection, cutoff: datetime

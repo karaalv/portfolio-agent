@@ -1,15 +1,11 @@
 """
-MongoDB-related exceptions for the Portfolio Agent application.
+Exceptions related to agent operations.
 """
 
 from exceptions.core import PortfolioAgentException
 
-
-class MongoDBException(PortfolioAgentException):
-    """
-    Base exception class for MongoDB-related errors
-    in the Portfolio Agent application.
-    """
+class AgentException(PortfolioAgentException):
+    """Base exception for agent-related errors."""
     def __init__(
         self,
         message: str,
@@ -18,7 +14,7 @@ class MongoDBException(PortfolioAgentException):
     ):
         super().__init__(
             message=message,
-            scope="mongodb",
+            scope="agent",
             module=module,
             operation=operation,
         )

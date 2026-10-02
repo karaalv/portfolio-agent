@@ -9,7 +9,7 @@ layout, so data from one environment is isolated from the others.
 | Database | Collection | Purpose |
 | --- | --- | --- |
 | `application` | `users` | Anonymous user records. |
-| `application` | `messages` | Chat history for user sessions. This is the current chat memory collection. |
+| `application` | `memories` | Chat history for user sessions. This is the current chat memory collection. |
 | `application` | `corpus` | Vector store for personal information used by the agent. |
 | `analytics` | `monitoring` | Purpose to be defined for this version. |
 
@@ -27,7 +27,7 @@ and `created_at` fields are UTC datetimes stored as MongoDB dates.
 The user data pruner runs when maintenance starts and every 24 hours after
 that. It identifies users whose `last_active_at` is more than seven days old,
 then deletes their records from `application.users` and matching chat history
-from `application.messages` by `user_id`. It does not modify `application.corpus`
+from `application.memories` by `user_id`. It does not modify `application.corpus`
 or `analytics.monitoring`.
 
 The schemas for `messages` and `corpus` will be documented separately.

@@ -16,7 +16,7 @@ class OpenAIException(PortfolioAgentException):
     ):
         super().__init__(
             message=message,
-            scope="OpenAI",
+            scope="openai",
             module=module,
             operation=operation,
         )

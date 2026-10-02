@@ -5,21 +5,22 @@ and Query Planner for the RAG system.
 
 import textwrap
 
-from agent.memory.compressor import get_user_summarisation
+from agent.memory.retrieval import retrieve_agent_memory_prompt
 from common.utils import (
 	TerminalColors,
 	handle_exceptions_async,
 )
 from openai_client.main import (
-	normal_response,
+	text_response,
 	structured_response,
 )
+from openai_client.models import OpenAILanguageModel
 from rag.schemas import QueryPlan
 
 # --- Constants ---
 
-_refiner_model = 'gpt-4.1-mini'
-_planner_model = 'gpt-4.1'
+_refiner_model = OpenAILanguageModel.GPT_6_LUNA
+_planner_model = OpenAILanguageModel.GPT_6_1_SOL
 
 # --- Input Refiner ---
 
@@ -32,7 +33,7 @@ async def input_refiner(
 	Refine the user input by reformating the
 	original prompt with relevant context.
 	"""
-	summary = await get_user_summarisation(user_id)
+	history = await retrieve_agent_memory_prompt(user_id)
 
 	system_prompt = textwrap.dedent(f"""
         You are an expert input refiner for a portfolio site
@@ -51,12 +52,12 @@ async def input_refiner(
         Rules:
         - Preserve the user's original intent, meaning, and
         tone exactly.
-        - Use the conversation summary only to lightly
+        - Use the conversation history only to lightly
         supplement the input — never override or replace it.
         - Fix grammar, structure, and clarity where needed.
         - You may add scope, clarifications, or specific
         terminology *only* if it is clearly implied by the
-        conversation summary.
+        conversation history.
         - Do not introduce new ideas, assumptions, or
         speculative context.
         - Do not ask the user for more information or offer
@@ -68,8 +69,8 @@ async def input_refiner(
         Your role is to clean and clarify — not to resolve
         ambiguity or generate content.
 
-        Conversation summary:
-        {summary}
+        Conversation history:
+        {history}
     """)
 
 	if verbose:
@@ -77,12 +78,12 @@ async def input_refiner(
 			f'{TerminalColors.cyan}'
 			f'Refining input with context:\n'
 			f'{TerminalColors.reset}'
-			f'{summary}\n'
+			f'{history}\n'
 		)
 
-	return await normal_response(
+	return await text_response(
 		system_prompt=system_prompt,
-		user_input=user_input,
+		user_prompt=user_input,
 		model=_refiner_model,
 	)
 
@@ -129,7 +130,7 @@ async def query_planner(refined_input: str) -> QueryPlan:
 
 	query_plan = await structured_response(
 		system_prompt=system_prompt,
-		user_input=refined_input,
+		user_prompt=refined_input,
 		response_format=QueryPlan,
 		model=_planner_model,
 	)

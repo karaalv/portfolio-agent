@@ -12,7 +12,8 @@ from fastapi import (
 )
 
 from agent.main import chat
-from agent.memory.main import delete_memory, retrieve_memory
+from agent.memory.deletion import delete_agent_memory
+from agent.memory.retrieval import retrieve_agent_memory
 from api.common.authentication import (
 	validate_frontend_token,
 	verify_frontend_token,
@@ -30,7 +31,6 @@ from api.common.socket_registry import (
 	send_message_ws,
 )
 from api.common.utils import api_exception_handler
-from monitoring.main import get_usages_remaining
 from users.main import does_user_exist
 
 # --- Constants ---
@@ -62,10 +62,6 @@ async def agent_chat_ws(ws: WebSocket):
 	if not await does_user_exist(user_id):
 		return error_response('User does not exist', status_code=404)
 
-	# Extract info for finger printing
-	ip = ws.headers.get('x-forwarded-for', '').split(',')[0].strip()
-	user_agent = ws.headers.get('user-agent', '')
-
 	# Start socket connection
 	await ws.accept()
 	await add_connection_registry(user_id=user_id, ws=ws)
@@ -84,26 +80,12 @@ async def agent_chat_ws(ws: WebSocket):
 				)
 				continue
 
-			# Checking usage limits
-			if socket_message.type == 'check_usage':
-				remaining = await get_usages_remaining(
-					user_id=user_id, ip=ip, ua=user_agent
-				)
-				await send_message_ws(
-					user_id=user_id,
-					type='usage_info',
-					data=remaining,
-				)
-				continue
-
 			# Chat responses
 			user_input = socket_message.data
 
 			response = await chat(
 				user_id=user_id,
-				ip=ip,
-				ua=user_agent,
-				input=str(user_input),
+				user_input=str(user_input),
 			)
 
 			# Handle streamed responses
@@ -143,7 +125,7 @@ async def get_memory_api(request: Request):
 	if not await does_user_exist(user_id):
 		return error_response('User does not exist', status_code=404)
 
-	memory = await retrieve_memory(user_id, to_str=False)
+	memory = await retrieve_agent_memory(user_id)
 
 	return success_response(
 		message='Successfully retrieved user memory',
@@ -172,12 +154,7 @@ async def delete_memory_api(request: Request):
 	if not await does_user_exist(user_id):
 		return error_response('User does not exist', status_code=404)
 
-	result = await delete_memory(user_id=user_id)
-
-	if result is False:
-		return error_response(
-			'Failed to delete user memory', status_code=500
-		)
+	await delete_agent_memory(user_id=user_id)
 
 	return success_response(
 		message='Successfully deleted user memory'
