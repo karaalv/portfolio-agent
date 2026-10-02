@@ -18,7 +18,8 @@ from database.mongodb.config import (
 	close_mongo,
 	connect_mongo,
 )
-from users.main import create_user, does_user_exist
+from users.creation import create_user
+from users.retrieval import does_user_exist
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 file_path = os.path.join(current_dir, 'test_user_id.txt')

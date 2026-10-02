@@ -8,5 +8,5 @@ from schemas.api.shared.metadata import ApiResponseMetaData
 
 
 class ApiHttpResponse(BaseModel):
-    meta: ApiResponseMetaData
-    data: Any | None
+	meta: ApiResponseMetaData
+	data: Any | None

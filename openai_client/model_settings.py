@@ -10,6 +10,7 @@ class OpenAILanguageModelReasoning(StrEnum):
 	MEDIUM = 'medium'
 	HIGH = 'high'
 
+
 class OpenAILanguageModelVerbosity(StrEnum):
 	LOW = 'low'
 	MEDIUM = 'medium'

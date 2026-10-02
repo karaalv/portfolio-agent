@@ -6,10 +6,10 @@ and timestamp.
 
 ```python
 class ApiResponseMetaData(BaseModel):
-    request_id: str
-    success: bool
-    message: str
-    timestamp: datetime
+	request_id: str
+	success: bool
+	message: str
+	timestamp: datetime
 ```
 
 Implemented in `schemas/api/shared/metadata.py`.

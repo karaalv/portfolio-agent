@@ -16,8 +16,9 @@ from api.common.utils import (
 	api_exception_handler,
 	create_jwt_token,
 )
-from users.main import create_user, does_user_exist
 from schemas.users.anonymous import AnonymousUser
+from users.creation import create_user
+from users.retrieval import does_user_exist
 
 # --- Constants ---
 

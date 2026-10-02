@@ -10,8 +10,8 @@ Defined in `schemas/corpus/file.py`.
 
 ```python
 class CorpusFile(BaseModel):
-    file_path: Path
-    label: str
+	file_path: Path
+	label: str
 ```
 
 Both fields are required.

@@ -31,7 +31,7 @@ from api.common.socket_registry import (
 	send_message_ws,
 )
 from api.common.utils import api_exception_handler
-from users.main import does_user_exist
+from users.retrieval import does_user_exist
 
 # --- Constants ---
 

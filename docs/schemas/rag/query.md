@@ -7,7 +7,7 @@ schema and `execute_rag` consumes it.
 
 ```python
 class QueryPlan(BaseModel):
-    queries: list[str]
+	queries: list[str]
 ```
 
 ## Fields

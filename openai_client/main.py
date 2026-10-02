@@ -35,51 +35,48 @@ T = TypeVar('T', bound=BaseModel)
 
 # --- Embedding Functionality ---
 
+
 async def get_embedding(
-    input: str,
-    model: OpenAIEmbeddingModel = \
-        OpenAIEmbeddingModel.TEXT_EMBEDDING_3_LARGE
+	input: str,
+	model: OpenAIEmbeddingModel = OpenAIEmbeddingModel.TEXT_EMBEDDING_3_LARGE,
 ) -> list[float]:
 	"""
-	Get the embedding for the given 
-	input using the specified OpenAI 
+	Get the embedding for the given
+	input using the specified OpenAI
 	embedding model.
 	"""
 	client = get_openai_client()
 	semaphore = get_openai_semaphore()
 	limiter = get_openai_embedding_limiter()
 	timeout = get_openai_response_timeout()
-	
+
 	async with limiter:
 		async with semaphore:
 			response = await client.embeddings.create(
-				model=model.value,
-				input=input,
-				timeout=timeout
+				model=model.value, input=input, timeout=timeout
 			)
 
 			if not response.data or not response.data[0].embedding:
 				raise OpenAIException(
 					message=(
-						"Failed to retrieve embedding"
-						"from OpenAI response."
+						'Failed to retrieve embedding'
+						'from OpenAI response.'
 					),
 					module='openai_client.main',
-					operation='get_embedding'
+					operation='get_embedding',
 				)
 	return response.data[0].embedding
 
+
 # --- Language Model Functionality ---
+
 
 async def text_response(
 	system_prompt: str,
 	user_prompt: str,
-	model: OpenAILanguageModel = \
-        OpenAILanguageModel.GPT_6_LUNA,
-    reasoning: OpenAILanguageModelReasoning = \
-        OpenAILanguageModelReasoning.MEDIUM,
-    verbosity: OpenAILanguageModelVerbosity = \
-		OpenAILanguageModelVerbosity.MEDIUM
+	model: OpenAILanguageModel = OpenAILanguageModel.GPT_6_LUNA,
+	reasoning: OpenAILanguageModelReasoning = OpenAILanguageModelReasoning.MEDIUM,
+	verbosity: OpenAILanguageModelVerbosity = OpenAILanguageModelVerbosity.MEDIUM,
 ) -> str:
 	"""
 	Generates a text response from the OpenAI language
@@ -98,29 +95,28 @@ async def text_response(
 				input=user_prompt,
 				reasoning={'effort': reasoning.value},
 				text={'verbosity': verbosity.value},
-				timeout=timeout
+				timeout=timeout,
 			)
 
 			text = response.output_text.strip()
 			if not text:
 				raise OpenAIException(
 					message=(
-						"Failed to retrieve text response"
-						"from OpenAI response."
+						'Failed to retrieve text response'
+						'from OpenAI response.'
 					),
 					module='openai_client.main',
-					operation='text_response'
+					operation='text_response',
 				)
 	return text
+
 
 async def structured_response(
 	system_prompt: str,
 	user_prompt: str,
 	response_format: type[T],
-	model: OpenAILanguageModel = \
-		OpenAILanguageModel.GPT_6_1_SOL,
-	reasoning: OpenAILanguageModelReasoning = \
-		OpenAILanguageModelReasoning.MEDIUM,
+	model: OpenAILanguageModel = OpenAILanguageModel.GPT_6_1_SOL,
+	reasoning: OpenAILanguageModelReasoning = OpenAILanguageModelReasoning.MEDIUM,
 ) -> T:
 	"""
 	Generates a structured response from the OpenAI language
@@ -141,18 +137,18 @@ async def structured_response(
 				input=user_prompt,
 				reasoning={'effort': reasoning.value},
 				text_format=response_format,
-				timeout=timeout
+				timeout=timeout,
 			)
 
 			parsed_response = response.output_parsed
 			if not parsed_response:
 				raise OpenAIException(
 					message=(
-						"Failed to retrieve structured response"
-						"from OpenAI response."
+						'Failed to retrieve structured response'
+						'from OpenAI response.'
 					),
 					module='openai_client.main',
-					operation='structured_response'
+					operation='structured_response',
 				)
 
 			# Check if the parsed response matches
@@ -160,13 +156,14 @@ async def structured_response(
 			if not isinstance(parsed_response, response_format):
 				raise OpenAIException(
 					message=(
-						"Parsed response does not"
-						"match the expected schema."
+						'Parsed response does not'
+						'match the expected schema.'
 					),
 					module='openai_client.main',
-					operation='structured_response'
+					operation='structured_response',
 				)
 	return parsed_response
+
 
 async def agent_response(
 	system_prompt: str,
@@ -210,13 +207,10 @@ async def agent_response(
 async def stream_response(
 	system_prompt: str,
 	user_prompt: str,
-	model: OpenAILanguageModel = \
-		OpenAILanguageModel.GPT_6_1_SOL,
-	reasoning: OpenAILanguageModelReasoning = \
-		OpenAILanguageModelReasoning.MEDIUM,
+	model: OpenAILanguageModel = OpenAILanguageModel.GPT_6_1_SOL,
+	reasoning: OpenAILanguageModelReasoning = OpenAILanguageModelReasoning.MEDIUM,
 	tools: list[ToolParam] | None = None,
-	verbosity: OpenAILanguageModelVerbosity = \
-		OpenAILanguageModelVerbosity.MEDIUM,
+	verbosity: OpenAILanguageModelVerbosity = OpenAILanguageModelVerbosity.MEDIUM,
 ) -> AsyncGenerator[ResponseStreamEvent, None]:
 	"""
 	Yield response events while holding the OpenAI concurrency permit.
@@ -236,7 +230,7 @@ async def stream_response(
 			reasoning={'effort': reasoning.value},
 			text={'verbosity': verbosity.value},
 			timeout=timeout,
-			stream=True
+			stream=True,
 		)
 		async with stream:
 			async for event in stream:

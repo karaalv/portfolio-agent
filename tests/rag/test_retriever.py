@@ -40,9 +40,7 @@ class RagExecutionTests(unittest.IsolatedAsyncioTestCase):
 			return [_item(query), _item('shared')]
 
 		with (
-			patch.object(
-				query_executor, '_retrieve_query', retrieve
-			),
+			patch.object(query_executor, '_retrieve_query', retrieve),
 			patch.object(
 				query_executor,
 				'_refine_context',
@@ -145,6 +143,4 @@ class RagExecutionTests(unittest.IsolatedAsyncioTestCase):
 			response.await_args.kwargs['user_prompt']
 		)
 		self.assertEqual(payload['user_input'], 'question')
-		self.assertEqual(
-			payload['entries'][0]['label'], 'topic_one'
-		)
+		self.assertEqual(payload['entries'][0]['label'], 'topic_one')

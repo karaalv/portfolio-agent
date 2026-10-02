@@ -6,9 +6,9 @@ activity timestamps.
 
 ```python
 class AnonymousUser(BaseModel):
-    user_id: str
-    last_active_at: datetime
-    created_at: datetime
+	user_id: str
+	last_active_at: datetime
+	created_at: datetime
 ```
 
 Implemented in `schemas/users/anonymous.py`. The datetime fields are stored

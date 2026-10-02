@@ -43,9 +43,7 @@ class RagPlanningTests(unittest.IsolatedAsyncioTestCase):
 				'visitor', 'How was it built?'
 			)
 		self.assertEqual(result, plan)
-		payload = json.loads(
-			refine.await_args.kwargs['user_prompt']
-		)
+		payload = json.loads(refine.await_args.kwargs['user_prompt'])
 		self.assertEqual(
 			payload['history'][0]['content'], memory.content
 		)
@@ -76,9 +74,7 @@ class RagPlanningTests(unittest.IsolatedAsyncioTestCase):
 		planner.assert_awaited_once_with(
 			'visitor', 'experience', True
 		)
-		executor.assert_awaited_once_with(
-			plan, 'experience', True
-		)
+		executor.assert_awaited_once_with(plan, 'experience', True)
 
 	def test_query_limit(self):
 		with self.assertRaises(ValidationError):

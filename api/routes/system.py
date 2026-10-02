@@ -13,13 +13,14 @@ system_router = APIRouter()
 
 # --- Endpoints ---
 
-@system_router.get("/health")
+
+@system_router.get('/health')
 async def health_check(request: Request):
 	"""Report whether the system is running."""
 	return create_http_response(
 		request_id=get_request_id(request),
 		success=True,
-		message="System is running.",
-		data={"status": "ok"},
-		status_code=200
+		message='System is running.',
+		data={'status': 'ok'},
+		status_code=200,
 	)

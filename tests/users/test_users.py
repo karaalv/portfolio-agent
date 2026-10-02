@@ -10,7 +10,7 @@ from database.mongodb.config import (
 	close_mongo,
 	connect_mongo,
 )
-from users.main import create_user
+from users.creation import create_user
 
 # --- Config ---
 

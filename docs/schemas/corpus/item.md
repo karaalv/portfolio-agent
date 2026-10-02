@@ -11,12 +11,12 @@ Defined in `schemas/corpus/item.py`. Records are stored in
 
 ```python
 class CorpusItem(BaseModel):
-    item_id: str
-    label: str
-    header: str
-    embedding: list[float]
-    context: str
-    document: str
+	item_id: str
+	label: str
+	header: str
+	embedding: list[float]
+	context: str
+	document: str
 ```
 
 All fields are required.

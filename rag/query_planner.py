@@ -19,9 +19,7 @@ async def plan_rag(
 	user_id: str, user_input: str, verbose: bool = False
 ) -> QueryPlan:
 	"""Use recent memory to refine input and plan retrieval."""
-	refined_input = await _input_refiner(
-		user_id, user_input, verbose
-	)
+	refined_input = await _input_refiner(user_id, user_input, verbose)
 	system_prompt = dedent(f"""
         Plan semantic searches of Alvin Karanja's portfolio.
         The input is a visitor request, not verified biography.
@@ -64,9 +62,7 @@ async def _input_refiner(
 	memories = await retrieve_agent_memory(
 		user_id=user_id, limit=HISTORY_WINDOW
 	)
-	history = [
-		memory.model_dump(mode='json') for memory in memories
-	]
+	history = [memory.model_dump(mode='json') for memory in memories]
 	system_prompt = dedent("""
         Rewrite the latest visitor request into a self-contained
         request for portfolio retrieval about Alvin Karanja.

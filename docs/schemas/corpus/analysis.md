@@ -7,10 +7,10 @@ Defined in `schemas/corpus/analysis.py` and produced by
 
 ```python
 class CorpusItemAnalysis(BaseModel):
-    item_label: str
-    context_token_count: int
-    document_token_count: int
-    total_token_count: int
+	item_label: str
+	context_token_count: int
+	document_token_count: int
+	total_token_count: int
 ```
 
 - `item_label`: The source label from `CorpusItem.label`.
@@ -22,10 +22,10 @@ class CorpusItemAnalysis(BaseModel):
 
 ```python
 class CorpusDocumentAnalysis(BaseModel):
-    file_label: str
-    section_count: int
-    total_token_count: int
-    corpus_items: list[CorpusItemAnalysis]
+	file_label: str
+	section_count: int
+	total_token_count: int
+	corpus_items: list[CorpusItemAnalysis]
 ```
 
 - `file_label`: The display label from `CorpusFile.label`.

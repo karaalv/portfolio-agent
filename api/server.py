@@ -51,6 +51,7 @@ app = FastAPI(
 
 # - Exception Handling -
 
+
 @app.exception_handler(PortfolioAgentException)
 async def PORTFOLIO_AGENT_exception_handler(
 	request: Request, exc: PortfolioAgentException
@@ -62,8 +63,9 @@ async def PORTFOLIO_AGENT_exception_handler(
 		success=False,
 		message=exc.message,
 		data=None,
-		status_code=400
+		status_code=400,
 	)
+
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(
@@ -72,20 +74,17 @@ async def http_exception_handler(
 	# Handle HTTPException
 	request_id = get_request_id(request)
 	exc_message = (
-		str(exc.detail) if hasattr(exc, 'detail')
-		else str(exc)
+		str(exc.detail) if hasattr(exc, 'detail') else str(exc)
 	)
-	exc_code = (
-		exc.status_code if hasattr(exc, 'status_code')
-		else 500
-	)
+	exc_code = exc.status_code if hasattr(exc, 'status_code') else 500
 	return create_http_response(
 		request_id=request_id,
 		success=False,
 		message=exc_message,
 		data=None,
-		status_code=exc_code
+		status_code=exc_code,
 	)
+
 
 @app.exception_handler(Exception)
 async def general_exception_handler(
@@ -98,8 +97,9 @@ async def general_exception_handler(
 		success=False,
 		message=str(exc),
 		data=None,
-		status_code=500
+		status_code=500,
 	)
+
 
 # - CORS Configuration -
 
@@ -117,9 +117,7 @@ app.add_middleware(
 # --- Routes ---
 
 app.include_router(
-	router=system_router,
-	prefix='/system',
-	tags=['System']
+	router=system_router, prefix='/system', tags=['System']
 )
 
 app.include_router(

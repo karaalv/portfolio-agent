@@ -38,8 +38,7 @@ async def main() -> None:
 			)
 			inserted_count = await _insert_corpus_items(items)
 			rich_print(
-				f'Inserted {inserted_count} items '
-				f'from {file.label}.',
+				f'Inserted {inserted_count} items from {file.label}.',
 				LogStyle.SUCCESS,
 			)
 		rich_print('Corpus upload complete.', LogStyle.SUCCESS)

@@ -28,9 +28,7 @@ async def main() -> None:
 		)
 		analysis = await _analyse_corpus_file(file)
 		corpus_tokens += analysis.total_token_count
-		rich_print(
-			f'Summary for {file.file_path}:', LogStyle.INFO
-		)
+		rich_print(f'Summary for {file.file_path}:', LogStyle.INFO)
 		print(analysis.model_dump_json(indent=4))
 		rich_print('-' * 20, LogStyle.DEFAULT)
 
@@ -49,8 +47,7 @@ def _analyse_corpus_item(
 		item_label=corpus_item.label,
 		context_token_count=context_token_count,
 		document_token_count=document_token_count,
-		total_token_count=context_token_count
-		+ document_token_count,
+		total_token_count=context_token_count + document_token_count,
 	)
 
 
@@ -58,9 +55,7 @@ async def _analyse_corpus_file(
 	corpus_file: CorpusFile,
 ) -> CorpusDocumentAnalysis:
 	"""Analyse file sections without generating embeddings."""
-	corpus_items = await load_corpus_from_file(
-		corpus_file.file_path
-	)
+	corpus_items = await load_corpus_from_file(corpus_file.file_path)
 	corpus_items_analysis = [
 		_analyse_corpus_item(item) for item in corpus_items
 	]
@@ -68,8 +63,7 @@ async def _analyse_corpus_file(
 		file_label=corpus_file.label,
 		section_count=len(corpus_items),
 		total_token_count=sum(
-			item.total_token_count
-			for item in corpus_items_analysis
+			item.total_token_count for item in corpus_items_analysis
 		),
 		corpus_items=corpus_items_analysis,
 	)

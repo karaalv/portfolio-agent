@@ -12,16 +12,14 @@ from exceptions.mongodb import MongoDBException
 # --- Resource Resolvers ---
 
 
-def get_collection(
-	collection: MongoDBCollection
-) -> AsyncCollection:
+def get_collection(collection: MongoDBCollection) -> AsyncCollection:
 	"""
 	Retrieves a collection from
 	MongoDB, resolves the database
 	during the process.
 
 	Args:
-		collection (MongoDBCollection): The 
+		collection (MongoDBCollection): The
 		collection enumeration member to retrieve.
 
 	Returns:
@@ -36,7 +34,7 @@ def get_collection(
 				'defined in the collection map.'
 			),
 			module='database.mongodb.main',
-			operation='get_collection'
+			operation='get_collection',
 		)
 
 	db = MONGODB_COLLECTION_TO_DATABASE[collection]

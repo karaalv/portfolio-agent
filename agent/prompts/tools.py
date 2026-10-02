@@ -1,11 +1,12 @@
 """
 Serialise retrieval results for the model's tool-output messages.
 """
+
 from textwrap import dedent
 
+
 def format_successful_tool_response(
-	tool_name: str, 
-	context: str
+	tool_name: str, context: str
 ) -> str:
 	return dedent(
 		f"""

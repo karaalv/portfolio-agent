@@ -60,6 +60,7 @@ def get_openai_embedding_limiter() -> AsyncLimiter:
 	"""Return the embedding request limiter for this event loop."""
 	return _limits_for_loop(get_running_loop()).embeddings
 
+
 def get_openai_response_timeout() -> int:
 	"""Return the response request timeout for this event loop."""
 	return _positive_int_env('OPENAI_RESPONSE_TIMEOUT', 120)
