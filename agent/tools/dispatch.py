@@ -81,7 +81,10 @@ async def _dispatch_tool_call(
 			rich_print(message, style=LogStyle.WARNING)
 		return format_failed_tool_response(message)
 	except Exception as error:
-		message = f'Unexpected error for {tool_name}: {type(error).__name__}: {error}'
+		message = (
+			f'Unexpected error for {tool_name}: '
+			f'{type(error).__name__}: {error}'
+		)
 		if verbose:
 			rich_print(
 				message,

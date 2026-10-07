@@ -18,7 +18,7 @@ export AWS_REGION=eu-west-2
 aws sts get-caller-identity
 ```
 
-Confirm that the returned account is the intended sandbox account before planning or applying. The AWS profile was not available in the environment used to prepare this configuration, so no cloud operations have been run.
+Confirm that the returned account is the intended sandbox account before planning or applying. On 7 October 2026, the state bucket was created using `karaalv-sandbox`, authenticated as the `alvin` IAM Identity Centre user in account `533267122031`. This bootstrap did not apply the AWS or MongoDB service roots.
 
 ## Bootstrap the state bucket
 

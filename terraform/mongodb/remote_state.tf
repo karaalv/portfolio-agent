@@ -1,4 +1,5 @@
 data "terraform_remote_state" "aws" {
+  count   = var.read_aws_remote_state ? 1 : 0
   backend = "s3"
 
   config = {
