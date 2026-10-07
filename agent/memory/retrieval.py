@@ -5,7 +5,7 @@ Retrieve stored API items for model conversation history.
 from openai.types.responses import ResponseInputParam
 
 from agent.config.memory import (
-	AGENT_MEMORY_LIMIT,
+	AGENT_HISTORY_TURN_LIMIT,
 	AGENT_MEMORY_PAGE_SIZE,
 )
 from database.mongodb import get_collection
@@ -14,35 +14,54 @@ from schemas.agent.memory import AgentMemory
 
 
 async def retrieve_agent_memory(
-	user_id: str, limit: int | None = AGENT_MEMORY_LIMIT
+	user_id: str, limit: int | None = AGENT_HISTORY_TURN_LIMIT
 ) -> list[AgentMemory]:
-	"""
-	Return stored artefacts, including tools and reasoning,
-	optionally limited to recent entries in chronological order.
+	"""Return history from the oldest selected user turn onwards.
+
+	The limit counts user messages, not individual artefacts.
+	Include all artefacts at or after the boundary timestamp,
+	ordered by creation time and sequence. With fewer user
+	messages, start at the earliest available user message.
+	Pass None to retrieve the user's entire stored history.
 	"""
 	if limit is not None and limit < 1:
-		raise ValueError('The memory limit must be positive.')
+		raise ValueError('History turn limit must be positive.')
 
-	# - Fetch memories from database -
 	collection = get_collection(MongoDBCollection.MEMORIES)
-	cursor = collection.find({'user_id': user_id}, {'_id': 0}).sort(
-		[('created_at', -1), ('sequence', -1)]
-	)
+	query: dict[str, object] = {'user_id': user_id}
 	if limit is not None:
-		cursor = cursor.limit(limit)
-	memories = [
-		AgentMemory.model_validate(document)
-		async for document in cursor
-	]
-	# Reverse to chronological order
-	memories.reverse()
-	return memories
+		user_cursor = (
+			collection.find(
+				{
+					'user_id': user_id,
+					'payload.role': {'$in': ['user']},
+				},
+				{'_id': 0, 'created_at': 1},
+			)
+			.sort([('created_at', -1), ('sequence', -1)])
+			.limit(limit)
+		)
+		async with user_cursor:
+			messages = await user_cursor.to_list(length=None)
+		if not messages:
+			return []
+		boundary = messages[-1]['created_at']
+		query['created_at'] = {'$gte': boundary}
+
+	cursor = collection.find(query, {'_id': 0}).sort(
+		[('created_at', 1), ('sequence', 1)]
+	)
+	async with cursor:
+		return [
+			AgentMemory.model_validate(document)
+			async for document in cursor
+		]
 
 
 async def retrieve_agent_memory_param(
-	user_id: str, limit: int | None = AGENT_MEMORY_LIMIT
+	user_id: str, limit: int | None = AGENT_HISTORY_TURN_LIMIT
 ) -> ResponseInputParam:
-	"""Return stored payloads ready for the model input field."""
+	"""Return turn-bounded history as model input payloads."""
 	memories = await retrieve_agent_memory(user_id, limit)
 
 	# - Format memories for agent input -
@@ -62,7 +81,7 @@ async def retrieve_agent_memory_page(
 	Return an empty list when no further records are available.
 	"""
 	if offset < 0:
-		raise ValueError('The memory offset must not be negative.')
+		raise ValueError('Memory offset must not be negative.')
 
 	collection = get_collection(MongoDBCollection.MEMORIES)
 	cursor = (

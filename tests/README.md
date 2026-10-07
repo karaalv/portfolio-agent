@@ -8,6 +8,9 @@
 - `clients/openai/connection/`: authenticated model listing.
 - `clients/openai/functionality/`: embeddings, text, structured
   responses, streamed text and streamed function calls.
+- `agent/unit/<scope>/`: streaming state, memory, chat and tools.
+- `agent/integration/<scope>/`: memory, chat, tools and main loop.
+- `agent/agent_input.py`: interactive terminal runner, not a test.
 - `rag/integration/`: index readiness, uploaded corpus and
   query planning, vector retrieval and LLM-judged context.
 - `shared/`: reusable fixtures imported by scoped conftests.
@@ -25,6 +28,7 @@ No environment file or credentials are required:
 
 ```sh
 uv run pytest tests/users/unit
+uv run pytest tests/agent/unit
 ```
 
 ## Live integration tests
@@ -98,6 +102,66 @@ entries. The quality test uses a fresh user ID for empty history.
 It consumes API usage and remains non-deterministic because both
 retrieval planning and judging involve language models. Passing
 these education cases is smoke coverage, not a broad benchmark.
+
+## Agent tests
+
+```sh
+uv run pytest tests/agent/unit
+export PORTFOLIO_AGENT_ENV=testing
+uv run pytest tests/agent/integration
+```
+
+The agent integration package shares MongoDB and OpenAI clients
+across its scope folders. Each test gets unique visitor IDs and
+removes only its own memories and user records during teardown.
+Memory and chat checks use real MongoDB without model requests.
+Tool and main-loop tests also require the bootstrapped corpus.
+
+Memory supports creation, insertion, retrieval and deletion.
+Chat is a read projection over the same stored artefacts, so
+its creation and deletion checks use memory writes. There is
+no memory or chat update operation to exercise at present.
+
+Pagination checks advance offsets until the final empty page.
+They verify chronological order, complete coverage, no duplicate
+IDs, timestamp ties and isolation from other visitors. Chat
+pages count visible messages, excluding tool and reasoning items.
+History checks retain all artefacts from the selected user-turn
+boundary, including the default twenty-turn window.
+
+The dispatcher deliberately returns recoverable error text for
+unknown names and invalid arguments. Unit tests check those
+responses, backend failures, parallel execution and ordered
+`function_call_output` results with matching `call_id` values.
+
+Live main-loop tests exercise a greeting without retrieval and
+an education request requiring the context tool. Stream observers
+forward real SDK events and record input/output snapshots. Tests
+compare these with stored artefacts, checking replayed history,
+unique memory IDs, one turn ID, contiguous sequences, tool-output
+pairing, stream closure before recursion and final assistant text.
+The education response is evaluated using the shared LLM judge.
+These live model checks remain non-deterministic and cost usage.
+
+### Interactive terminal session
+
+```sh
+export PORTFOLIO_AGENT_ENV=testing
+uv run python -m tests.agent.agent_input --verbosity 1
+```
+
+Verbosity defaults to 1. Use 0 for minimal agent diagnostics or 2
+for SDK event diagnostics. Text deltas are displayed as they
+arrive. The runner observes the SDK stream until application
+publishing is implemented; production code is unchanged.
+
+The corresponding root environment file must exist. Clients
+start before interaction and close on exit or failure. Enter
+`exit`, `quit` or Ctrl-D to finish; Ctrl-C cancels the session.
+A new visitor is created by default and its records are retained
+for inspection. Reuse the printed ID with `--user-id <id>` to
+continue that conversation. Bootstrap the corpus before asking
+questions requiring portfolio retrieval.
 
 ## Markers
 
