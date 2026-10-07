@@ -1,26 +1,16 @@
-"""Store visitor and assistant messages in MongoDB."""
+"""Persist replayable API items with their memory metadata."""
 
 from database.mongodb import get_collection
 from database.mongodb.collections import MongoDBCollection
-from schemas.agent.memory import AgentMemory, AgentMemorySource
+from schemas.agent.memory import AgentMemory
 
 
 async def insert_agent_memory(
-	user_id: str,
-	memory_id: str,
-	memory_source: AgentMemorySource,
-	content: str,
+	memory: AgentMemory,
 ) -> AgentMemory:
-	"""
-	Create and persist one conversation entry,
-	returning its model.
-	"""
-	memory = AgentMemory(
-		user_id=user_id,
-		memory_id=memory_id,
-		memory_source=memory_source,
-		content=content,
-	)
+	"""Store a payload while preserving its BSON timestamp."""
 	collection = get_collection(MongoDBCollection.MEMORIES)
-	await collection.insert_one(memory.model_dump(mode='json'))
+	document = memory.model_dump(mode='json')
+	document['created_at'] = memory.created_at
+	await collection.insert_one(document)
 	return memory

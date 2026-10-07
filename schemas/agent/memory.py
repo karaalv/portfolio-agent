@@ -1,41 +1,41 @@
 """
-Stored conversation entries for anonymous portfolio visitors.
+Canonical stored API items and metadata for model replay.
 """
 
 from datetime import datetime, timezone
-from enum import StrEnum
 
+from openai.types.responses import ResponseInputItemParam
 from pydantic import BaseModel, Field, field_validator
 
+from shared.ids import generate_uuid_str
 from shared.time.get import get_utc_datetime_now
 
 
-class AgentMemorySource(StrEnum):
-	"""
-	Participants whose messages are
-	stored as conversation memory.
-	"""
-
-	USER = 'user'
-	AGENT = 'agent'
-
-
 class AgentMemory(BaseModel):
-	"""
-	One visitor or assistant message
-	in application.memories.
-	"""
+	"""One API payload with ownership and order metadata."""
 
-	memory_id: str
 	user_id: str
-	memory_source: AgentMemorySource
+	memory_id: str = Field(
+		default_factory=generate_uuid_str,
+		description=(
+			'Unique identifier for each artefact stored '
+			'in the memory collection.'
+		),
+	)
+	turn_id: str = Field(
+		description=(
+			'Identifier shared by one user message, any optional '
+			'tool calls and their outputs, and the agent response.'
+		)
+	)
 	created_at: datetime = Field(default_factory=get_utc_datetime_now)
-	content: str
+	sequence: int = Field(ge=0)
+	payload: ResponseInputItemParam
 
 	@field_validator('created_at')
 	@classmethod
 	def normalise_created_at(cls, value: datetime) -> datetime:
-		"""Normalise BSON dates, including naive UTC dates, to UTC."""
+		"""Normalise aware and naive BSON dates to UTC."""
 		if value.tzinfo is None:
 			return value.replace(tzinfo=timezone.utc)
 		return value.astimezone(timezone.utc)

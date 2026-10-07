@@ -38,7 +38,9 @@ T = TypeVar('T', bound=BaseModel)
 
 async def get_embedding(
 	input: str,
-	model: OpenAIEmbeddingModel = OpenAIEmbeddingModel.TEXT_EMBEDDING_3_LARGE,
+	model: OpenAIEmbeddingModel = (
+		OpenAIEmbeddingModel.TEXT_EMBEDDING_3_LARGE
+	),
 ) -> list[float]:
 	"""
 	Get the embedding for the given
@@ -75,8 +77,12 @@ async def text_response(
 	system_prompt: str,
 	user_prompt: str,
 	model: OpenAILanguageModel = OpenAILanguageModel.GPT_6_LUNA,
-	reasoning: OpenAILanguageModelReasoning = OpenAILanguageModelReasoning.MEDIUM,
-	verbosity: OpenAILanguageModelVerbosity = OpenAILanguageModelVerbosity.MEDIUM,
+	reasoning: OpenAILanguageModelReasoning = (
+		OpenAILanguageModelReasoning.MEDIUM
+	),
+	verbosity: OpenAILanguageModelVerbosity = (
+		OpenAILanguageModelVerbosity.MEDIUM
+	),
 ) -> str:
 	"""
 	Generates a text response from the OpenAI language
@@ -116,7 +122,9 @@ async def structured_response(
 	user_prompt: str,
 	response_format: type[T],
 	model: OpenAILanguageModel = OpenAILanguageModel.GPT_6_1_SOL,
-	reasoning: OpenAILanguageModelReasoning = OpenAILanguageModelReasoning.MEDIUM,
+	reasoning: OpenAILanguageModelReasoning = (
+		OpenAILanguageModelReasoning.MEDIUM
+	),
 ) -> T:
 	"""
 	Generates a structured response from the OpenAI language
@@ -204,13 +212,17 @@ async def agent_response(
 	return response
 
 
-async def stream_response(
+async def stream_agent_response(
 	system_prompt: str,
-	user_prompt: str,
+	input: ResponseInputParam,
 	model: OpenAILanguageModel = OpenAILanguageModel.GPT_6_1_SOL,
-	reasoning: OpenAILanguageModelReasoning = OpenAILanguageModelReasoning.MEDIUM,
+	reasoning: OpenAILanguageModelReasoning = (
+		OpenAILanguageModelReasoning.MEDIUM
+	),
 	tools: list[ToolParam] | None = None,
-	verbosity: OpenAILanguageModelVerbosity = OpenAILanguageModelVerbosity.MEDIUM,
+	verbosity: OpenAILanguageModelVerbosity = (
+		OpenAILanguageModelVerbosity.MEDIUM
+	),
 ) -> AsyncGenerator[ResponseStreamEvent, None]:
 	"""
 	Yield response events while holding the OpenAI concurrency permit.
@@ -225,12 +237,14 @@ async def stream_response(
 		stream = await client.responses.create(
 			model=model,
 			instructions=system_prompt,
-			input=user_prompt,
+			input=input,
 			tools=tools or [],
 			reasoning={'effort': reasoning.value},
 			text={'verbosity': verbosity.value},
 			timeout=timeout,
 			stream=True,
+			store=False,
+			include=['reasoning.encrypted_content'],
 		)
 		async with stream:
 			async for event in stream:

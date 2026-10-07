@@ -1,26 +1,29 @@
 """
-Serialise retrieval results for the model's tool-output messages.
+Format failures for replayable function call outputs.
 """
 
 from textwrap import dedent
 
 
-def format_successful_tool_response(
-	tool_name: str, context: str
-) -> str:
+def format_failed_tool_response(message: str) -> str:
+	"""Explain a failure so the agent can revise its call."""
 	return dedent(
 		f"""
-		The {tool_name} executed successfully.
-		Use the following context to continue:
-		{context}
+		The tool execution failed.
+		Reason: {message}
 		"""
 	)
 
 
-def format_failed_tool_response(message: str) -> str:
+def format_tool_exception_response(
+	tool_name: str,
+	message: str,
+) -> str:
+	"""Explain an exception so the agent can revise its call."""
 	return dedent(
 		f"""
-		The tool execution failed.
+		The tool execution encountered an exception.
+		Tool: {tool_name}
 		Reason: {message}
 		"""
 	)

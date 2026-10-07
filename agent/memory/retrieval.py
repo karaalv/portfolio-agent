@@ -1,30 +1,32 @@
 """
-Retrieve user-scoped conversation records and prompt context.
+Retrieve stored API items for model conversation history.
 """
+
+from openai.types.responses import ResponseInputParam
 
 from agent.config.memory import (
 	AGENT_MEMORY_LIMIT,
 	AGENT_MEMORY_PAGE_SIZE,
 )
-from agent.prompts.memory import format_agent_memory_prompt
 from database.mongodb import get_collection
 from database.mongodb.collections import MongoDBCollection
 from schemas.agent.memory import AgentMemory
 
 
 async def retrieve_agent_memory(
-	user_id: str, limit: int | None = None
+	user_id: str, limit: int | None = AGENT_MEMORY_LIMIT
 ) -> list[AgentMemory]:
 	"""
-	Return chronological history,
-	optionally limited to recent entries.
+	Return stored artefacts, including tools and reasoning,
+	optionally limited to recent entries in chronological order.
 	"""
 	if limit is not None and limit < 1:
 		raise ValueError('The memory limit must be positive.')
 
+	# - Fetch memories from database -
 	collection = get_collection(MongoDBCollection.MEMORIES)
 	cursor = collection.find({'user_id': user_id}, {'_id': 0}).sort(
-		[('created_at', -1), ('_id', -1)]
+		[('created_at', -1), ('sequence', -1)]
 	)
 	if limit is not None:
 		cursor = cursor.limit(limit)
@@ -37,6 +39,16 @@ async def retrieve_agent_memory(
 	return memories
 
 
+async def retrieve_agent_memory_param(
+	user_id: str, limit: int | None = AGENT_MEMORY_LIMIT
+) -> ResponseInputParam:
+	"""Return stored payloads ready for the model input field."""
+	memories = await retrieve_agent_memory(user_id, limit)
+
+	# - Format memories for agent input -
+	return [m.payload for m in memories]
+
+
 async def retrieve_agent_memory_page(
 	user_id: str, offset: int
 ) -> list[AgentMemory]:
@@ -44,7 +56,9 @@ async def retrieve_agent_memory_page(
 	Return the next page of memories in chronological order.
 
 	Offset counts records already fetched, starting from the
-	newest memory. Older pages should be prepended to the chat.
+	newest memory. Offset counts all artefacts, including
+	internal items.
+	Use agent.chat.retrieval for frontend message pagination.
 	Return an empty list when no further records are available.
 	"""
 	if offset < 0:
@@ -53,7 +67,7 @@ async def retrieve_agent_memory_page(
 	collection = get_collection(MongoDBCollection.MEMORIES)
 	cursor = (
 		collection.find({'user_id': user_id}, {'_id': 0})
-		.sort([('created_at', -1), ('_id', -1)])
+		.sort([('created_at', -1), ('sequence', -1)])
 		.skip(offset)
 		.limit(AGENT_MEMORY_PAGE_SIZE)
 	)
@@ -65,12 +79,9 @@ async def retrieve_agent_memory_page(
 	return memories
 
 
-async def retrieve_agent_memory_prompt(user_id: str) -> str:
-	"""
-	Fetch the configured recent history
-	and format it for the agent.
-	"""
-	memories = await retrieve_agent_memory(
-		user_id, limit=AGENT_MEMORY_LIMIT
-	)
-	return format_agent_memory_prompt(memories)
+async def retrieve_agent_memory_page_param(
+	user_id: str, offset: int
+) -> ResponseInputParam:
+	"""Return one artefact page as model input payloads."""
+	memories = await retrieve_agent_memory_page(user_id, offset)
+	return [m.payload for m in memories]
