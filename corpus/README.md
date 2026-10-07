@@ -1,4 +1,3 @@
-
 # RAG Agent Corpus 📚
 
 This folder contains the **RAG Agent Corpus**, a curated collection of documents and resources designed to provide the agent with contextual knowledge for more accurate and relevant responses.
@@ -13,25 +12,46 @@ The corpus is used with a **contextual retrieval** approach, enhancing the agent
 
 While this folder is primarily part of the **preprocessing pipeline**, it is included in the repository for completeness and transparency.
 
-## Uploading the corpus and creating the index
+## Bootstrapping an environment
 
-Run these commands from the repository root. The corresponding
-**environment file must exist** in the repository root:
+Run from the repository root. The corresponding environment
+file must exist there:
 
-
-| Environment   | Required file      |
-| --------------- | -------------------- |
-| `testing`     | `.env.testing`     |
+| Environment | Required file |
+| --- | --- |
+| `testing` | `.env.testing` |
 | `development` | `.env.development` |
-| `production`  | `.env.production`  |
+| `production` | `.env.production` |
 
-Populate the file with the target environment's settings,
-including its `MONGODB_URI` and `OPENAI_KEY`. Both scripts use
-the shared environment loader, which also requires valid
-`PORTFOLIO_AGENT_PORT` and `CORS_ORIGINS` values.
+Populate it with `MONGODB_URI`, `OPENAI_KEY`, `JWT_SECRET`,
+`PORTFOLIO_AGENT_PORT` and `CORS_ORIGINS`. The command uses the
+shared environment loader and its validation rules.
 
-Select the environment, then upload the corpus and create its
-vector search index:
+```sh
+export PORTFOLIO_AGENT_ENV=development
+uv run python -m corpus.bootstrap
+```
+
+Replace `development` with `testing` or `production` as needed.
+**Run bootstrap in every database environment.** Each has its
+own corpus collection and vector search index.
+
+Bootstrap first checks for `corpus_vector_index`, then checks
+whether the corpus contains any documents. It independently:
+
+- Creates a missing index and waits until it is queryable.
+- Embeds and uploads local corpus files when the collection
+  is empty, starting the OpenAI client only for that upload.
+- Leaves existing indexes and documents unchanged.
+
+Repeat runs skip resources that already exist. The data check
+only tests whether any document exists. It does not detect
+partial uploads, reconcile changed files or refresh embeddings.
+An existing index is not rebuilt or checked for queryability.
+
+## Individual commands
+
+The original commands remain available:
 
 ```sh
 export PORTFOLIO_AGENT_ENV=development
@@ -39,15 +59,9 @@ uv run python -m corpus.push_corpus
 uv run python -m corpus.push_index
 ```
 
-Replace `development` with `testing` or `production` as needed.
-**Perform both steps in every database environment.** Each
-MongoDB environment has its own corpus collection and search
-index; setting up one does not configure the others.
+`push_corpus` uploads file by file. Repeated uploads append
+records with fresh IDs and duplicate existing content.
 
-`push_corpus` generates embeddings and inserts records file by
-file. Repeat uploads append records with fresh IDs and duplicate
-existing content.
-
-`push_index` creates `corpus_vector_index` and waits until it is
-queryable. Run it when setting up the index; rerunning creation
-against an existing index may fail.
+`push_index` creates the named index and waits for queryability.
+Creating an index that already exists may fail. Use bootstrap
+for conditional initial setup.

@@ -24,6 +24,24 @@ See the [NOTICE](./NOTICE) file for attribution and additional details.
 
 - This repository also contains user management functionality that manages users and their sessions. It uses JWTs to secure the API endpoints and manage user sessions.
 
+## Corpus bootstrap
+
+Run from the repository root for each database environment:
+
+```sh
+export PORTFOLIO_AGENT_ENV=development
+uv run python -m corpus.bootstrap
+```
+
+Use `testing`, `development` or `production`. The corresponding
+`.env.<environment>` file must exist in the repository root with
+all required settings. See [corpus setup](corpus/README.md).
+
+Bootstrap checks the index and corpus data independently. It
+creates the index if missing and uploads the corpus if empty.
+Existing resources are retained; partial uploads and document
+updates are not reconciled.
+
 ## 🗂️ Project Structure
 
 The project is structured into the following packages to make things easier for myself:

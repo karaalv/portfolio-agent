@@ -26,24 +26,30 @@ async def main() -> None:
 	"""Upload each corpus file and close clients on exit."""
 	try:
 		await _startup()
-		rich_print('Starting corpus upload...', LogStyle.INFO)
-		for file in get_corpus_files():
-			rich_print(
-				f'Processing file: {file.file_path}',
-				LogStyle.INFO,
-			)
-			items = await load_corpus_from_file(
-				file.file_path,
-				embeddings=True,
-			)
-			inserted_count = await _insert_corpus_items(items)
-			rich_print(
-				f'Inserted {inserted_count} items from {file.label}.',
-				LogStyle.SUCCESS,
-			)
-		rich_print('Corpus upload complete.', LogStyle.SUCCESS)
+		await push_corpus()
 	finally:
 		await _shutdown()
+
+
+async def push_corpus() -> None:
+	"""Embed and upload files using already-started clients."""
+	rich_print('Starting corpus upload...', LogStyle.INFO)
+	for file in get_corpus_files():
+		rich_print(
+			f'Processing file: {file.file_path}',
+			LogStyle.INFO,
+		)
+		items = await load_corpus_from_file(
+			file.file_path,
+			embeddings=True,
+		)
+		inserted_count = await insert_corpus_items(items)
+		rich_print(
+			f'Inserted {inserted_count} items '
+			f'from {file.label}.',
+			LogStyle.SUCCESS,
+		)
+	rich_print('Corpus upload complete.', LogStyle.SUCCESS)
 
 
 async def _startup() -> None:
@@ -63,7 +69,7 @@ async def _shutdown() -> None:
 		await stop_mongo_client()
 
 
-async def _insert_corpus_items(items: list[CorpusItem]) -> int:
+async def insert_corpus_items(items: list[CorpusItem]) -> int:
 	"""Insert one file's items and return the inserted count.
 
 	Skip empty files. Existing records are retained, so repeat
