@@ -6,7 +6,6 @@ from collections.abc import AsyncGenerator
 from typing import TypeVar
 
 from openai.types.responses import (
-	Response,
 	ResponseInputParam,
 	ResponseStreamEvent,
 	ToolParam,
@@ -171,45 +170,6 @@ async def structured_response(
 					operation='structured_response',
 				)
 	return parsed_response
-
-
-async def agent_response(
-	system_prompt: str,
-	user_prompt: str | ResponseInputParam,
-	tools: list[ToolParam],
-	model: OpenAILanguageModel = OpenAILanguageModel.GPT_6_1_SOL,
-	reasoning: OpenAILanguageModelReasoning = (
-		OpenAILanguageModelReasoning.MEDIUM
-	),
-	verbosity: OpenAILanguageModelVerbosity = (
-		OpenAILanguageModelVerbosity.MEDIUM
-	),
-) -> Response:
-	"""Return a complete tool-capable response without server storage.
-
-	Encrypted reasoning allows callers to carry all output items into
-	the next tool round while keeping response storage disabled.
-	"""
-	client = get_openai_client()
-	async with get_openai_response_limiter(), get_openai_semaphore():
-		response = await client.responses.create(
-			model=model.value,
-			instructions=system_prompt,
-			input=user_prompt,
-			tools=tools,
-			reasoning={'effort': reasoning.value},
-			text={'verbosity': verbosity.value},
-			timeout=get_openai_response_timeout(),
-			store=False,
-			include=['reasoning.encrypted_content'],
-		)
-	if response.status != 'completed':
-		raise OpenAIException(
-			message='The agent response did not complete.',
-			module='openai_client.main',
-			operation='agent_response',
-		)
-	return response
 
 
 async def stream_agent_response(
