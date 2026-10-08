@@ -24,7 +24,8 @@ class MongoDBCollection(StrEnum):
 	USERS = 'users'
 	MEMORIES = 'memories'
 	CORPUS = 'corpus'
-	MONITORING = 'monitoring'
+	USAGE = 'usage'
+	BLOCKED = 'blocked'
 
 
 # --- Mapping of Collections to Their Databases ---
@@ -35,5 +36,6 @@ MONGODB_COLLECTION_TO_DATABASE = {
 	MongoDBCollection.MEMORIES: MongoDBDatabase.APPLICATION,
 	MongoDBCollection.CORPUS: MongoDBDatabase.APPLICATION,
 	# Analytics Database Collections
-	MongoDBCollection.MONITORING: MongoDBDatabase.ANALYTICS,
+	MongoDBCollection.USAGE: MongoDBDatabase.ANALYTICS,
+	MongoDBCollection.BLOCKED: MongoDBDatabase.ANALYTICS,
 }

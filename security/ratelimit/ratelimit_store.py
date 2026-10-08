@@ -18,7 +18,7 @@ from shared.time import get_utc_datetime_now
 class RateLimitStore:
 	"""Keep caller allowances isolated within an app instance."""
 
-	_cleanup_interval_seconds = 12 * 60 * 60
+	_cleanup_interval_seconds = 12 * 60 * 60 # 12 hours
 	_retention_period = timedelta(days=3)
 
 	def __init__(self) -> None:

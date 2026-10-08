@@ -13,6 +13,9 @@
 - `agent/agent_input.py`: interactive terminal runner, not a test.
 - `rag/integration/`: index readiness, uploaded corpus and
   query planning, vector retrieval and LLM-judged context.
+- `security/ratelimit/unit/`: limiter identity and cleanup.
+- `security/monitoring/unit/`: allowances and observer behaviour.
+- `security/monitoring/integration/`: persisted usage and blocks.
 - `shared/`: reusable fixtures imported by scoped conftests.
 - `schemas/`: response models used only by tests.
 
@@ -162,6 +165,29 @@ A new visitor is created by default and its records are retained
 for inspection. Reuse the printed ID with `--user-id <id>` to
 continue that conversation. Bootstrap the corpus before asking
 questions requiring portfolio retrieval.
+
+## Security integration tests
+
+```sh
+export PORTFOLIO_AGENT_ENV=testing
+uv run pytest tests/security/monitoring/integration
+```
+
+These tests use the shared package-scoped MongoDB client and
+temporary collections in the testing `analytics` database. They
+exercise real MongoDB updates and deletion, including bulk daily
+resets and observer pruning. Collection resolution is redirected
+to those temporary collections; the normal mapping to `usage`
+and `blocked` is checked separately without modifying them.
+
+Temporary records are cleared after each test and the collections
+are dropped at package teardown, including after test failures.
+OpenAI requests are not required.
+
+Coverage includes entity CRUD, concurrent creation and increments,
+daily rollover, IP and user allowances, duplicate connection IDs,
+fifth-connection blocking, block reuse, duplicate block deletion,
+ten-day retention and expiry cleanup.
 
 ## Markers
 

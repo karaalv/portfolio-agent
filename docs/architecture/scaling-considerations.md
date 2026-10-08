@@ -20,10 +20,14 @@ testing is required to establish the supported chat workload.
 
 ## Multiple workers
 
+Multiple workers are outside the current single-instance
+operating model. See [operating model](operating-model.md) for
+the responsibilities that must be reviewed before changing it.
+
 Each worker is a separate process with its own clients and rate
-limit store. Worker-local limits are compatible with this model,
-but a caller reaching several workers can consume an allowance
-in each. Restarts also reset the worker's limiter state.
+limit store. A caller reaching several workers can consume an
+allowance in each. Restarts also reset the worker's limiter
+state.
 
 If application-wide enforcement becomes necessary, use a shared
 limiter backend or an upstream control that coordinates across
