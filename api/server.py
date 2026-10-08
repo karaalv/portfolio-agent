@@ -18,6 +18,7 @@ from api.utils.cors import get_allowed_origins
 from api.utils.requests import get_request_id
 from api.utils.responses import create_http_response
 from exceptions.core import PortfolioAgentException
+from api.middleware.request_id import RequestIdMiddleware
 
 # --- Lifecycle Management ---
 
@@ -110,6 +111,10 @@ app.add_middleware(
 	allow_methods=['*'],
 	allow_headers=['*'],
 )
+
+# - Request ID Middleware -
+
+app.add_middleware(RequestIdMiddleware)
 
 
 # Health Check Endpoint

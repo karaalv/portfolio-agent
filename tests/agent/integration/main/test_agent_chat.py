@@ -80,7 +80,7 @@ def _check_turn(
 		assert trace.inputs[round_index] == history + expected
 		expected.extend(output)
 		calls = [
-			p for p in output if p['type'] == 'function_call'
+			p for p in output if p['type'] == 'function_call' # type: ignore
 		]
 		if calls:
 			start = len(expected)
@@ -89,7 +89,7 @@ def _check_turn(
 				'function_call_output'
 			] * len(calls)
 			assert [p['call_id'] for p in results] == [
-				p['call_id'] for p in calls
+				p['call_id'] for p in calls # type: ignore
 			]
 			expected.extend(results)
 	assert expected == payloads
