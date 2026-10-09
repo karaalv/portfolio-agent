@@ -6,7 +6,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api.common.authentication import verify_frontend_token
+from api.dependencies.auth.ip import require_ip_access
 from api.lifecycle.config import (
 	start_api_lifecycle,
 	stop_api_lifecycle,
@@ -14,6 +14,7 @@ from api.lifecycle.config import (
 from api.maintenance.maintenance_manager import (
 	MaintenanceManager,
 )
+from api.middleware.origin import OriginMiddleware
 from api.middleware.request_id import RequestIdMiddleware
 from api.routes import agent, users
 from api.routes.system import system_router
@@ -115,6 +116,12 @@ async def general_exception_handler(
 # - CORS Configuration -
 
 app.add_middleware(
+	OriginMiddleware,
+	allowed_origins=get_allowed_origins(),
+	protected_prefixes=('/users', '/agent'),
+)
+
+app.add_middleware(
 	CORSMiddleware,
 	allow_origins=get_allowed_origins(),
 	allow_credentials=True,
@@ -132,14 +139,17 @@ app.add_middleware(RequestIdMiddleware)
 # --- Routes ---
 
 app.include_router(
-	router=system_router, prefix='/system', tags=['System']
+	router=system_router,
+	prefix='/system',
+	tags=['System'],
+	dependencies=[Depends(require_ip_access)],
 )
 
 app.include_router(
 	router=users.router,
 	prefix='/users',
 	tags=['Users'],
-	dependencies=[Depends(verify_frontend_token)],
+	dependencies=[Depends(require_ip_access)],
 )
 
 # HTTP and Websocket dependencies handled

@@ -52,9 +52,27 @@ may receive a new identity through the issuance flow.
 ## API protections
 
 The API must serve traffic over HTTPS and secure WebSockets.
-WebSocket handshakes must check an explicit Origin allowlist;
-HTTP CORS settings alone do not protect WebSocket connections.
-The cookie-claim endpoint must also enforce the allowed origins.
+`OriginMiddleware` requires an Origin matching `CORS_ORIGINS`
+on the `/users` and `/agent` router prefixes. The protected
+prefixes are configured in `api/server.py`. Both HTTP requests
+and WebSocket handshakes are checked before route execution.
+Missing, `null` and disallowed origins are rejected.
+
+HTTP rejection returns the standard error envelope with status
+403. WebSockets are closed before acceptance with code 1008,
+which normally appears to clients as a failed HTTP handshake.
+The `/system` router is exempt from this Origin check; its
+existing IP protections remain in place.
+
+CORS middleware remains responsible for browser response
+headers and preflight handling. Rejected preflights return its
+normal 400 response. Origin middleware returns responses
+directly rather than raising endpoint exceptions. Request-ID
+middleware wraps both layers so HTTP denials remain traceable.
+
+Terminal clients must send an allowed Origin when calling
+protected endpoints. Origin can be forged outside browsers;
+JWT authentication, blocking and rate limits still apply.
 
 The cookie's `SameSite` policy must match the deployment's site
 relationship. Prefer `Lax` or `Strict` where possible; cross-site
@@ -78,6 +96,12 @@ still handle missing records explicitly.
 ## Implementation boundary
 
 JWT creation and validation are implemented in
-`authorisation/jwt`. Cookie claiming, HTTP dependencies and
-WebSocket authentication will be connected during the API
-refactor.
+`authorisation/jwt`. HTTP dependencies and
+`POST /api/users/claim-cookie` are implemented. The claim route
+requires an allowed Origin and sets a `JWT` cookie using the
+supplied token's remaining lifetime. The cookie domain comes
+from `COOKIE_DOMAIN`, which must be non-empty at startup.
+
+The former navigation-based `/users/session` route is removed.
+WebSocket issuance and authentication will be connected during
+the API refactor.

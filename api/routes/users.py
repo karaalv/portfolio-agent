@@ -1,23 +1,26 @@
-"""
-This module contains user routes for
-the API.
-"""
+"""Expose cookie claiming for existing anonymous visitors."""
 
-import os
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 
-from api.common.config import COOKIE_EXPIRY_SECONDS
-from api.common.responses import (
-	error_response,
-	success_response,
+from api.config.cookies import (
+	ACCESS_TOKEN_COOKIE_HTTPONLY,
+	ACCESS_TOKEN_COOKIE_NAME,
+	ACCESS_TOKEN_COOKIE_PATH,
+	ACCESS_TOKEN_COOKIE_SAMESITE,
+	ACCESS_TOKEN_COOKIE_SECURE,
+	get_cookie_domain,
 )
-from api.common.utils import (
-	api_exception_handler,
-	create_jwt_token,
-)
-from schemas.users.anonymous import AnonymousUser
-from users.creation import create_user
+from api.dependencies.auth._checks import check_entity_block
+from api.utils.requests import get_request_id
+from api.utils.responses import create_http_response
+from authorisation.jwt.validate import validate_token
+from exceptions.authorisation import JwtValidationException
+from schemas.api.http.users import ClaimCookieRequest
+from schemas.security.monitoring.blocked import BlockedEntity
+from shared.time import get_utc_datetime_now
 from users.retrieval import does_user_exist
 
 # --- Constants ---
@@ -27,56 +30,64 @@ router = APIRouter()
 # --- User Routes ---
 
 
-@router.get('/session')
-@api_exception_handler('Inspecting user session')
-async def set_session(request: Request):
-	"""
-	Sets a user session by creating a new user
-	and setting a cookie with the user ID.
-	"""
-	user_id: str = request.cookies.get('UUID', '')
-
-	if not user_id:
-		user: AnonymousUser = await create_user()
-
-		response = success_response(
-			message='User session created successfully.',
-			data={'user_id': user.user_id},
-			status_code=201,
+@router.post('/claim-cookie')
+async def claim_cookie(
+	request: Request,
+	body: ClaimCookieRequest,
+) -> JSONResponse:
+	"""Set a token cookie for an existing, unblocked visitor."""
+	try:
+		payload = validate_token(body.claim_token)
+	except JwtValidationException as exc:
+		raise HTTPException(
+			status_code=status.HTTP_401_UNAUTHORIZED,
+			detail='Access token is invalid or expired.',
+		) from exc
+	except Exception as exc:
+		raise HTTPException(
+			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			detail='Unable to validate access token.',
+		) from exc
+	user_id = payload['sub']
+	try:
+		user_exists = await does_user_exist(user_id)
+	except Exception as exc:
+		raise HTTPException(
+			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			detail='Unable to check user existence.',
+		) from exc
+	if not user_exists:
+		raise HTTPException(
+			status_code=status.HTTP_404_NOT_FOUND,
+			detail='User does not exist.',
 		)
-
-		response.set_cookie(
-			key='UUID',
-			value=user.user_id,
-			httponly=True,
-			secure=True,
-			samesite='lax',
-			max_age=COOKIE_EXPIRY_SECONDS,
-			expires=COOKIE_EXPIRY_SECONDS,
-			domain=os.getenv('CORS_DOMAIN'),
-		)
-
-		response.set_cookie(
-			key='JWT',
-			value=create_jwt_token(user.user_id),
-			httponly=True,
-			secure=True,
-			samesite='lax',
-			max_age=COOKIE_EXPIRY_SECONDS,
-			expires=COOKIE_EXPIRY_SECONDS,
-			domain=os.getenv('CORS_DOMAIN'),
-		)
-
-		return response
-
-	if not await does_user_exist(user_id):
-		return error_response(
-			message='User session does not exist.',
-			status_code=404,
-		)
-
-	return success_response(
-		message='User session already exists.',
-		data={'user_id': user_id},
-		status_code=200,
+	await check_entity_block(BlockedEntity.USER, user_id)
+	expires_at = datetime.fromtimestamp(
+		payload['exp'], tz=timezone.utc
 	)
+	remaining_seconds = int(
+		(expires_at - get_utc_datetime_now()).total_seconds()
+	)
+	if remaining_seconds <= 0:
+		raise HTTPException(
+			status_code=status.HTTP_401_UNAUTHORIZED,
+			detail='Access token is invalid or expired.',
+		)
+	response = create_http_response(
+		request_id=get_request_id(request),
+		success=True,
+		message='Access cookie claimed successfully.',
+		data=None,
+	)
+	response.set_cookie(
+		key=ACCESS_TOKEN_COOKIE_NAME,
+		value=body.claim_token,
+		max_age=remaining_seconds,
+		expires=expires_at,
+		path=ACCESS_TOKEN_COOKIE_PATH,
+		domain=get_cookie_domain(),
+		httponly=ACCESS_TOKEN_COOKIE_HTTPONLY,
+		secure=ACCESS_TOKEN_COOKIE_SECURE,
+		samesite=ACCESS_TOKEN_COOKIE_SAMESITE,
+	)
+	return response

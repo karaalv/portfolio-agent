@@ -99,8 +99,9 @@ replaced.
 ## Integration boundary
 
 The security services are connected to the server lifespan.
-Production routes and cookie claiming still need migration.
-The legacy authentication module remains until route migration.
+Cookie claiming uses the IP gate and verifies the body token.
+Other production routes still need migration. The legacy
+authentication module remains until route migration.
 
 WebSocket dependencies and per-message enforcement will be
 connected with the controller. HTTP dependencies do not enforce
