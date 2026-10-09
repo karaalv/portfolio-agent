@@ -11,31 +11,39 @@ from api.lifecycle.config import (
 	start_api_lifecycle,
 	stop_api_lifecycle,
 )
-from api.maintenance.maintenance_manager import MaintenanceManager
+from api.maintenance.maintenance_manager import (
+	MaintenanceManager,
+)
+from api.middleware.request_id import RequestIdMiddleware
 from api.routes import agent, users
 from api.routes.system import system_router
+from api.security.security_manager import SecurityManager
 from api.utils.cors import get_allowed_origins
 from api.utils.requests import get_request_id
 from api.utils.responses import create_http_response
 from exceptions.core import PortfolioAgentException
-from api.middleware.request_id import RequestIdMiddleware
 
 # --- Lifecycle Management ---
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-	"""Start clients and maintenance, then stop both on shutdown."""
+	"""Start services and stop background work before clients."""
 	maintenance_manager = MaintenanceManager()
+	security_manager = SecurityManager()
 	await start_api_lifecycle()
 	try:
+		await security_manager.start()
 		maintenance_manager.start()
 		yield
 	finally:
 		try:
 			await maintenance_manager.stop()
 		finally:
-			await stop_api_lifecycle()
+			try:
+				await security_manager.stop()
+			finally:
+				await stop_api_lifecycle()
 
 
 # --- FastAPI App Initialization ---
@@ -77,7 +85,9 @@ async def http_exception_handler(
 	exc_message = (
 		str(exc.detail) if hasattr(exc, 'detail') else str(exc)
 	)
-	exc_code = exc.status_code if hasattr(exc, 'status_code') else 500
+	exc_code = (
+		exc.status_code if hasattr(exc, 'status_code') else 500
+	)
 	return create_http_response(
 		request_id=request_id,
 		success=False,

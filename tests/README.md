@@ -16,6 +16,8 @@
 - `security/ratelimit/unit/`: limiter identity and cleanup.
 - `security/monitoring/unit/`: allowances and observer behaviour.
 - `security/monitoring/integration/`: persisted usage and blocks.
+- `security/unit/`: security client ownership and shutdown.
+- `api/dependencies/unit/`: HTTPX access checks and limiter waits.
 - `shared/`: reusable fixtures imported by scoped conftests.
 - `schemas/`: response models used only by tests.
 
@@ -32,6 +34,7 @@ No environment file or credentials are required:
 ```sh
 uv run pytest tests/users/unit
 uv run pytest tests/agent/unit
+uv run pytest tests/api/dependencies/unit tests/security/unit
 ```
 
 ## Live integration tests

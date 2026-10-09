@@ -24,6 +24,12 @@ class UsageObserver:
 			loop = asyncio.get_running_loop()
 			self._task = loop.create_task(self._run())
 
+		rich_print(
+			message='Starting usage observer...',
+			style=LogStyle.INFO,
+			prefix='security.observers',
+		)
+
 	async def stop(self) -> None:
 		"""Cancel maintenance and wait for it to finish."""
 		if self._task is None:
@@ -35,6 +41,11 @@ class UsageObserver:
 			pass
 		finally:
 			self._task = None
+			rich_print(
+				message='Stopping usage observer...',
+				style=LogStyle.INFO,
+				prefix='security.observers',
+			)
 
 	async def run_once(self) -> None:
 		"""Reset older days and prune inactive records."""

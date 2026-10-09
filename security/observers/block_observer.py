@@ -24,6 +24,12 @@ class BlockObserver:
 			loop = asyncio.get_running_loop()
 			self._task = loop.create_task(self._run())
 
+		rich_print(
+			message='Starting block observer...',
+			style=LogStyle.INFO,
+			prefix='security.observers',
+		)
+
 	async def stop(self) -> None:
 		"""Cancel maintenance and wait for it to finish."""
 		if self._task is None:
@@ -35,6 +41,11 @@ class BlockObserver:
 			pass
 		finally:
 			self._task = None
+			rich_print(
+				message='Stopping block observer...',
+				style=LogStyle.INFO,
+				prefix='security.observers',
+			)
 
 	async def run_once(self) -> None:
 		"""Delete expired block records from MongoDB."""
