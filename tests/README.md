@@ -9,15 +9,24 @@
 - `clients/openai/functionality/`: embeddings, text, structured
   responses, streamed text and streamed function calls.
 - `agent/unit/<scope>/`: streaming state, memory, chat and tools.
-- `agent/integration/<scope>/`: memory, chat, tools and main loop.
-- `agent/agent_input.py`: interactive terminal runner, not a test.
+- `agent/integration/<scope>/`: memory, chat, tools and main
+  loop.
+- `agent/agent_input.py`: interactive terminal runner, not a
+  test.
 - `rag/integration/`: index readiness, uploaded corpus and
   query planning, vector retrieval and LLM-judged context.
 - `security/ratelimit/unit/`: limiter identity and cleanup.
 - `security/monitoring/unit/`: allowances and observer behaviour.
 - `security/monitoring/integration/`: persisted usage and blocks.
 - `security/unit/`: security client ownership and shutdown.
-- `api/dependencies/unit/`: HTTPX access checks and limiter waits.
+- `api/dependencies/unit/`: HTTPX access checks and limiter
+  waits.
+- `api/users/unit/`: cookie claiming with scoped HTTP fixtures.
+- `api/agent/unit/`: client scaffold for upcoming agent routes.
+- `api/agent_memory/unit/`: authenticated chat pages and
+  deletion.
+- `api/agent_memory/integration/`: HTTP endpoints with live
+  MongoDB.
 - `shared/`: reusable fixtures imported by scoped conftests.
 - `schemas/`: response models used only by tests.
 
@@ -41,7 +50,8 @@ uv run pytest tests/api/dependencies/unit tests/security/unit
 
 Create `.env.testing` at the repository root. Set its testing
 project credentials and the required `MONGODB_URI`, `OPENAI_KEY`,
-`JWT_SECRET`, `PORTFOLIO_AGENT_PORT` and `CORS_ORIGINS` values.
+`JWT_SECRET`, `PORTFOLIO_AGENT_PORT`, `CORS_ORIGINS` and
+`COOKIE_DOMAIN` values.
 Do not select a development or production environment.
 
 ```sh
@@ -51,7 +61,15 @@ uv run pytest tests/clients/mongodb/connection
 uv run pytest tests/clients/openai/connection
 uv run pytest tests/clients/openai/functionality
 uv run pytest tests/rag/integration
+uv run pytest tests/api/agent_memory/integration
 ```
+
+Memory endpoint integration tests use temporary collections in
+the testing MongoDB project. JWT validation, block lookups and
+rate limits remain active. They verify chat response structure,
+pagination, owner isolation and deletion of all model artefacts.
+Temporary records and collections are removed at teardown.
+No OpenAI requests are made.
 
 The OpenAI connection test lists models. Functionality tests
 make real embedding and model requests and consume API usage.
@@ -59,8 +77,8 @@ All four current OpenAI wrapper functions are exercised.
 
 User fixtures remove only the identities created by their test.
 They do not clear collections. MongoDB connection tests only
-read data. Each package fixture closes its client on teardown, including
-after test failures.
+read data. Each package fixture closes its client on teardown,
+including after test failures.
 
 ## RAG integration tests
 
@@ -99,7 +117,8 @@ education facts. This isolates executor quality from planning.
 
 All judge requests use `tests/shared/llm_judge.py`. The helper
 accepts system and user prompts and returns an `LLMJudgement`
-with `satisfactory` and `reason` fields. Each test owns its rubric
+with `satisfactory` and `reason` fields. Each test owns its
+rubric
 and assertion; model settings and response parsing are shared.
 
 RAG tests share package-scoped MongoDB and OpenAI clients. They
@@ -145,7 +164,8 @@ an education request requiring the context tool. Stream observers
 forward real SDK events and record input/output snapshots. Tests
 compare these with stored artefacts, checking replayed history,
 unique memory IDs, one turn ID, contiguous sequences, tool-output
-pairing, stream closure before recursion and final assistant text.
+pairing, stream closure before recursion and final assistant
+text.
 The education response is evaluated using the shared LLM judge.
 These live model checks remain non-deterministic and cost usage.
 
@@ -187,7 +207,8 @@ Temporary records are cleared after each test and the collections
 are dropped at package teardown, including after test failures.
 OpenAI requests are not required.
 
-Coverage includes entity CRUD, concurrent creation and increments,
+Coverage includes entity CRUD, concurrent creation and
+increments,
 daily rollover, IP and user allowances, duplicate connection IDs,
 fifth-connection blocking, block reuse, duplicate block deletion,
 ten-day retention and expiry cleanup.

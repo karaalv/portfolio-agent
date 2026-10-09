@@ -25,12 +25,12 @@ from users.retrieval import does_user_exist
 
 # --- Constants ---
 
-router = APIRouter()
+users_router = APIRouter()
 
 # --- User Routes ---
 
 
-@router.post('/claim-cookie')
+@users_router.post('/claim-cookie')
 async def claim_cookie(
 	request: Request,
 	body: ClaimCookieRequest,

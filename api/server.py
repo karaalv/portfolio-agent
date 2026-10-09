@@ -16,8 +16,10 @@ from api.maintenance.maintenance_manager import (
 )
 from api.middleware.origin import OriginMiddleware
 from api.middleware.request_id import RequestIdMiddleware
-from api.routes import agent, users
+from api.routes.agent import agent_router
+from api.routes.agent_memory import agent_memory_router
 from api.routes.system import system_router
+from api.routes.users import users_router
 from api.security.security_manager import SecurityManager
 from api.utils.cors import get_allowed_origins
 from api.utils.requests import get_request_id
@@ -118,7 +120,7 @@ async def general_exception_handler(
 app.add_middleware(
 	OriginMiddleware,
 	allowed_origins=get_allowed_origins(),
-	protected_prefixes=('/users', '/agent'),
+	protected_prefixes=('/users', '/agent', '/agent-memory'),
 )
 
 app.add_middleware(
@@ -146,7 +148,7 @@ app.include_router(
 )
 
 app.include_router(
-	router=users.router,
+	router=users_router,
 	prefix='/users',
 	tags=['Users'],
 	dependencies=[Depends(require_ip_access)],
@@ -155,7 +157,14 @@ app.include_router(
 # HTTP and Websocket dependencies handled
 # on a per-route basis
 app.include_router(
-	router=agent.router,
+	router=agent_router,
 	prefix='/agent',
 	tags=['Agent'],
+)
+
+app.include_router(
+	router=agent_memory_router,
+	prefix='/agent-memory',
+	tags=['Agent Memory'],
+	dependencies=[Depends(require_ip_access)],
 )

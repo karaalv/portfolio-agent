@@ -127,8 +127,8 @@ the cookie. It does not create users or issue a new token.
 
 * The IP's `APPLICATION` rate limit and block checks apply
   at the users router level before the endpoint executes.
-* Origin validation is applied by middleware to the `/users`
-  and `/agent` routers before route dependencies run.
+* Origin middleware protects `/users`, `/agent` and
+  `/agent-memory` before route dependencies run.
 * Set `COOKIE_DOMAIN` in each environment's configuration.
   Use a hostname such as `example.com`, without a scheme,
   path or port. Startup rejects missing or blank values.

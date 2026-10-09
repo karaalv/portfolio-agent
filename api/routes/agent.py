@@ -6,41 +6,34 @@ the Agent API.
 from fastapi import (
 	APIRouter,
 	Depends,
-	Request,
 	WebSocket,
 	WebSocketDisconnect,
 )
 
 from agent.main import chat
-from agent.memory.deletion import delete_agent_memory
-from agent.memory.retrieval import retrieve_agent_memory
 from api.common.authentication import (
 	validate_frontend_token,
-	verify_frontend_token,
-	verify_jwt,
 	verify_jwt_ws,
 )
-from api.common.responses import (
-	error_response,
-	success_response,
-)
+from api.common.responses import error_response
 from api.common.schemas import SocketMessage
 from api.common.socket_registry import (
 	add_connection_registry,
 	delete_connection_registry,
 	send_message_ws,
 )
-from api.common.utils import api_exception_handler
 from users.retrieval import does_user_exist
 
 # --- Constants ---
 
-router = APIRouter()
+agent_router = APIRouter()
 
 # --- Agent Routes ---
 
 
-@router.websocket('/ws/chat', dependencies=[Depends(verify_jwt_ws)])
+@agent_router.websocket(
+	'/ws/chat', dependencies=[Depends(verify_jwt_ws)]
+)
 async def agent_chat_ws(ws: WebSocket):
 	"""
 	WebSocket endpoint for agent chat.
@@ -60,7 +53,9 @@ async def agent_chat_ws(ws: WebSocket):
 		return error_response('Missing user_id', status_code=400)
 
 	if not await does_user_exist(user_id):
-		return error_response('User does not exist', status_code=404)
+		return error_response(
+			'User does not exist', status_code=404
+		)
 
 	# Start socket connection
 	await ws.accept()
@@ -99,63 +94,3 @@ async def agent_chat_ws(ws: WebSocket):
 			)
 	except WebSocketDisconnect:
 		await delete_connection_registry(user_id=user_id)
-
-
-# --- HTTP Based Routes ---
-
-
-@router.get(
-	'/memory',
-	dependencies=[
-		Depends(verify_frontend_token),
-		Depends(verify_jwt),
-	],
-)
-@api_exception_handler('Get user memory')
-async def get_memory_api(request: Request):
-	"""
-	Retrieves the memory for a user.
-	"""
-	cookies = request.cookies
-	user_id = cookies.get('UUID')
-
-	if not user_id:
-		return error_response('Missing user_id', status_code=400)
-
-	if not await does_user_exist(user_id):
-		return error_response('User does not exist', status_code=404)
-
-	memory = await retrieve_agent_memory(user_id)
-
-	return success_response(
-		message='Successfully retrieved user memory',
-		data=memory,
-	)
-
-
-@router.delete(
-	'/clear-memory',
-	dependencies=[
-		Depends(verify_frontend_token),
-		Depends(verify_jwt),
-	],
-)
-@api_exception_handler('Delete user memory')
-async def delete_memory_api(request: Request):
-	"""
-	Deletes the memory for a user.
-	"""
-	cookies = request.cookies
-	user_id = cookies.get('UUID')
-
-	if not user_id:
-		return error_response('Missing user_id', status_code=400)
-
-	if not await does_user_exist(user_id):
-		return error_response('User does not exist', status_code=404)
-
-	await delete_agent_memory(user_id=user_id)
-
-	return success_response(
-		message='Successfully deleted user memory'
-	)

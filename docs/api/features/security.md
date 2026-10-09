@@ -53,7 +53,7 @@ may receive a new identity through the issuance flow.
 
 The API must serve traffic over HTTPS and secure WebSockets.
 `OriginMiddleware` requires an Origin matching `CORS_ORIGINS`
-on the `/users` and `/agent` router prefixes. The protected
+on `/users`, `/agent` and `/agent-memory`. The protected
 prefixes are configured in `api/server.py`. Both HTTP requests
 and WebSocket handshakes are checked before route execution.
 Missing, `null` and disallowed origins are rejected.
