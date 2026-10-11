@@ -43,7 +43,7 @@ class WebSocketManager:
 		self.user_id = user_id
 		self.connection_id = connection_id
 		self.websocket = websocket
-		self.request_id = request_id
+		self.request_id = request_id or generate_uuid_str()
 		self.created_at = get_utc_datetime_now()
 		self.last_message_at = self.created_at
 		self._message_queue: asyncio.Queue[WebSocketResponse] = (
@@ -137,9 +137,18 @@ class WebSocketManager:
 
 		Close slow connections if queue space stays unavailable.
 		Log unexpected enqueue failures and drop the item.
+		Stamp a copied envelope with the current request ID so
+		later state changes cannot relabel already queued output.
 		"""
 		if self.is_closed:
 			return False
+		response = response.model_copy(
+			update={
+				'meta': response.meta.model_copy(
+					update={'request_id': self.request_id}
+				),
+			}
+		)
 		try:
 			async with asyncio.timeout(
 				_QUEUE_PUT_TIMEOUT_SECONDS
@@ -170,7 +179,6 @@ class WebSocketManager:
 		try:
 			while not self.is_closed:
 				response = create_ws_heartbeat_response(
-					request_id=generate_uuid_str(),
 					payload='ping',
 				)
 				if not await self.send_message(response):

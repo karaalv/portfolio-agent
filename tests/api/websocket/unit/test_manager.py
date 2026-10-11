@@ -17,16 +17,36 @@ from schemas.api.ws.response import WebSocketWarningResponse
 pytestmark = pytest.mark.unit
 
 
+async def test_queue_captures_current_request_id(
+	manager: WebSocketManager,
+	response: WebSocketWarningResponse,
+) -> None:
+	"""Keep queued IDs stable without mutating shared output."""
+	fallback_id = response.meta.request_id
+	manager.record_message('first-request')
+	assert await manager.send_message(response)
+	manager.record_message('second-request')
+	assert await manager.send_message(response)
+	first = manager._message_queue.get_nowait()
+	second = manager._message_queue.get_nowait()
+	assert first.meta.request_id == 'first-request'
+	assert second.meta.request_id == 'second-request'
+	assert response.meta.request_id == fallback_id
+	manager._message_queue.task_done()
+	manager._message_queue.task_done()
+
+
 async def test_delivery_preserves_order(
 	manager: WebSocketManager, socket: AsyncMock
 ) -> None:
 	"""
 	One sender delivers queued application messages in order.
 	"""
+	manager.record_message('request')
 	manager.start()
 	for number in range(3):
 		assert await manager.send_message(
-			create_ws_warning_response('request', str(number))
+			create_ws_warning_response(str(number))
 		)
 	await asyncio.wait_for(manager._message_queue.join(), 1)
 	messages = [

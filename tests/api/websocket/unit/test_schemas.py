@@ -11,7 +11,10 @@ from schemas.agent.streaming.stream_manager import (
 	StreamManagerItem,
 	StreamManagerItemType,
 )
-from schemas.api.ws.request import WebSocketRequest
+from schemas.api.ws.request import (
+	WebSocketRequest,
+	WebSocketRequestType,
+)
 from schemas.api.ws.response import WebSocketResponse
 
 pytestmark = pytest.mark.unit
@@ -28,6 +31,17 @@ def test_request_accepts_text(kind: str) -> None:
 	)
 	assert request.type == kind
 	assert request.payload == 'hello'
+	assert request.request_id is None
+
+
+def test_request_preserves_client_id() -> None:
+	"""Accept an optional client correlation string."""
+	request = WebSocketRequest(
+		type=WebSocketRequestType.AGENT_MESSAGE,
+		payload='hello',
+		request_id='client-request',
+	)
+	assert request.request_id == 'client-request'
 
 
 @pytest.mark.parametrize(
@@ -36,6 +50,11 @@ def test_request_accepts_text(kind: str) -> None:
 		{'type': 'unknown', 'payload': 'hello'},
 		{'type': 'agent_message', 'payload': {'text': 'hello'}},
 		{'type': 'heartbeat'},
+		{
+			'type': 'heartbeat',
+			'payload': 'pong',
+			'request_id': 1,
+		},
 	],
 )
 def test_request_rejects_invalid_envelopes(data: object) -> None:
@@ -74,15 +93,19 @@ def test_request_rejects_invalid_envelopes(data: object) -> None:
 	],
 )
 def test_text_helpers_create_valid_envelopes(
-	factory: Callable[[str, str, str], WebSocketResponse],
+	factory: Callable[[str, str], WebSocketResponse],
 	kind: str,
 	success: bool,
 ) -> None:
-	"""Helpers preserve identity, metadata and discriminators."""
-	response = factory('request', 'payload', 'Description')
+	"""Helpers generate identity and preserve payload metadata."""
+	response = factory('payload', 'Description')
 	assert response.type == kind
 	assert response.payload == 'payload'
-	assert response.meta.request_id == 'request'
+	assert response.meta.request_id
+	assert (
+		factory('next', 'Next').meta.request_id
+		!= response.meta.request_id
+	)
 	assert response.meta.message == 'Description'
 	assert response.meta.success is success
 	offset = response.meta.timestamp.utcoffset()
@@ -105,16 +128,14 @@ def test_agent_and_tool_helpers_round_trip() -> None:
 		sequence_number=1,
 		payload='Hello',
 	)
-	response = responses.create_ws_agent_response(
-		'request', item
-	)
+	response = responses.create_ws_agent_response(item)
 	parsed = TypeAdapter(WebSocketResponse).validate_json(
 		response.model_dump_json()
 	)
 	assert parsed.type == 'agent_response'
 	assert parsed.payload == item
 	tool = responses.create_ws_tool_message_response(
-		'request', {'fetch_context'}
+		{'fetch_context'}
 	)
 	assert tool.model_dump(mode='json')['payload'] == [
 		'fetch_context'

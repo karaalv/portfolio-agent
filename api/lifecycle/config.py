@@ -3,6 +3,10 @@
 from os import getenv
 
 from api.lifecycle.environment import load_environment_variables
+from api.websocket import (
+	start_websocket_registry,
+	stop_websocket_registry,
+)
 from database.mongodb.config import (
 	start_mongo_client,
 	stop_mongo_client,
@@ -16,8 +20,7 @@ from shared.logging import LogStyle, rich_print
 
 async def start_api_lifecycle():
 	"""
-	Start the API lifecycle by initializing necessary
-	clients and loading environment variables.
+	Load the environment and start clients and socket tracking.
 	"""
 	rich_print(
 		message='Starting Portfolio Backend...',
@@ -27,6 +30,7 @@ async def start_api_lifecycle():
 	load_environment_variables()
 	await start_mongo_client()
 	start_openai_client()
+	await start_websocket_registry()
 
 	# Log successful startup
 	env = getenv('PORTFOLIO_AGENT_ENV')
@@ -42,14 +46,19 @@ async def start_api_lifecycle():
 
 
 async def stop_api_lifecycle():
-	"""Stop the API lifecycle by shutting down clients."""
+	"""Close sockets before shutting down service clients."""
 	rich_print(
 		message='Stopping Portfolio Backend...',
 		style=LogStyle.INFO,
 		prefix='[API LIFECYCLE]',
 	)
-	await stop_openai_client()
-	await stop_mongo_client()
+	try:
+		await stop_websocket_registry()
+	finally:
+		try:
+			await stop_openai_client()
+		finally:
+			await stop_mongo_client()
 
 	# Log successful shutdown
 	rich_print(

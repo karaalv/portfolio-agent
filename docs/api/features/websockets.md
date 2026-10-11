@@ -4,9 +4,9 @@
 
 The portfolio uses direct delivery through a process-local
 connection manager and registry. There is no shared event bus.
-The controller, agent integration and application lifespan
-wiring will be implemented separately. These base classes do
-not accept sockets, authenticate users or read client messages.
+The chat route invokes the agent directly. Agent stream delivery
+and message safety checks remain to be implemented. The manager
+and registry do not authenticate users or read client messages.
 
 ## Modules
 
@@ -15,7 +15,64 @@ not accept sockets, authenticate users or read client messages.
 - `api/websocket/helpers/responses.py`: response construction.
 - `api/websocket/manager.py`: one connection's outbound delivery.
 - `api/websocket/registry.py`: tracking and inactivity cleanup.
+- `api/websocket/lifecycle.py`: process-local registry access.
 - `exceptions/websocket.py`: lifecycle failure context.
+
+## Agent chat endpoint
+
+Connect to `/agent/ws/agent-chat`, beneath the API root, with an
+optional `access_token` query parameter. IP access is checked
+before acceptance. Supplied tokens are validated and subject to
+user blocking and application rate limits. Invalid supplied
+tokens are rejected rather than replaced with new identities.
+
+The optional query `request_id` identifies the handshake.
+Each client message can supply its own `request_id`; missing,
+null or empty IDs receive generated UUID strings. Agent messages
+update the manager's current request ID; heartbeats do not.
+Response helpers create fallback metadata, then the manager
+stamps a copied response at enqueue time with its current ID.
+This preserves correlation while queued responses await sending.
+See `docs/api/responses/agent/agent-chat.md` for the protocol.
+
+Without a token, the route creates an anonymous user and user
+usage record. After accepting and registering the socket, it
+queues `set_user_token` immediately after registry registration.
+This carries the token for the cookie claim flow and is sent once.
+
+Requests are validated as `WebSocketRequest`. Heartbeats are
+ignored and do not consume agent-message capacity. Each agent
+message acquires both IP and user allowances before invoking
+`agent_chat`. Turns run sequentially on the connection.
+
+Malformed requests close with `1008`; rate-limit timeouts close
+with `1013`. Disconnect handling removes and closes the tracked
+connection. Message safety enforcement remains an explicit TODO
+immediately before the agent invocation.
+
+## Registry lifecycle and package access
+
+The API lifecycle starts the registry after service clients.
+Shutdown closes its connections and stops cleanup before
+closing the OpenAI and MongoDB clients.
+
+Import lifecycle helpers directly from `api.websocket`:
+
+```python
+from api import websocket
+
+registry = websocket.get_websocket_registry()
+queued = await websocket.send_connection(
+    user_id, connection_id, response
+)
+```
+
+Startup and shutdown are idempotent. Access before startup
+raises `WebSocketRegistryException`. The send helper returns
+false for missing or closed connections; true means queued.
+`set_websocket_registry` replaces the reference for tests; it
+does not start or stop either instance. The caller owns those
+lifecycles. Each process holds its own registry and connections.
 
 ## Response helpers
 

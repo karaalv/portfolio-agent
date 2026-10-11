@@ -6,6 +6,12 @@ Every response contains `meta`, `type` and `payload`.
 `meta` uses `ApiResponseMetaData`, including the request ID,
 success flag, message and UTC timestamp.
 
+Response helpers generate fallback request IDs. Before queueing
+output, the connection manager replaces the ID with its current
+request ID in a copied envelope. Callers do not pass request IDs
+to response helpers. Queued IDs remain stable after subsequent
+requests update manager state.
+
 ## Discriminated variants
 
 `WebSocketResponse` is a type alias for a Pydantic discriminated

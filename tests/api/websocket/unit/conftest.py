@@ -30,9 +30,9 @@ def socket_factory() -> Callable[[], AsyncMock]:
 @pytest.fixture
 def response() -> WebSocketWarningResponse:
 	"""
-	Create application output with a stable request identity.
+	Create application output with fallback metadata.
 	"""
-	return create_ws_warning_response('request', 'Notice')
+	return create_ws_warning_response('Notice')
 
 
 @pytest_asyncio.fixture

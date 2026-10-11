@@ -2,7 +2,7 @@
 
 from enum import StrEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class WebSocketRequestType(StrEnum):
@@ -17,3 +17,7 @@ class WebSocketRequest(BaseModel):
 
 	type: WebSocketRequestType
 	payload: str
+	request_id: str | None = Field(
+		default=None,
+		description='Client correlation ID; generated if absent.',
+	)

@@ -75,15 +75,9 @@ def harness() -> Iterator[WebSocketHarness]:
 					payload=request.payload,
 				)
 				for response in (
-					create_ws_agent_start_response(
-						'echo-request', 'Started'
-					),
-					create_ws_agent_response(
-						'echo-request', item
-					),
-					create_ws_agent_end_response(
-						'echo-request', 'Finished'
-					),
+					create_ws_agent_start_response('Started'),
+					create_ws_agent_response(item),
+					create_ws_agent_end_response('Finished'),
 				):
 					await registry.send_connection(
 						user_id, connection_id, response

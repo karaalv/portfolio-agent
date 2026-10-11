@@ -10,6 +10,7 @@ separate request variants are needed.
 | --- | --- | --- |
 | `type` | `WebSocketRequestType` | Message discriminator. |
 | `payload` | `str` | Agent input or heartbeat text. |
+| `request_id` | `str \| None` | Optional correlation ID. |
 
 ## Supported types
 
@@ -19,10 +20,14 @@ separate request variants are needed.
 ```json
 {
   "type": "agent_message",
-  "payload": "Tell me about Alvin's projects."
+  "payload": "Tell me about Alvin's projects.",
+  "request_id": "client-message-001"
 }
 ```
 
-The controller will validate incoming JSON with
-`WebSocketRequest.model_validate_json(...)`. Parsing does not
+The request helper validates decoded JSON with
+`WebSocketRequest.model_validate(...)`. It generates an ID when
+`request_id` is missing, null or empty. Agent messages update
+the manager's current ID; heartbeat requests do not update it.
+Parsing does not
 perform authentication, rate limiting or agent execution.

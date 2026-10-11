@@ -64,7 +64,7 @@ def test_targeted_delivery_isolates_connections_and_users(
 			harness.registry.send_connection,
 			'a',
 			'one',
-			create_ws_warning_response('target', 'Only first'),
+			create_ws_warning_response('Only first'),
 		)
 		assert first.receive_json()['payload'] == 'Only first'
 		for socket in (second, other):

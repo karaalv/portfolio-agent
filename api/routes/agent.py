@@ -1,96 +1,86 @@
-"""
-This module contains agent routes for
-the Agent API.
-"""
+"""Accept portfolio chat sockets and process client messages."""
 
 from fastapi import (
 	APIRouter,
-	Depends,
 	WebSocket,
 	WebSocketDisconnect,
+	WebSocketException,
 )
 
-from agent.main import chat
-from api.common.authentication import (
-	validate_frontend_token,
-	verify_jwt_ws,
+from agent.main import agent_chat
+from api.dependencies.auth.ip import WSIPAccess
+from api.websocket import get_websocket_registry
+from api.websocket.helpers.access import (
+	resolve_ws_user,
+	send_claim_token,
 )
-from api.common.responses import error_response
-from api.common.schemas import SocketMessage
-from api.common.socket_registry import (
-	add_connection_registry,
-	delete_connection_registry,
-	send_message_ws,
+from api.websocket.helpers.ratelimit import (
+	agent_message_rate_limit,
 )
-from users.retrieval import does_user_exist
-
-# --- Constants ---
+from api.websocket.helpers.requests import receive_ws_request
+from schemas.api.ws.request import WebSocketRequestType
+from shared.ids import generate_uuid_str
 
 agent_router = APIRouter()
 
-# --- Agent Routes ---
 
+@agent_router.websocket('/ws/agent-chat')
+async def agent_chat_ws(
+	ws: WebSocket,
+	ip_address: WSIPAccess,
+	access_token: str | None = None,
+	request_id: str | None = None,
+) -> None:
+	"""Resolve an identity and run sequential agent turns.
 
-@agent_router.websocket(
-	'/ws/chat', dependencies=[Depends(verify_jwt_ws)]
-)
-async def agent_chat_ws(ws: WebSocket):
+	The optional access_token comes from the query string.
+	Use the query request_id for handshake response metadata.
+	Issue a claim token after registering anonymous sockets.
 	"""
-	WebSocket endpoint for agent chat.
-	"""
-	token = ws.query_params.get('ft')
-	if not token:
-		return error_response(
-			'Missing frontend token', status_code=400
-		)
-
-	# Validate token - HTTP exception raised
-	# on validation
-	validate_frontend_token(token)
-
-	user_id = ws.cookies.get('UUID')
-	if not user_id:
-		return error_response('Missing user_id', status_code=400)
-
-	if not await does_user_exist(user_id):
-		return error_response(
-			'User does not exist', status_code=404
-		)
-
-	# Start socket connection
+	user_id, claim_token = await resolve_ws_user(access_token)
+	connection_id = generate_uuid_str()
+	request_id = request_id or generate_uuid_str()
+	registry = get_websocket_registry()
 	await ws.accept()
-	await add_connection_registry(user_id=user_id, ws=ws)
-
 	try:
+		manager = await registry.add_connection(
+			user_id, connection_id, ws, request_id
+		)
+		await send_claim_token(manager, claim_token)
 		while True:
-			data: dict = await ws.receive_json()
-			socket_message = SocketMessage(**data)
+			request = await receive_ws_request(ws)
 
-			# Ping for connection
-			if socket_message.type == 'ping':
-				await send_message_ws(
+			# Process incoming WebSocket requests
+			if request.type == WebSocketRequestType.HEARTBEAT:
+				continue
+
+			# WebSocketRequestType == AGENT_MESSAGE
+			manager.record_message(request.request_id)
+			async with agent_message_rate_limit(
+				user_id, ip_address
+			):
+				# TODO: Apply agent-message safety checks.
+				await agent_chat(
 					user_id=user_id,
-					type='ping',
-					data='pong',
+					user_input=request.payload,
 				)
-				continue
-
-			# Chat responses
-			user_input = socket_message.data
-
-			response = await chat(
-				user_id=user_id,
-				user_input=str(user_input),
-			)
-
-			# Handle streamed responses
-			if not response:
-				continue
-
-			await send_message_ws(
-				user_id=user_id,
-				type='agent_memory',
-				data=response,
-			)
 	except WebSocketDisconnect:
-		await delete_connection_registry(user_id=user_id)
+		pass
+	except WebSocketException as exc:
+		await registry.remove_connection(
+			user_id,
+			connection_id,
+			reason=exc.reason or '',
+			close_code=exc.code,
+		)
+		return
+	except Exception:
+		await registry.remove_connection(
+			user_id,
+			connection_id,
+			reason='Unable to process chat.',
+			close_code=1011,
+		)
+		raise
+	finally:
+		await registry.remove_connection(user_id, connection_id)
