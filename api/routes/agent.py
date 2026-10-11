@@ -76,6 +76,7 @@ async def agent_chat_ws(
 				await agent_chat(
 					user_id=user_id,
 					user_input=user_input,
+					connection_id=connection_id,
 				)
 	except WebSocketDisconnect:
 		pass

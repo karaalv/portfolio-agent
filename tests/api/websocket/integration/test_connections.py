@@ -33,7 +33,7 @@ def test_heartbeat_and_ordered_agent_envelopes(
 		messages = [ws.receive_json() for _ in range(3)]
 		assert [message['type'] for message in messages] == [
 			'agent_start',
-			'agent_response',
+			'agent_delta',
 			'agent_end',
 		]
 		assert messages[1]['payload']['payload'] == 'Hello'
@@ -76,7 +76,7 @@ def test_targeted_delivery_isolates_connections_and_users(
 			)
 			assert [
 				socket.receive_json()['type'] for _ in range(3)
-			] == ['agent_start', 'agent_response', 'agent_end']
+			] == ['agent_start', 'agent_delta', 'agent_end']
 	assert not harness.call(harness.registry.has_user, 'a')
 	assert not harness.call(harness.registry.has_user, 'b')
 

@@ -2,6 +2,7 @@
 
 from os import getenv
 
+from api.config.websocket import MAX_TRANSPORT_MESSAGE_BYTES
 from api.lifecycle.environment import load_environment_variables
 from shared.logging import LogStyle, rich_print
 
@@ -28,6 +29,7 @@ def main() -> None:
 		port=port,
 		log_level='info' if env == 'production' else 'debug',
 		workers=1,
+		ws_max_size=MAX_TRANSPORT_MESSAGE_BYTES,
 		reload=env == 'development',
 	)
 

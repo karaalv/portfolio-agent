@@ -128,11 +128,11 @@ def test_agent_and_tool_helpers_round_trip() -> None:
 		sequence_number=1,
 		payload='Hello',
 	)
-	response = responses.create_ws_agent_response(item)
+	response = responses.create_ws_agent_delta_response(item)
 	parsed = TypeAdapter(WebSocketResponse).validate_json(
 		response.model_dump_json()
 	)
-	assert parsed.type == 'agent_response'
+	assert parsed.type == 'agent_delta'
 	assert parsed.payload == item
 	tool = responses.create_ws_tool_message_response(
 		{'fetch_context'}
@@ -148,7 +148,7 @@ def test_agent_and_tool_helpers_round_trip() -> None:
 @pytest.mark.parametrize(
 	'kind, payload',
 	[
-		('agent_response', 'plain text'),
+		('agent_delta', 'plain text'),
 		('tool_message', 'plain text'),
 		('heartbeat', ['ping']),
 		('warning', {'text': 'notice'}),

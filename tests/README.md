@@ -244,7 +244,7 @@ FastAPI application and use Starlette's `TestClient` WebSocket
 sessions. This exercises ASGI connection handling, JSON messages,
 targeted delivery, disconnect cleanup and server close codes.
 The harness echoes text through stream-item responses; it does
-not invoke the agent or mount the unfinished production route.
+not invoke the agent or mount the production chat route.
 
 The client context runs lifespan startup and shutdown. Registry
 state is created on the application's event loop. Operations from
@@ -255,3 +255,35 @@ async resources on that loop.
 No server subprocess, listening port, environment file, MongoDB
 or OpenAI client is required. These tests do not exercise TCP,
 TLS, reverse proxies or Uvicorn worker behaviour.
+
+
+## Live agent WebSocket integration tests
+
+```sh
+export PORTFOLIO_AGENT_ENV=testing
+uv run pytest tests/api/agent/integration
+```
+
+These tests require `.env.testing`, working MongoDB and OpenAI
+credentials, and a populated testing corpus with its vector
+index. Bootstrap the corpus in the testing environment before
+running them if it has not already been uploaded.
+
+The actual application lifespan starts clients, security,
+maintenance and the WebSocket registry. Starlette's `TestClient`
+exercises the production chat route without a server subprocess.
+Database operations and model calls run on the application's
+loop through the client's portal. If COOKIE_DOMAIN is a bare
+localhost, the fixture temporarily uses `portfolio.test` so
+HTTPX accepts the domain-scoped secure cookie.
+
+Coverage includes anonymous visitor creation, token delivery,
+cookie claiming, authenticated chat retrieval, reconnection and
+history replay. A separate RAG conversation checks tool messages,
+ordered text deltas, request correlation, persisted turn ordering
+and matching tool call outputs. An LLM judge checks the retrieved
+answer against a factual reference. These tests make live OpenAI
+requests and remove their own visitor, memory and usage records.
+
+This verifies the application through ASGI. It does not test TCP,
+TLS, reverse proxies or Uvicorn's transport message size limit.

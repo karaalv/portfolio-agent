@@ -1,7 +1,7 @@
 """Exercise cleaning and hard input guards over ASGI sockets."""
 
 from typing import cast
-from unittest.mock import AsyncMock
+from unittest.mock import ANY, AsyncMock
 
 import pytest
 from starlette.testclient import TestClient, WebSocketTestSession
@@ -121,7 +121,11 @@ def test_noisy_input_warns_then_valid_input_is_cleaned(
 ) -> None:
 	"""Keep the socket usable after empty sanitised input."""
 
-	async def reply(user_id: str, user_input: str) -> None:
+	async def reply(
+		user_id: str,
+		user_input: str,
+		connection_id: str,
+	) -> None:
 		"""Expose the text passed to the mocked agent."""
 		registry = agent.get_websocket_registry()
 		manager = next(
@@ -162,6 +166,7 @@ def test_noisy_input_warns_then_valid_input_is_cleaned(
 	mock.assert_awaited_once_with(
 		user_id='visitor',
 		user_input='Hello Alvin',
+		connection_id=ANY,
 	)
 	cast(
 		AsyncMock, enforcement.create_block

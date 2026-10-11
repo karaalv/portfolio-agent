@@ -2,6 +2,7 @@
 Coordinate portfolio conversations, retrieval tools, and memory.
 """
 
+import logging
 from contextlib import aclosing
 
 from openai.types.responses import ResponseInputParam
@@ -19,13 +20,26 @@ from agent.memory.retrieval import (
 )
 from agent.prompts.agent import AGENT_SYSTEM_PROMPT
 from agent.prompts.behaviour import AGENT_BEHAVIOUR_PROMPT
+from agent.streaming.delivery import send_agent_ws_response
 from agent.streaming.stream_manager import StreamManager
 from agent.tools.dispatch import run_function_calls
 from agent.tools.tool_definitions import AGENT_TOOL_DEFINITIONS
 from agent.validation import raise_agent_recursion_limit
+from api.websocket.helpers.responses import (
+	create_ws_agent_delta_response,
+	create_ws_agent_end_response,
+	create_ws_agent_start_response,
+	create_ws_error_response,
+	create_ws_tool_message_response,
+	create_ws_warning_response,
+)
 from openai_client.main import stream_agent_response
-from schemas.agent.streaming.stream_manager import EventStreamState
+from schemas.agent.streaming.stream_manager import (
+	EventStreamState,
+)
 from shared.logging import LogStyle, rich_print
+
+_logger = logging.getLogger(__name__)
 
 
 async def agent_chat(
@@ -33,11 +47,13 @@ async def agent_chat(
 	user_input: str,
 	history: ResponseInputParam | None = None,
 	verbosity_level: int = 0,
+	connection_id: str | None = None,
 ) -> None:
 	"""Answer one turn and persist its input and final response.
 
-	Allow up to three rounds of context retrieval. Load history before
-	storing the current input so that input appears only once.
+	Allow up to three rounds of context retrieval. Load history
+	before storing input so it appears only once. An optional
+	connection ID enables socket delivery for the whole turn.
 	"""
 
 	# Start stream manager for handling
@@ -47,32 +63,46 @@ async def agent_chat(
 		verbosity_level=verbosity_level,
 	)
 
-	# Begin response lifecycle by pulling previous
-	# conversation history and appending
-	# current input
-	history = await retrieve_agent_memory_param(
-		user_id=user_id,
+	await send_agent_ws_response(
+		user_id,
+		connection_id,
+		create_ws_agent_start_response('Agent turn started.'),
 	)
+	try:
+		# Begin response lifecycle by pulling previous
+		# conversation history and appending
+		# current input
+		history = await retrieve_agent_memory_param(
+			user_id=user_id,
+		)
 
-	current_memory = await create_user_memory(
-		user_id=user_id,
-		turn_id=stream_manager.get_turn_id(),
-		sequence=stream_manager.increment_turn_sequence_counter(),
-		content=user_input,
-	)
+		current_memory = await create_user_memory(
+			user_id=user_id,
+			turn_id=stream_manager.get_turn_id(),
+			sequence=stream_manager.increment_turn_sequence_counter(),
+			content=user_input,
+		)
 
-	history.append(current_memory.payload)
+		history.append(current_memory.payload)
 
-	if verbosity_level > 0:
-		log_agent_history(history)
+		if verbosity_level > 0:
+			log_agent_history(history)
 
-	# Manage agent response lifecycle in
-	# recursive handler
-	return await _agent_response_handler(
-		stream_manager=stream_manager,
-		history=history,
-		verbosity_level=verbosity_level,
-	)
+		# Manage agent response lifecycle in
+		# recursive handler
+		await _agent_response_handler(
+			stream_manager=stream_manager,
+			history=history,
+			verbosity_level=verbosity_level,
+			connection_id=connection_id,
+		)
+
+	finally:
+		await send_agent_ws_response(
+			user_id,
+			connection_id,
+			create_ws_agent_end_response('Agent turn ended.'),
+		)
 
 
 # --- Helper Functions ---
@@ -83,6 +113,7 @@ async def _agent_response_handler(
 	history: ResponseInputParam,
 	verbosity_level: int,
 	recursion_depth: int = 0,
+	connection_id: str | None = None,
 ) -> None:
 	"""
 	Handles the agent response lifecycle,
@@ -98,6 +129,8 @@ async def _agent_response_handler(
 		tools=AGENT_TOOL_DEFINITIONS,
 	)
 
+	completed = False
+	user_id = stream_manager.get_user_id()
 	async with aclosing(client_stream) as events:
 		async for event in events:
 			if verbosity_level > 1:
@@ -118,18 +151,19 @@ async def _agent_response_handler(
 					stream_manager.get_event_stream_state()
 					== EventStreamState.MESSAGE
 				):
-					response = stream_manager.add_delta(event.delta)
-					if response:
-						# TODO: Publish response
-						pass
+					response = stream_manager.add_delta(
+						event.delta
+					)
+					await send_agent_ws_response(
+						user_id,
+						connection_id,
+						create_ws_agent_delta_response(response),
+					)
 			elif event.type == 'response.output_item.done':
-				if (
-					stream_manager.get_event_stream_state()
-					== EventStreamState.MESSAGE
-				):
-					# TODO: Handle the end of a message output item
-					pass
+				if event.item.type == 'message':
+					stream_manager.set_idle_state()
 			elif event.type == 'response.completed':
+				completed = True
 				for item in event.response.output:
 					# Append the response item to the
 					# conversation history
@@ -146,21 +180,71 @@ async def _agent_response_handler(
 							tool_name=item.name,
 							tool_args=item.arguments,
 						)
+				break
 			elif event.type == 'response.failed':
-				# TODO: Handle failure using event.response.error.
-				pass
+				_logger.error(
+					'Agent response failed: %s',
+					event.response.error,
+				)
+				await send_agent_ws_response(
+					user_id,
+					connection_id,
+					create_ws_error_response(
+						'I could not generate a response. '
+						'Please try again.'
+					),
+				)
+				return
 			elif event.type == 'response.incomplete':
-				# TODO: Handle event.response.incomplete_details.
-				pass
+				_logger.warning(
+					'Agent response incomplete: %s',
+					event.response.incomplete_details,
+				)
+				await send_agent_ws_response(
+					user_id,
+					connection_id,
+					create_ws_warning_response(
+						'This response is incomplete. '
+						'Please try again.'
+					),
+				)
+				return
 			elif event.type == 'error':
-				# TODO: Handle the stream error and end the round.
-				pass
+				_logger.error(
+					'Agent stream error: %s', event.message
+				)
+				await send_agent_ws_response(
+					user_id,
+					connection_id,
+					create_ws_error_response(
+						'The response was interrupted. '
+						'Please try again.'
+					),
+				)
+				return
 
 	# Stream closed
+	if not completed:
+		await send_agent_ws_response(
+			user_id,
+			connection_id,
+			create_ws_error_response(
+				'The response was interrupted. Please try again.'
+			),
+		)
+		return
 
 	# Run function calls from manager and
 	# return results.
 	if stream_manager.has_function_calls():
+		calls = stream_manager.get_function_calls().values()
+		await send_agent_ws_response(
+			user_id,
+			connection_id,
+			create_ws_tool_message_response(
+				{call.tool_name for call in calls}
+			),
+		)
 		results = await run_function_calls(
 			user_id=stream_manager.get_user_id(),
 			function_calls=stream_manager.get_function_calls(),
@@ -178,6 +262,7 @@ async def _agent_response_handler(
 			history=history + results,
 			verbosity_level=verbosity_level,
 			recursion_depth=recursion_depth + 1,
+			connection_id=connection_id,
 		)
 
 	# Base case: Successfully reached the

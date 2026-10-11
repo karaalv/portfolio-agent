@@ -17,7 +17,7 @@ class WebSocketResponseType(StrEnum):
 	HEARTBEAT = 'heartbeat'
 	AGENT_START = 'agent_start'
 	AGENT_END = 'agent_end'
-	AGENT_RESPONSE = 'agent_response'
+	AGENT_DELTA = 'agent_delta'
 	TOOL_MESSAGE = 'tool_message'
 	SET_USER_TOKEN = 'set_user_token'
 	WARNING = 'warning'
@@ -55,13 +55,13 @@ class WebSocketAgentEndResponse(_ResponseEnvelope[str]):
 	)
 
 
-class WebSocketAgentResponse(
+class WebSocketAgentDeltaResponse(
 	_ResponseEnvelope[StreamManagerItem]
 ):
-	"""Carry the payload for an agent_response message."""
+	"""Carry the payload for an agent_delta message."""
 
-	type: Literal[WebSocketResponseType.AGENT_RESPONSE] = (
-		WebSocketResponseType.AGENT_RESPONSE
+	type: Literal[WebSocketResponseType.AGENT_DELTA] = (
+		WebSocketResponseType.AGENT_DELTA
 	)
 
 
@@ -101,7 +101,7 @@ type WebSocketResponse = Annotated[
 	WebSocketHeartbeatResponse
 	| WebSocketAgentStartResponse
 	| WebSocketAgentEndResponse
-	| WebSocketAgentResponse
+	| WebSocketAgentDeltaResponse
 	| WebSocketToolResponse
 	| WebSocketSetUserTokenResponse
 	| WebSocketWarningResponse

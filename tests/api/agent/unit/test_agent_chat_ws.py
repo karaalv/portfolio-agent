@@ -1,7 +1,7 @@
 """Check socket identity, request handling and close codes."""
 
 from typing import cast
-from unittest.mock import AsyncMock
+from unittest.mock import ANY, AsyncMock
 
 import pytest
 from fastapi import HTTPException
@@ -57,7 +57,7 @@ def test_anonymous_socket_issues_token_and_runs_agent(
 		AsyncMock, access.create_usage_statistics
 	).assert_awaited_once_with(UsageEntity.USER, 'visitor')
 	cast(AsyncMock, agent.agent_chat).assert_awaited_once_with(
-		user_id='visitor', user_input='Hello'
+		user_id='visitor', user_input='Hello', connection_id=ANY
 	)
 	assert ws_client.portal is not None
 	assert not ws_client.portal.call(
@@ -76,7 +76,11 @@ def test_message_responses_use_current_request_id(
 ) -> None:
 	"""Stamp replies with supplied or generated message IDs."""
 
-	async def reply(user_id: str, user_input: str) -> None:
+	async def reply(
+		user_id: str,
+		user_input: str,
+		connection_id: str,
+	) -> None:
 		"""Queue mock output through the actual socket manager."""
 		registry = agent.get_websocket_registry()
 		manager = next(

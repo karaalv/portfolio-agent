@@ -84,6 +84,49 @@ registry for outbound messages and connection cleanup.
     do not consume agent-message capacity or change the
     manager's current request ID.
 
+## Agent stream messages
+
+Text deltas use the following envelope. Append `payload.payload`
+to the displayed response in `sequence_number` order.
+
+```json
+{
+    "meta": {
+        "request_id": "message-001",
+        "success": true,
+        "message": "Agent delta",
+        "timestamp": "<UTCISO8601Timestamp>"
+    },
+    "type": "agent_delta",
+    "payload": {
+        "stream_id": "<StreamID>",
+        "timestamp": "<UTCISO8601Timestamp>",
+        "type": "text",
+        "user_id": "<UserID>",
+        "memory_id": "<MemoryID>",
+        "sequence_number": 0,
+        "payload": "Hello"
+    }
+}
+```
+
+| Event | Payload |
+| --- | --- |
+| `agent_start` | `Agent turn started.` |
+| `tool_message` | Array of requested tool names. |
+| `agent_delta` | Incremental `StreamManagerItem`. |
+| `agent_end` | `Agent turn ended.` |
+
+Failed responses emit an `error` saying the response could not
+be generated. Stream errors or missing completion emit an
+`error` saying the response was interrupted. Incomplete model
+responses emit a `warning` saying the response is incomplete.
+Each notification asks the visitor to try again. Raw provider
+error details are logged internally and not sent to the client.
+
+The event mapping follows the
+[Responses streaming reference](https://developers.openai.com/api/reference/resources/responses/streaming-events).
+
 <!-- Unsuccessful Responses -->
 
 ---
@@ -117,9 +160,21 @@ registry for outbound messages and connection cleanup.
   Response helpers do not require request ID arguments.
 * Heartbeats and token delivery use the same outbound queue.
   A heartbeat may arrive before the token response.
-* Agent output publishing is still pending in `agent.main`.
-  The endpoint invokes the agent, but currently does not deliver
-  its text stream, tool messages or turn lifecycle responses.
+* An accepted agent turn emits `agent_start`, incremental
+  `agent_delta` events and one `agent_end`. Tool rounds also
+  emit `tool_message` before executing the requested tools.
+  Start and end events surround the entire recursive turn.
+* `agent_delta` carries a `StreamManagerItem` containing
+  `stream_id`, `timestamp`, `type`, `user_id`, `memory_id`,
+  `sequence_number` and incremental text in `payload`.
+  `tool_message` carries an array of unique tool names in JSON.
+* Failed model responses and stream errors emit `error` with a
+  retry message. Incomplete responses emit `warning`. These
+  stop the current turn and are followed by `agent_end`.
+  The connection can receive another request afterwards.
+* `agent_end` signifies lifecycle completion, not successful
+  generation. Partial deltas are not persisted as completed
+  output if the model round fails or is incomplete.
 * The complete UTF-8 JSON envelope must not exceed 16 KiB.
   This guard runs before parsing and applies to heartbeats too.
 * Agent payloads must not exceed 10,000 `o200k_base` tokens.
@@ -135,6 +190,7 @@ registry for outbound messages and connection cleanup.
   are removed. Personal data and URLs are not redacted.
 * Empty cleaned input receives a `warning` and does not invoke
   the agent or create a block. The connection remains usable.
-* These application guards do not configure the server's
-  transport-level message limit. Transport limits are separate
-  from ASGI endpoint validation.
+* Uvicorn has a separate 64 KiB transport limit configured in
+  `run.py`. Messages above that limit are rejected before the
+  application guard receives them, so that guard cannot persist
+  a user block for those messages.

@@ -5,8 +5,8 @@ from schemas.agent.streaming.stream_manager import (
 )
 from schemas.api.shared.metadata import ApiResponseMetaData
 from schemas.api.ws.response import (
+	WebSocketAgentDeltaResponse,
 	WebSocketAgentEndResponse,
-	WebSocketAgentResponse,
 	WebSocketAgentStartResponse,
 	WebSocketErrorResponse,
 	WebSocketHeartbeatResponse,
@@ -51,12 +51,12 @@ def create_ws_agent_end_response(
 	)
 
 
-def create_ws_agent_response(
+def create_ws_agent_delta_response(
 	payload: StreamManagerItem,
-	message: str = 'Agent response',
-) -> WebSocketAgentResponse:
-	"""Build a agent_response response with its typed payload."""
-	return WebSocketAgentResponse(
+	message: str = 'Agent delta',
+) -> WebSocketAgentDeltaResponse:
+	"""Build a agent_delta response with its typed payload."""
+	return WebSocketAgentDeltaResponse(
 		meta=_create_metadata(True, message),
 		payload=payload,
 	)

@@ -4,9 +4,9 @@
 
 The portfolio uses direct delivery through a process-local
 connection manager and registry. There is no shared event bus.
-The chat route invokes the agent directly. Agent stream delivery
-remains to be implemented. The manager
-and registry do not authenticate users or read client messages.
+The chat route invokes the agent directly and streams output to
+the requesting connection. The manager and registry do not
+authenticate users or read client messages.
 
 ## Modules
 
@@ -72,7 +72,39 @@ Empty cleaned input receives a warning and skips agent execution.
 Limits are configured in `agent/config/input.py` and
 `api/config/websocket.py`. The tokeniser caches its vocabulary;
 its initial load may download the standard encoding file.
-Transport-level limits remain separate server settings.
+`run.py` configures Uvicorn's transport ceiling at 64 KiB per
+incoming WebSocket message. The application still blocks at
+16 KiB. Messages rejected at the transport ceiling never reach
+the application byte guard, so it cannot persist their blocks.
+
+### Agent stream delivery
+
+The route passes its connection ID to `agent_chat`. Direct
+terminal and integration callers can omit it and use the agent
+without a running WebSocket registry.
+
+Each turn queues `agent_start`, then `agent_delta` messages for
+text chunks. A delta carries a `StreamManagerItem`; its payload
+is incremental text, not the whole accumulated response.
+`sequence_number` increases across recursive model rounds.
+
+Tool rounds publish `tool_message` with the set of requested
+tool names before dispatch. Recursion retains the same socket
+and stream manager. Only one `agent_end` is queued for the turn,
+after all tool rounds finish or a terminal failure is handled.
+An output item's completion does not end the whole agent turn.
+
+`response.failed` and explicit stream errors produce `error`.
+`response.incomplete` produces `warning`. A stream that ends
+without `response.completed` also produces `error`. These paths
+stop the turn without executing pending tools or persisting that
+round's incomplete output. Already streamed text can remain
+visible but must not be treated as a completed saved response.
+
+Only `response.completed` output is persisted for model replay.
+The model stream is closed before tool execution and recursion.
+`agent_end` means the turn stopped, not that it succeeded. The
+preceding warning or error tells the client about failure.
 
 ## Registry lifecycle and package access
 
@@ -102,7 +134,7 @@ lifecycles. Each process holds its own registry and connections.
 
 The helper module provides `create_ws_heartbeat_response`,
 `create_ws_agent_start_response`, `create_ws_agent_end_response`,
-`create_ws_agent_response`,
+`create_ws_agent_delta_response`,
 `create_ws_tool_message_response`,
 `create_ws_set_user_token_response`,
 `create_ws_warning_response` and `create_ws_error_response`.

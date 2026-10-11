@@ -24,7 +24,7 @@ would allow mismatched message types and payloads.
 | `heartbeat` | `str` |
 | `agent_start` | `str` |
 | `agent_end` | `str` |
-| `agent_response` | `StreamManagerItem` |
+| `agent_delta` | `StreamManagerItem` |
 | `tool_message` | `set[str]` |
 | `set_user_token` | `str` |
 | `warning` | `str` |
@@ -32,9 +32,15 @@ would allow mismatched message types and payloads.
 
 Concrete models are named `WebSocketHeartbeatResponse`,
 `WebSocketAgentStartResponse`, `WebSocketAgentEndResponse`,
-`WebSocketAgentResponse`, `WebSocketToolResponse`,
+`WebSocketAgentDeltaResponse`, `WebSocketToolResponse`,
 `WebSocketSetUserTokenResponse`, `WebSocketWarningResponse`
 and `WebSocketErrorResponse`.
+
+`agent_delta` replaces the old `agent_response` discriminator.
+Its `StreamManagerItem.payload` is a text fragment to append.
+`agent_start` and `agent_end` frame one complete user turn,
+including recursive tool rounds. An end event can follow a
+warning or error and does not imply generation succeeded.
 
 ## Construction and validation
 

@@ -8,8 +8,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from starlette.testclient import TestClient
 
 from api.websocket.helpers.responses import (
+	create_ws_agent_delta_response,
 	create_ws_agent_end_response,
-	create_ws_agent_response,
 	create_ws_agent_start_response,
 )
 from api.websocket.registry import WebSocketRegistry
@@ -76,7 +76,7 @@ def harness() -> Iterator[WebSocketHarness]:
 				)
 				for response in (
 					create_ws_agent_start_response('Started'),
-					create_ws_agent_response(item),
+					create_ws_agent_delta_response(item),
 					create_ws_agent_end_response('Finished'),
 				):
 					await registry.send_connection(
