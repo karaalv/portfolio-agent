@@ -224,3 +224,34 @@ uv run pytest tests/users tests/clients --collect-only
 
 Other existing test packages still need migration. API tests
 will use HTTPX when the new API contract is implemented.
+
+
+## WebSocket tests
+
+```sh
+uv run pytest tests/api/websocket
+```
+
+Unit tests cover request and response validation, helper metadata,
+ordered delivery, heartbeat activity, queue pressure, timeout
+close codes, cancellation, task cleanup, scoped registry lookup,
+concurrent duplicate registration, removal and inactivity cleanup.
+Transport operations use isolated asynchronous mocks. Controlled
+UTC timestamps and short test-local timeouts avoid long waits.
+
+Integration tests mount the real manager and registry in a small
+FastAPI application and use Starlette's `TestClient` WebSocket
+sessions. This exercises ASGI connection handling, JSON messages,
+targeted delivery, disconnect cleanup and server close codes.
+The harness echoes text through stream-item responses; it does
+not invoke the agent or mount the unfinished production route.
+
+The client context runs lifespan startup and shutdown. Registry
+state is created on the application's event loop. Operations from
+synchronous tests use the client's AnyIO portal through
+`tests/api/websocket/integration/websocket_harness.py`, keeping
+async resources on that loop.
+
+No server subprocess, listening port, environment file, MongoDB
+or OpenAI client is required. These tests do not exercise TCP,
+TLS, reverse proxies or Uvicorn worker behaviour.
