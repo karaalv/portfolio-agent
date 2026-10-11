@@ -6,6 +6,7 @@ from collections.abc import (
 	Iterator,
 )
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -17,7 +18,12 @@ from starlette.testclient import TestClient
 
 from api.middleware.origin import OriginMiddleware
 from api.middleware.request_id import RequestIdMiddleware
+from schemas.security.monitoring.blocked import (
+	BlockedEntity,
+	BlockedRecord,
+)
 from security import lifecycle
+from shared.time import get_utc_datetime_now
 
 
 @pytest.fixture
@@ -25,14 +31,37 @@ def ws_client(
 	monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[TestClient]:
 	"""Mount the chat route with real local socket tracking."""
+	import api.websocket.lifecycle as websocket_lifecycle
 	from api import websocket
 	from api.dependencies.auth.ip import require_ws_ip_access
 	from api.routes import agent
 	from api.websocket.helpers import access
+	from security.monitoring.blocked import enforcement
+
+	def block_record(
+		entity: BlockedEntity,
+		entity_id: str,
+		reason: str,
+	) -> BlockedRecord:
+		"""Return a persisted block without using live MongoDB."""
+		now = get_utc_datetime_now()
+		return BlockedRecord(
+			entity=entity,
+			entity_id=entity_id,
+			reason=reason,
+			blocked_at=now,
+			blocked_until=now + timedelta(days=1),
+		)
+
+	monkeypatch.setattr(
+		enforcement,
+		'create_block',
+		AsyncMock(side_effect=block_record),
+	)
 
 	monkeypatch.setenv('JWT_SECRET', 'agent-route-test-' * 3)
 	monkeypatch.setattr(
-		websocket.lifecycle, '_websocket_registry', None
+		websocket_lifecycle, '_websocket_registry', None
 	)
 	monkeypatch.setattr(lifecycle, '_security_client', None)
 	monkeypatch.setattr(
@@ -48,7 +77,7 @@ def ws_client(
 	monkeypatch.setattr(
 		access,
 		'require_application_access',
-		AsyncMock(return_value='visitor'),
+		AsyncMock(side_effect=lambda user_id: user_id),
 	)
 	monkeypatch.setattr(agent, 'agent_chat', AsyncMock())
 

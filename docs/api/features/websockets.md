@@ -5,7 +5,7 @@
 The portfolio uses direct delivery through a process-local
 connection manager and registry. There is no shared event bus.
 The chat route invokes the agent directly. Agent stream delivery
-and message safety checks remain to be implemented. The manager
+remains to be implemented. The manager
 and registry do not authenticate users or read client messages.
 
 ## Modules
@@ -47,8 +47,32 @@ message acquires both IP and user allowances before invoking
 
 Malformed requests close with `1008`; rate-limit timeouts close
 with `1013`. Disconnect handling removes and closes the tracked
-connection. Message safety enforcement remains an explicit TODO
-immediately before the agent invocation.
+connection.
+
+### Input safety
+
+The request helper checks the entire UTF-8 envelope against
+16 KiB before parsing JSON. Heartbeat messages are included.
+Agent payloads are checked against 10,000 model tokens before
+sanitisation. Counts use the `o200k_base` encoding and treat
+special token markers as ordinary text.
+
+Exceeding either limit persists a 24-hour user block and closes
+every local connection for that user with `1009`. It does not
+block the IP. Block persistence failures still close connections,
+but cannot guarantee future access will be denied.
+
+`agent/input/sanitisation.py` provides `sanitise_input`.
+It normalises Unicode and whitespace, removes control characters,
+obvious repetition and uninterrupted strings over 100 characters,
+then truncates cleaned text to 2,000 characters. It does not
+redact personal data or classify text by English vowel ratios.
+Empty cleaned input receives a warning and skips agent execution.
+
+Limits are configured in `agent/config/input.py` and
+`api/config/websocket.py`. The tokeniser caches its vocabulary;
+its initial load may download the standard encoding file.
+Transport-level limits remain separate server settings.
 
 ## Registry lifecycle and package access
 

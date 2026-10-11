@@ -7,6 +7,7 @@ from fastapi import (
 	WebSocketException,
 )
 
+from agent.input.sanitisation import sanitise_input
 from agent.main import agent_chat
 from api.dependencies.auth.ip import WSIPAccess
 from api.websocket import get_websocket_registry
@@ -14,10 +15,14 @@ from api.websocket.helpers.access import (
 	resolve_ws_user,
 	send_claim_token,
 )
+from api.websocket.helpers.guards import guard_agent_input
 from api.websocket.helpers.ratelimit import (
 	agent_message_rate_limit,
 )
 from api.websocket.helpers.requests import receive_ws_request
+from api.websocket.helpers.responses import (
+	create_ws_warning_response,
+)
 from schemas.api.ws.request import WebSocketRequestType
 from shared.ids import generate_uuid_str
 
@@ -48,7 +53,7 @@ async def agent_chat_ws(
 		)
 		await send_claim_token(manager, claim_token)
 		while True:
-			request = await receive_ws_request(ws)
+			request = await receive_ws_request(ws, user_id)
 
 			# Process incoming WebSocket requests
 			if request.type == WebSocketRequestType.HEARTBEAT:
@@ -56,13 +61,21 @@ async def agent_chat_ws(
 
 			# WebSocketRequestType == AGENT_MESSAGE
 			manager.record_message(request.request_id)
+			await guard_agent_input(user_id, request.payload)
+			user_input = sanitise_input(request.payload)
+			if not user_input:
+				await manager.send_message(
+					create_ws_warning_response(
+						'Please send a readable text message.'
+					)
+				)
+				continue
 			async with agent_message_rate_limit(
 				user_id, ip_address
 			):
-				# TODO: Apply agent-message safety checks.
 				await agent_chat(
 					user_id=user_id,
-					user_input=request.payload,
+					user_input=user_input,
 				)
 	except WebSocketDisconnect:
 		pass

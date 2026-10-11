@@ -95,6 +95,7 @@ registry for outbound messages and connection cleanup.
     | Code | Meaning |
     | --- | --- |
     | `1008` | Invalid token, blocked access or bad request. |
+    | `1009` | Input byte or token limit exceeded. |
     | `1013` | Rate-limit timeout or exhausted queue capacity. |
     | `1011` | Internal access or processing failure. |
     | `1001` | Server shutdown or inactive connection cleanup. |
@@ -119,4 +120,21 @@ registry for outbound messages and connection cleanup.
 * Agent output publishing is still pending in `agent.main`.
   The endpoint invokes the agent, but currently does not deliver
   its text stream, tool messages or turn lifecycle responses.
-* Message safety checks remain a TODO before agent invocation.
+* The complete UTF-8 JSON envelope must not exceed 16 KiB.
+  This guard runs before parsing and applies to heartbeats too.
+* Agent payloads must not exceed 10,000 `o200k_base` tokens.
+  Count original input before cleaning or truncation. Exceeding
+  either hard limit persists a 24-hour user block and closes all
+  that user's local connections with `1009`. Other visitors
+  sharing the IP are not blocked. Sockets are closed even when
+  block persistence fails, but that failure cannot guarantee a
+  lasting block.
+* Accepted text is Unicode-normalised, cleaned of control
+  characters and obvious repetition, and capped at 2,000
+  characters. Uninterrupted strings longer than 100 characters
+  are removed. Personal data and URLs are not redacted.
+* Empty cleaned input receives a `warning` and does not invoke
+  the agent or create a block. The connection remains usable.
+* These application guards do not configure the server's
+  transport-level message limit. Transport limits are separate
+  from ASGI endpoint validation.

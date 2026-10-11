@@ -25,8 +25,9 @@ separate request variants are needed.
 }
 ```
 
-The request helper validates decoded JSON with
-`WebSocketRequest.model_validate(...)`. It generates an ID when
+The request helper checks raw UTF-8 content size before validating
+JSON with `WebSocketRequest.model_validate_json(...)`.
+It generates an ID when
 `request_id` is missing, null or empty. Agent messages update
 the manager's current ID; heartbeat requests do not update it.
 Parsing does not
