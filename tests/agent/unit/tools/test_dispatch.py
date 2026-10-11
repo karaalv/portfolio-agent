@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from agent.observability import AgentTimer
 from agent.tools import dispatch
 from schemas.agent.streaming.stream_manager import (
 	StreamManagerFunctionCall,
@@ -45,7 +46,15 @@ async def test_parallel_calls_return_original_order(monkeypatch):
 		)
 		for name in ('first', 'second')
 	}
-	results = await dispatch.run_function_calls('visitor', calls)
+	timer = AgentTimer()
+	results = await dispatch.run_function_calls(
+		'visitor', calls, timer=timer
+	)
+	assert [r.name for r in timer.records] == [
+		'fetch_context (call-second)',
+		'fetch_context (call-first)',
+	]
+	assert all(r.scope == 'tool' for r in timer.records)
 	assert results == [
 		{
 			'type': 'function_call_output',
@@ -84,9 +93,7 @@ async def test_unknown_tool_returns_error(name, monkeypatch):
 	"""Report invalid names without invoking a real tool."""
 	tool = AsyncMock()
 	monkeypatch.setattr(dispatch, 'fetch_context', tool)
-	result = await dispatch._dispatch_tool_call(
-		'visitor', name, '{}'
-	)
+	result = await dispatch._dispatch_tool_call('visitor', name, '{}')
 	assert 'tool execution failed' in result
 	assert 'Unknown tool' in result
 	tool.assert_not_awaited()

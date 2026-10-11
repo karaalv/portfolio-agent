@@ -10,6 +10,7 @@ from openai_client.main import get_embedding, text_response
 from rag.config import (
 	CANDIDATE_MULTIPLIER,
 	CONTEXT_REFINER_MODEL,
+	CONTEXT_REFINER_REASONING,
 	RETRIEVAL_LIMIT,
 	RETRIEVAL_THRESHOLD,
 	VECTOR_INDEX_NAME,
@@ -153,6 +154,7 @@ async def _refine_context(
 			ensure_ascii=False,
 		),
 		model=CONTEXT_REFINER_MODEL,
+		reasoning=CONTEXT_REFINER_REASONING,
 	)
 	if verbose:
 		rich_print(

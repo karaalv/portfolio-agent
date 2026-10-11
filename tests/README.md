@@ -189,6 +189,13 @@ for inspection. Reuse the printed ID with `--user-id <id>` to
 continue that conversation. Bootstrap the corpus before asking
 questions requiring portfolio retrieval.
 
+Each interaction prints a timing summary, including each model
+round, each individual tool call and the full turn. Timing is
+collected by `agent.observability.AgentTimer`; terminal formatting
+lives in `agent.logging.terminal.log_agent_timing`. A fresh timer
+can be passed to `agent_chat(..., timer=timer)` by other callers.
+
+
 ## Security integration tests
 
 ```sh

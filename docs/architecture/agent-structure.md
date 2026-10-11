@@ -68,3 +68,34 @@ decision from reducing the agent's exposed tools.
 The current prompt tells the agent to impersonate Alvin. Before writing the
 new `agent/prompts/agent.py`, decide whether it should speak as Alvin in the
 first person or identify itself as a portfolio assistant speaking about him.
+
+
+## Execution timing
+
+`agent.observability.AgentTimer` records one interaction across
+all recursive model rounds. Callers can pass a fresh timer to
+`agent_chat` and inspect its immutable `records` snapshot after
+execution. Terminal output is handled separately by
+`agent.logging.terminal.log_agent_timing`.
+
+- Interaction duration includes history retrieval, persistence,
+  model rounds, tools and response queueing.
+- OpenAI duration runs from starting stream consumption until
+  the terminal event. It includes local limiter waits, network
+  latency and streamed output handling. Final output persistence,
+  stream cleanup and subsequent tool execution are excluded.
+- Tool duration covers each individual dispatch, including RAG
+  planning, retrieval and context refinement. Parallel tool calls
+  have independent spans and retain their call IDs in the names.
+
+Durations use a monotonic performance clock. Nested and parallel
+spans overlap, so their sum is not the total interaction time.
+Records are emitted in completion order. Stream status retains
+the SDK terminal event name; a stream without a terminal event
+is marked `interrupted`. Other spans record completion, an
+exception or cancellation. A completed tool span means dispatch
+returned, including a recoverable failure packaged for replay.
+
+The input and context refiners use the separate
+`INPUT_REFINER_REASONING` and `CONTEXT_REFINER_REASONING` settings
+in `rag.config`, both defaulting to `LOW`.

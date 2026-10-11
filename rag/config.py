@@ -1,10 +1,13 @@
 """Configure RAG models, history and vector retrieval limits."""
 
+from openai_client.model_settings import OpenAILanguageModelReasoning
 from openai_client.models import OpenAILanguageModel
 
 INPUT_REFINER_MODEL = OpenAILanguageModel.GPT_6_LUNA
 QUERY_PLANNER_MODEL = OpenAILanguageModel.GPT_6_1_SOL
 CONTEXT_REFINER_MODEL = OpenAILanguageModel.GPT_6_LUNA
+INPUT_REFINER_REASONING = OpenAILanguageModelReasoning.LOW
+CONTEXT_REFINER_REASONING = OpenAILanguageModelReasoning.LOW
 HISTORY_WINDOW = 10
 MAX_QUERIES = 3
 RETRIEVAL_LIMIT = 3

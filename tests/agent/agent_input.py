@@ -8,12 +8,13 @@ from collections.abc import AsyncIterator
 from contextlib import aclosing
 from os import getenv
 from pathlib import Path
-from time import perf_counter
 from unittest.mock import patch
 
 from openai.types.responses import ResponseStreamEvent
 
 from agent import main as agent_main
+from agent.logging.terminal import log_agent_timing
+from agent.observability import AgentTimer
 from api.lifecycle.environment import load_environment_variables
 from database.mongodb.config import (
 	is_mongo_connected,
@@ -52,16 +53,12 @@ async def main(
 	try:
 		await start_mongo_client()
 		if not await is_mongo_connected():
-			raise RuntimeError(
-				'MongoDB connection check failed.'
-			)
+			raise RuntimeError('MongoDB connection check failed.')
 		start_openai_client()
 		if user_id is None:
 			user_id = (await create_user()).user_id
 		elif not await does_user_exist(user_id):
-			raise ValueError(
-				'The supplied user ID does not exist.'
-			)
+			raise ValueError('The supplied user ID does not exist.')
 		print(f'Visitor ID: {user_id}')
 		print('Enter exit or quit to finish. Ctrl-D also exits.')
 		original = agent_main.stream_agent_response
@@ -74,10 +71,7 @@ async def main(
 			"""
 			async with aclosing(original(**kwargs)) as events:
 				async for event in events:
-					if (
-						event.type
-						== 'response.output_text.delta'
-					):
+					if event.type == 'response.output_text.delta':
 						print(event.delta, end='', flush=True)
 					elif event.type in {
 						'error',
@@ -89,7 +83,7 @@ async def main(
 						)
 					yield event
 
-		# Observe SDK events until publishing is ready.
+		# Display SDK text deltas in the terminal.
 		with patch.object(
 			agent_main, 'stream_agent_response', display
 		):
@@ -107,17 +101,19 @@ async def main(
 					break
 				if not message.strip():
 					continue
-				started = perf_counter()
+				timer = AgentTimer()
 				print('Assistant: ', end='', flush=True)
-				await agent_main.agent_chat(
-					user_id=user_id,
-					user_input=message,
-					verbosity_level=verbosity_level,
-				)
-				print()
-				if verbosity_level > 0:
-					elapsed = perf_counter() - started
-					print(f'Completed in {elapsed:.2f}s.')
+				try:
+					await agent_main.agent_chat(
+						user_id=user_id,
+						user_input=message,
+						verbosity_level=verbosity_level,
+						timer=timer,
+					)
+				finally:
+					print()
+					log_agent_timing(timer)
+
 	finally:
 		try:
 			await stop_openai_client()

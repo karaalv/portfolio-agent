@@ -79,3 +79,7 @@ client_secret*.json
 
 # Ruff
 .ruff_cache/
+
+# Postman
+**/postman
+**.postman/

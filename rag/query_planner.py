@@ -8,6 +8,7 @@ from openai_client.main import structured_response, text_response
 from rag.config import (
 	HISTORY_WINDOW,
 	INPUT_REFINER_MODEL,
+	INPUT_REFINER_REASONING,
 	MAX_QUERIES,
 	QUERY_PLANNER_MODEL,
 )
@@ -89,6 +90,7 @@ async def _input_refiner(
 			ensure_ascii=False,
 		),
 		model=INPUT_REFINER_MODEL,
+		reasoning=INPUT_REFINER_REASONING,
 	)
 	if verbose:
 		rich_print(

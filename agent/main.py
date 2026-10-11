@@ -18,6 +18,7 @@ from agent.memory.creation import (
 from agent.memory.retrieval import (
 	retrieve_agent_memory_param,
 )
+from agent.observability import AgentTimer
 from agent.prompts.agent import AGENT_SYSTEM_PROMPT
 from agent.prompts.behaviour import AGENT_BEHAVIOUR_PROMPT
 from agent.streaming.delivery import send_agent_ws_response
@@ -48,61 +49,66 @@ async def agent_chat(
 	history: ResponseInputParam | None = None,
 	verbosity_level: int = 0,
 	connection_id: str | None = None,
+	timer: AgentTimer | None = None,
 ) -> None:
 	"""Answer one turn and persist its input and final response.
 
 	Allow up to three rounds of context retrieval. Load history
 	before storing input so it appears only once. An optional
 	connection ID enables socket delivery for the whole turn.
+	Pass a fresh timer to inspect timings across all rounds.
 	"""
 
-	# Start stream manager for handling
-	# response state
-	stream_manager = StreamManager(
-		user_id=user_id,
-		verbosity_level=verbosity_level,
-	)
-
-	await send_agent_ws_response(
-		user_id,
-		connection_id,
-		create_ws_agent_start_response('Agent turn started.'),
-	)
-	try:
-		# Begin response lifecycle by pulling previous
-		# conversation history and appending
-		# current input
-		history = await retrieve_agent_memory_param(
+	timer = timer if timer is not None else AgentTimer()
+	with timer.measure('interaction', 'Agent turn'):
+		# Start stream manager for handling
+		# response state
+		stream_manager = StreamManager(
 			user_id=user_id,
-		)
-
-		current_memory = await create_user_memory(
-			user_id=user_id,
-			turn_id=stream_manager.get_turn_id(),
-			sequence=stream_manager.increment_turn_sequence_counter(),
-			content=user_input,
-		)
-
-		history.append(current_memory.payload)
-
-		if verbosity_level > 0:
-			log_agent_history(history)
-
-		# Manage agent response lifecycle in
-		# recursive handler
-		await _agent_response_handler(
-			stream_manager=stream_manager,
-			history=history,
 			verbosity_level=verbosity_level,
-			connection_id=connection_id,
 		)
 
-	finally:
 		await send_agent_ws_response(
 			user_id,
 			connection_id,
-			create_ws_agent_end_response('Agent turn ended.'),
+			create_ws_agent_start_response('Agent turn started.'),
 		)
+		try:
+			# Begin response lifecycle by pulling previous
+			# conversation history and appending
+			# current input
+			history = await retrieve_agent_memory_param(
+				user_id=user_id,
+			)
+
+			current_memory = await create_user_memory(
+				user_id=user_id,
+				turn_id=stream_manager.get_turn_id(),
+				sequence=stream_manager.increment_turn_sequence_counter(),
+				content=user_input,
+			)
+
+			history.append(current_memory.payload)
+
+			if verbosity_level > 0:
+				log_agent_history(history)
+
+			# Manage agent response lifecycle in
+			# recursive handler
+			await _agent_response_handler(
+				stream_manager=stream_manager,
+				history=history,
+				verbosity_level=verbosity_level,
+				connection_id=connection_id,
+				timer=timer,
+			)
+
+		finally:
+			await send_agent_ws_response(
+				user_id,
+				connection_id,
+				create_ws_agent_end_response('Agent turn ended.'),
+			)
 
 
 # --- Helper Functions ---
@@ -114,12 +120,14 @@ async def _agent_response_handler(
 	verbosity_level: int,
 	recursion_depth: int = 0,
 	connection_id: str | None = None,
+	timer: AgentTimer | None = None,
 ) -> None:
 	"""
 	Handles the agent response lifecycle,
 	processing events, and managing the state
 	of the conversation and function calls.
 	"""
+	timer = timer if timer is not None else AgentTimer()
 	if recursion_depth > AGENT_TOOL_RECURSION_LIMIT:
 		raise_agent_recursion_limit()
 
@@ -131,97 +139,108 @@ async def _agent_response_handler(
 
 	completed = False
 	user_id = stream_manager.get_user_id()
-	async with aclosing(client_stream) as events:
-		async for event in events:
-			if verbosity_level > 1:
-				rich_print(
-					f'Received event: {event}',
-					style=LogStyle.DEFAULT,
-				)
+	with timer.measure(
+		'openai', f'Response round {recursion_depth + 1}'
+	) as response_timing:
+		async with aclosing(client_stream) as events:
+			async for event in events:
+				if event.type in {
+					'response.completed',
+					'response.failed',
+					'response.incomplete',
+					'error',
+				}:
+					response_timing.finish(event.type)
+				if verbosity_level > 1:
+					rich_print(
+						f'Received event: {event}',
+						style=LogStyle.DEFAULT,
+					)
 
-			if event.type == 'response.output_item.added':
-				# Resolve event type
-				if event.item.type == 'function_call':
-					stream_manager.set_function_call_state()
-				elif event.item.type == 'message':
-					stream_manager.set_message_state()
-			elif event.type == 'response.output_text.delta':
-				# Handle text delta
-				if (
-					stream_manager.get_event_stream_state()
-					== EventStreamState.MESSAGE
-				):
-					response = stream_manager.add_delta(
-						event.delta
+				if event.type == 'response.output_item.added':
+					# Resolve event type
+					if event.item.type == 'function_call':
+						stream_manager.set_function_call_state()
+					elif event.item.type == 'message':
+						stream_manager.set_message_state()
+				elif event.type == 'response.output_text.delta':
+					# Handle text delta
+					if (
+						stream_manager.get_event_stream_state()
+						== EventStreamState.MESSAGE
+					):
+						response = stream_manager.add_delta(
+							event.delta
+						)
+						await send_agent_ws_response(
+							user_id,
+							connection_id,
+							create_ws_agent_delta_response(response),
+						)
+				elif event.type == 'response.output_item.done':
+					if event.item.type == 'message':
+						stream_manager.set_idle_state()
+				elif event.type == 'response.completed':
+					completed = True
+					for item in event.response.output:
+						# Append the response item to the
+						# conversation history
+						payload = response_item_to_input_item(item)
+						await create_response_item_memory(
+							stream_manager=stream_manager,
+							payload=payload,
+						)
+						history.append(payload)
+
+						if item.type == 'function_call':
+							stream_manager.add_function_call(
+								call_id=item.call_id,
+								tool_name=item.name,
+								tool_args=item.arguments,
+							)
+					break
+				elif event.type == 'response.failed':
+					_logger.error(
+						'Agent response failed: %s',
+						event.response.error,
 					)
 					await send_agent_ws_response(
 						user_id,
 						connection_id,
-						create_ws_agent_delta_response(response),
+						create_ws_error_response(
+							'I could not generate a response. '
+							'Please try again.'
+						),
 					)
-			elif event.type == 'response.output_item.done':
-				if event.item.type == 'message':
-					stream_manager.set_idle_state()
-			elif event.type == 'response.completed':
-				completed = True
-				for item in event.response.output:
-					# Append the response item to the
-					# conversation history
-					payload = response_item_to_input_item(item)
-					await create_response_item_memory(
-						stream_manager=stream_manager,
-						payload=payload,
+					return
+				elif event.type == 'response.incomplete':
+					_logger.warning(
+						'Agent response incomplete: %s',
+						event.response.incomplete_details,
 					)
-					history.append(payload)
-
-					if item.type == 'function_call':
-						stream_manager.add_function_call(
-							call_id=item.call_id,
-							tool_name=item.name,
-							tool_args=item.arguments,
-						)
-				break
-			elif event.type == 'response.failed':
-				_logger.error(
-					'Agent response failed: %s',
-					event.response.error,
-				)
-				await send_agent_ws_response(
-					user_id,
-					connection_id,
-					create_ws_error_response(
-						'I could not generate a response. '
-						'Please try again.'
-					),
-				)
-				return
-			elif event.type == 'response.incomplete':
-				_logger.warning(
-					'Agent response incomplete: %s',
-					event.response.incomplete_details,
-				)
-				await send_agent_ws_response(
-					user_id,
-					connection_id,
-					create_ws_warning_response(
-						'This response is incomplete. '
-						'Please try again.'
-					),
-				)
-				return
-			elif event.type == 'error':
-				_logger.error(
-					'Agent stream error: %s', event.message
-				)
-				await send_agent_ws_response(
-					user_id,
-					connection_id,
-					create_ws_error_response(
-						'The response was interrupted. '
-						'Please try again.'
-					),
-				)
-				return
+					await send_agent_ws_response(
+						user_id,
+						connection_id,
+						create_ws_warning_response(
+							'This response is incomplete. '
+							'Please try again.'
+						),
+					)
+					return
+				elif event.type == 'error':
+					_logger.error(
+						'Agent stream error: %s', event.message
+					)
+					await send_agent_ws_response(
+						user_id,
+						connection_id,
+						create_ws_error_response(
+							'The response was interrupted. '
+							'Please try again.'
+						),
+					)
+					return
+		response_timing.finish('interrupted')
 
 	# Stream closed
 	if not completed:
@@ -249,6 +268,7 @@ async def _agent_response_handler(
 			user_id=stream_manager.get_user_id(),
 			function_calls=stream_manager.get_function_calls(),
 			verbose=verbosity_level > 0,
+			timer=timer,
 		)
 		await create_response_input_memories(
 			stream_manager=stream_manager,
@@ -263,6 +283,7 @@ async def _agent_response_handler(
 			verbosity_level=verbosity_level,
 			recursion_depth=recursion_depth + 1,
 			connection_id=connection_id,
+			timer=timer,
 		)
 
 	# Base case: Successfully reached the

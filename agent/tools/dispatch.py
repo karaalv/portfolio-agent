@@ -6,6 +6,7 @@ from openai.types.responses import ResponseInputParam
 from pydantic import ValidationError
 
 from agent.input_items import create_function_output_item
+from agent.observability import AgentTimer
 from agent.prompts.tools import (
 	format_failed_tool_response,
 	format_tool_exception_response,
@@ -22,6 +23,7 @@ async def run_function_calls(
 	user_id: str,
 	function_calls: dict[str, StreamManagerFunctionCall],
 	verbose: bool = False,
+	timer: AgentTimer | None = None,
 ) -> ResponseInputParam:
 	"""Run calls concurrently; return dictionary insertion order.
 
@@ -39,12 +41,7 @@ async def run_function_calls(
 				)
 			tasks.append(
 				group.create_task(
-					_dispatch_tool_call(
-						user_id=user_id,
-						tool_name=call.tool_name,
-						tool_args=call.tool_args,
-						verbose=verbose,
-					)
+					_run_tool_call(user_id, call, verbose, timer)
 				)
 			)
 
@@ -52,6 +49,23 @@ async def run_function_calls(
 		create_function_output_item(call.call_id, task.result())
 		for call, task in zip(calls, tasks, strict=True)
 	]
+
+
+async def _run_tool_call(
+	user_id: str,
+	call: StreamManagerFunctionCall,
+	verbose: bool,
+	timer: AgentTimer | None,
+) -> str:
+	"""Time each tool independently, preserving call identity."""
+	if timer is None:
+		return await _dispatch_tool_call(
+			user_id, call.tool_name, call.tool_args, verbose
+		)
+	with timer.measure('tool', f'{call.tool_name} ({call.call_id})'):
+		return await _dispatch_tool_call(
+			user_id, call.tool_name, call.tool_args, verbose
+		)
 
 
 async def _dispatch_tool_call(

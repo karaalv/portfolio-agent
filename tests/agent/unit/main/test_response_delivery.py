@@ -22,6 +22,7 @@ from openai.types.responses import (
 )
 
 from agent import main
+from agent.observability import AgentTimer
 from agent.streaming import delivery
 
 
@@ -133,9 +134,7 @@ async def test_deltas_and_end_are_delivered_in_order(
 			]
 		],
 	)
-	await main.agent_chat(
-		'visitor', 'Hello', connection_id='socket'
-	)
+	await main.agent_chat('visitor', 'Hello', connection_id='socket')
 	messages = [call.args[2] for call in output.await_args_list]
 	assert [m.type for m in messages] == [
 		'agent_start',
@@ -147,9 +146,10 @@ async def test_deltas_and_end_are_delivered_in_order(
 		'Hello ',
 		'there',
 	]
-	assert [
-		m.payload.sequence_number for m in messages[1:3]
-	] == [0, 1]
+	assert [m.payload.sequence_number for m in messages[1:3]] == [
+		0,
+		1,
+	]
 	assert closed == [0]
 
 
@@ -196,9 +196,7 @@ async def test_terminal_failures_stop_without_persisting_output(
 	if kind != 'interrupted':
 		events.append(_completed([_message()]))
 	_, closed = _install_stream(monkeypatch, [events])
-	await main.agent_chat(
-		'visitor', 'Hello', connection_id='socket'
-	)
+	await main.agent_chat('visitor', 'Hello', connection_id='socket')
 	messages = [call.args[2] for call in output.await_args_list]
 	assert [m.type for m in messages] == [
 		'agent_start',
@@ -208,14 +206,10 @@ async def test_terminal_failures_stop_without_persisting_output(
 	assert 'Internal provider details' not in messages[1].payload
 	assert closed == [0]
 	assert (
-		cast(
-			AsyncMock, main.create_response_item_memory
-		).await_count
+		cast(AsyncMock, main.create_response_item_memory).await_count
 		== 0
 	)
-	assert (
-		cast(AsyncMock, main.run_function_calls).await_count == 0
-	)
+	assert cast(AsyncMock, main.run_function_calls).await_count == 0
 
 
 async def test_tool_recursion_shares_connection_and_lifecycle(
@@ -235,9 +229,7 @@ async def test_tool_recursion_shares_connection_and_lifecycle(
 		'call_id': 'call',
 		'output': 'Grounded context',
 	}
-	cast(AsyncMock, main.run_function_calls).return_value = [
-		result
-	]
+	cast(AsyncMock, main.run_function_calls).return_value = [result]
 	inputs, closed = _install_stream(
 		monkeypatch,
 		[
@@ -245,8 +237,24 @@ async def test_tool_recursion_shares_connection_and_lifecycle(
 			[_completed([_message()])],
 		],
 	)
+	timer = AgentTimer()
 	await main.agent_chat(
-		'visitor', 'Hello', connection_id='socket'
+		'visitor', 'Hello', connection_id='socket', timer=timer
+	)
+	assert [r.scope for r in timer.records] == [
+		'openai',
+		'openai',
+		'interaction',
+	]
+	assert [r.name for r in timer.records[:2]] == [
+		'Response round 1',
+		'Response round 2',
+	]
+	assert (
+		cast(AsyncMock, main.run_function_calls).call_args.kwargs[
+			'timer'
+		]
+		is timer
 	)
 	messages = [call.args[2] for call in output.await_args_list]
 	assert [m.type for m in messages] == [
@@ -271,3 +279,32 @@ async def test_direct_agent_calls_do_not_require_registry(
 	_install_stream(monkeypatch, [[_completed([_message()])]])
 	await main.agent_chat('visitor', 'Hello')
 	output.assert_not_awaited()
+
+
+async def test_model_timer_excludes_output_persistence(
+	output: AsyncMock,
+	monkeypatch: pytest.MonkeyPatch,
+) -> None:
+	"""Keep database writes in turn time, outside model time."""
+	from agent.observability import timing
+
+	clock = [0.0]
+	monkeypatch.setattr(timing, 'perf_counter', lambda: clock[0])
+
+	async def stream(**kwargs) -> AsyncIterator[ResponseStreamEvent]:
+		"""Spend two seconds producing the terminal response."""
+		clock[0] += 2.0
+		yield _completed([_message()])
+
+	async def persist(**kwargs) -> None:
+		"""Spend ten seconds writing the completed output."""
+		clock[0] += 10.0
+
+	monkeypatch.setattr(main, 'stream_agent_response', stream)
+	monkeypatch.setattr(main, 'create_response_item_memory', persist)
+	timer = AgentTimer()
+	await main.agent_chat('visitor', 'Hello', timer=timer)
+	assert [(r.scope, r.duration_seconds) for r in timer.records] == [
+		('openai', 2.0),
+		('interaction', 12.0),
+	]
