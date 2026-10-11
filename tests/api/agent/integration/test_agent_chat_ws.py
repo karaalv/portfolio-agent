@@ -20,6 +20,7 @@ from database.mongodb.main import get_collection
 from schemas.agent.chat import AgentChatMemory, AgentChatSource
 from schemas.api.ws.response import (
 	WebSocketAgentDeltaResponse,
+	WebSocketAgentThinkingCaptionsResponse,
 	WebSocketResponse,
 	WebSocketSetUserTokenResponse,
 	WebSocketToolResponse,
@@ -213,6 +214,15 @@ def test_rag_tool_stream_and_persisted_replay(
 			e for e in events if isinstance(e, WebSocketToolResponse)
 		]
 		assert tools
+		captions = [
+			e
+			for e in events
+			if isinstance(e, WebSocketAgentThinkingCaptionsResponse)
+		]
+		assert captions
+		assert all(e.payload for e in captions)
+		assert all(c.strip() for e in captions for c in e.payload)
+		assert events.index(tools[0]) < events.index(captions[0])
 		assert all(e.payload == {'fetch_context'} for e in tools)
 		payloads = _check_memory(
 			live_client, user_id, question, answer

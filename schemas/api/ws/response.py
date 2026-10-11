@@ -19,6 +19,7 @@ class WebSocketResponseType(StrEnum):
 	AGENT_END = 'agent_end'
 	AGENT_DELTA = 'agent_delta'
 	TOOL_MESSAGE = 'tool_message'
+	AGENT_THINKING_CAPTIONS = 'agent_thinking_captions'
 	SET_USER_TOKEN = 'set_user_token'
 	WARNING = 'warning'
 	ERROR = 'error'
@@ -73,6 +74,16 @@ class WebSocketToolResponse(_ResponseEnvelope[set[str]]):
 	)
 
 
+class WebSocketAgentThinkingCaptionsResponse(
+	_ResponseEnvelope[list[str]]
+):
+	"""Carry ordered retrieval progress captions for the client."""
+
+	type: Literal[WebSocketResponseType.AGENT_THINKING_CAPTIONS] = (
+		WebSocketResponseType.AGENT_THINKING_CAPTIONS
+	)
+
+
 class WebSocketSetUserTokenResponse(_ResponseEnvelope[str]):
 	"""Carry the payload for a set_user_token message."""
 
@@ -103,6 +114,7 @@ type WebSocketResponse = Annotated[
 	| WebSocketAgentEndResponse
 	| WebSocketAgentDeltaResponse
 	| WebSocketToolResponse
+	| WebSocketAgentThinkingCaptionsResponse
 	| WebSocketSetUserTokenResponse
 	| WebSocketWarningResponse
 	| WebSocketErrorResponse,

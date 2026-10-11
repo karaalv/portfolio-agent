@@ -32,7 +32,12 @@ async def test_plan_rag_returns_suitable_query_plan(
 	user_id = generate_uuid_str()
 	plan = await plan_rag(user_id, question, verbose=True)
 	assert isinstance(plan, QueryPlan)
-	assert set(plan.model_dump()) == {'queries'}
+	assert set(plan.model_dump()) == {
+		'queries',
+		'agent_thinking_captions',
+	}
+	assert len(plan.agent_thinking_captions) == len(plan.queries)
+	assert all(c.strip() for c in plan.agent_thinking_captions)
 	assert isinstance(plan.queries, list)
 	assert 1 <= len(plan.queries) <= MAX_QUERIES
 	assert all(

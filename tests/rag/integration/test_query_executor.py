@@ -36,7 +36,6 @@ async def test_retrieve_query_returns_relevant_corpus_items(
 	for item in items:
 		assert item.item_id
 		assert item.label
-		assert item.header.strip()
 		assert item.context.strip()
 		assert item.document.strip()
 		assert item.embedding == []
@@ -65,7 +64,11 @@ async def test_execute_rag_returns_suitable_context(
 		queries=[
 			"Alvin Karanja's MSc at Imperial College London",
 			"Alvin's Imperial College London MSc classification",
-		]
+		],
+		agent_thinking_captions=[
+			"Checking Alvin's MSc at Imperial",
+			"Checking Alvin's MSc classification",
+		],
 	)
 	context = await execute_rag(plan, question, verbose=True)
 	assert isinstance(context, str)

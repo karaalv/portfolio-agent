@@ -36,7 +36,7 @@ class CorpusDocumentAnalysis(BaseModel):
 ## Counting behaviour
 
 Both text fields use the helper's default `o200k_base` encoding.
-These are plain-text counts, excluding headers, labels, message
+These are plain-text counts, excluding labels, message
 framing and tool-schema overhead. They are not embedding-model
 counts or the token usage of a complete agent request.
 

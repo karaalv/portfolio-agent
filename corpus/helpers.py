@@ -72,13 +72,12 @@ async def load_corpus_from_file(
 				path,
 				section_number,
 			)
-			for tag in ('label', 'header', 'context', 'document')
+			for tag in ('label', 'context', 'document')
 		}
 		items.append(
 			CorpusItem(
 				item_id=generate_uuid_str(),
 				label=fields['label'],
-				header=fields['header'],
 				context=fields['context'],
 				document=fields['document'],
 				embedding=[],

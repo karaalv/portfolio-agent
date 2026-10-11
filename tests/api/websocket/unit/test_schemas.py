@@ -150,6 +150,7 @@ def test_agent_and_tool_helpers_round_trip() -> None:
 	[
 		('agent_delta', 'plain text'),
 		('tool_message', 'plain text'),
+		('agent_thinking_captions', 'plain text'),
 		('heartbeat', ['ping']),
 		('warning', {'text': 'notice'}),
 		('unknown', 'text'),
@@ -173,3 +174,16 @@ def test_response_discriminator_rejects_wrong_payload(
 				},
 			}
 		)
+
+
+def test_thinking_captions_preserve_order() -> None:
+	"""Round-trip planner captions as an ordered JSON array."""
+	captions = ["Checking Alvin's education", 'Exploring his work']
+	response = responses.create_ws_agent_thinking_captions_response(
+		captions
+	)
+	parsed = TypeAdapter(WebSocketResponse).validate_json(
+		response.model_dump_json()
+	)
+	assert parsed.type == 'agent_thinking_captions'
+	assert parsed.payload == captions

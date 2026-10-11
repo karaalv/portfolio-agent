@@ -19,3 +19,15 @@ class QueryPlan(BaseModel):
 		),
 		max_length=MAX_QUERIES,
 	)
+
+	agent_thinking_captions: list[str] = Field(
+		...,
+		description=(
+			'Short, visitor-facing retrieval progress captions in '
+			'query order, one per query. Describe the topic being '
+			'searched without asserting facts or revealing internal '
+			'reasoning. Use plain text and at most eight words per '
+			'caption. Return an empty list when there are no queries.'
+		),
+		max_length=MAX_QUERIES,
+	)

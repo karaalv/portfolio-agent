@@ -22,7 +22,9 @@ async def test_parallel_calls_return_original_order(monkeypatch):
 	second_finished = asyncio.Event()
 	started = []
 
-	async def run(user_id, tool_name, tool_args, verbose):
+	async def run(
+		user_id, tool_name, tool_args, verbose, connection_id=None
+	):
 		"""
 		Coordinate reverse completion without timing sleeps.
 		"""
@@ -84,7 +86,10 @@ async def test_valid_dispatch_preserves_json_arguments(
 		== 'Grounded context'
 	)
 	tool.assert_awaited_once_with(
-		user_id='visitor', tool_args=arguments, verbose=False
+		user_id='visitor',
+		tool_args=arguments,
+		verbose=False,
+		connection_id=None,
 	)
 
 

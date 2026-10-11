@@ -8,6 +8,7 @@ async def fetch_context(
 	user_id: str,
 	tool_args: str,
 	verbose: bool = False,
+	connection_id: str | None = None,
 ) -> str:
 	"""Retrieve context using validated model-supplied arguments.
 
@@ -19,4 +20,5 @@ async def fetch_context(
 		user_id=user_id,
 		user_input=arguments.user_input,
 		verbose=verbose,
+		connection_id=connection_id,
 	)

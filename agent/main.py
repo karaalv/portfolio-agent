@@ -90,7 +90,7 @@ async def agent_chat(
 
 			history.append(current_memory.payload)
 
-			if verbosity_level > 0:
+			if verbosity_level > 1:
 				log_agent_history(history)
 
 			# Manage agent response lifecycle in
@@ -269,6 +269,7 @@ async def _agent_response_handler(
 			function_calls=stream_manager.get_function_calls(),
 			verbose=verbosity_level > 0,
 			timer=timer,
+			connection_id=connection_id,
 		)
 		await create_response_input_memories(
 			stream_manager=stream_manager,

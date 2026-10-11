@@ -24,6 +24,7 @@ async def run_function_calls(
 	function_calls: dict[str, StreamManagerFunctionCall],
 	verbose: bool = False,
 	timer: AgentTimer | None = None,
+	connection_id: str | None = None,
 ) -> ResponseInputParam:
 	"""Run calls concurrently; return dictionary insertion order.
 
@@ -41,7 +42,9 @@ async def run_function_calls(
 				)
 			tasks.append(
 				group.create_task(
-					_run_tool_call(user_id, call, verbose, timer)
+					_run_tool_call(
+						user_id, call, verbose, timer, connection_id
+					)
 				)
 			)
 
@@ -56,15 +59,24 @@ async def _run_tool_call(
 	call: StreamManagerFunctionCall,
 	verbose: bool,
 	timer: AgentTimer | None,
+	connection_id: str | None,
 ) -> str:
 	"""Time each tool independently, preserving call identity."""
 	if timer is None:
 		return await _dispatch_tool_call(
-			user_id, call.tool_name, call.tool_args, verbose
+			user_id,
+			call.tool_name,
+			call.tool_args,
+			verbose,
+			connection_id,
 		)
 	with timer.measure('tool', f'{call.tool_name} ({call.call_id})'):
 		return await _dispatch_tool_call(
-			user_id, call.tool_name, call.tool_args, verbose
+			user_id,
+			call.tool_name,
+			call.tool_args,
+			verbose,
+			connection_id,
 		)
 
 
@@ -73,6 +85,7 @@ async def _dispatch_tool_call(
 	tool_name: str | None,
 	tool_args: str,
 	verbose: bool = False,
+	connection_id: str | None = None,
 ) -> str:
 	"""Dispatch a tool and report recoverable failures."""
 	try:
@@ -82,6 +95,7 @@ async def _dispatch_tool_call(
 					user_id=user_id,
 					tool_args=tool_args,
 					verbose=verbose,
+					connection_id=connection_id,
 				)
 			case _:
 				message = f'Unknown tool: {tool_name!r}.'

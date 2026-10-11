@@ -252,3 +252,14 @@ The current operating model remains one serving process.
 Security counters, persisted connection bookkeeping, agent
 cancellation and authentication are not managed by these base
 classes. Those responsibilities belong to later integration.
+
+
+### RAG progress
+
+During a context tool call, the query planner generates short
+retrieval captions. After planning and before execution, the
+server sends `agent_thinking_captions` with an ordered `list[str]`
+payload to the requesting connection. The manager stamps the
+current request ID as with other turn responses. Display these
+captions under the thinking indicator; they are search progress
+labels, not internal reasoning or completed retrieval results.

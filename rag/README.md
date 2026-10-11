@@ -5,11 +5,13 @@ agent. The answering agent generates the visitor-facing reply.
 
 ## Entry points
 
-- `fetch_context(user_id, user_input, verbose=False)`
-  orchestrates planning and execution.
+- `fetch_context(user_id, user_input, verbose=False,
+  connection_id=None)`
+  orchestrates planning, caption delivery and execution.
 - `plan_rag(user_id, user_input, verbose=False)` resolves clear
   follow-up references using recent memory, then returns a
-  `QueryPlan` containing up to three distinct semantic queries.
+  `QueryPlan` containing up to three distinct semantic queries
+  and their ordered retrieval progress captions.
 - `execute_rag(query_plan, user_input, verbose=False)` retrieves
   matching entries and returns refined supporting context.
 
@@ -30,7 +32,10 @@ retrieval tasks, so result merging does not require a lock.
 The process-local MongoDB and OpenAI clients must be started
 before calling these functions and remain available throughout.
 RAG uses the existing OpenAI request limits. It does not start,
-stop or replace clients, and it does not send WebSocket messages.
+stop or replace clients. When a connection ID is supplied,
+`fetch_context` sends `agent_thinking_captions` to that specific
+socket immediately after planning and before retrieval. Direct
+callers without a connection ID make no socket calls.
 
 Each query retrieves up to three entries above the configured
 similarity threshold. If no queries are planned or no entries

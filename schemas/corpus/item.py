@@ -14,7 +14,6 @@ class CorpusItem(BaseModel):
 
 	item_id: str
 	label: str
-	header: str
 	embedding: list[float]
 	context: str
 	document: str

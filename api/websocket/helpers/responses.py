@@ -8,6 +8,7 @@ from schemas.api.ws.response import (
 	WebSocketAgentDeltaResponse,
 	WebSocketAgentEndResponse,
 	WebSocketAgentStartResponse,
+	WebSocketAgentThinkingCaptionsResponse,
 	WebSocketErrorResponse,
 	WebSocketHeartbeatResponse,
 	WebSocketSetUserTokenResponse,
@@ -68,6 +69,17 @@ def create_ws_tool_message_response(
 ) -> WebSocketToolResponse:
 	"""Build a tool_message response with its typed payload."""
 	return WebSocketToolResponse(
+		meta=_create_metadata(True, message),
+		payload=payload,
+	)
+
+
+def create_ws_agent_thinking_captions_response(
+	payload: list[str],
+	message: str = 'Agent thinking captions',
+) -> WebSocketAgentThinkingCaptionsResponse:
+	"""Build ordered captions describing planned retrieval."""
+	return WebSocketAgentThinkingCaptionsResponse(
 		meta=_create_metadata(True, message),
 		payload=payload,
 	)
