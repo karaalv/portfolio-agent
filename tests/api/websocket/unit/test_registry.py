@@ -89,9 +89,7 @@ async def test_send_targets_only_one_connection(
 		call.args[0]['type'] == 'warning'
 		for call in other.send_json.await_args_list
 	)
-	assert not await registry.send_connection(
-		'b', 'one', response
-	)
+	assert not await registry.send_connection('b', 'one', response)
 
 
 @pytest.mark.parametrize(
@@ -125,16 +123,12 @@ async def test_removal_closes_and_clears_selected_scope(
 		await registry.remove_user_connections('a')
 		expected = [True, True, False]
 	elif operation == 'users':
-		await registry.remove_users_connections(
-			['a', 'a', 'missing']
-		)
+		await registry.remove_users_connections(['a', 'a', 'missing'])
 		expected = [True, True, False]
 	else:
 		await registry.close_all_connections()
 		expected = [True, True, True]
-	assert [
-		bool(s.close.await_count) for s in sockets
-	] == expected
+	assert [bool(s.close.await_count) for s in sockets] == expected
 	assert await registry.count_connections('a') == (
 		1 if operation == 'connection' else 0
 	)
@@ -150,9 +144,7 @@ async def test_prune_handles_idle_boundary_and_closed_sockets(
 	Expire exactly-hour-old activity but retain fresh sockets.
 	"""
 	now = get_utc_datetime_now()
-	monkeypatch.setattr(
-		module, 'get_utc_datetime_now', lambda: now
-	)
+	monkeypatch.setattr(module, 'get_utc_datetime_now', lambda: now)
 	idle = await registry.add_connection(
 		'a', 'idle', socket_factory()
 	)
@@ -262,3 +254,110 @@ async def test_cancelled_removal_finishes_detached_cleanup(
 		await asyncio.wait_for(removal, 1)
 	assert manager._close_complete.is_set()
 	assert not await registry.has_user('a')
+
+
+@pytest.mark.parametrize('concurrent', [False, True])
+async def test_fifth_connection_blocks_and_closes_user(
+	registry: WebSocketRegistry,
+	socket_factory: Callable[[], AsyncMock],
+	monkeypatch: pytest.MonkeyPatch,
+	concurrent: bool,
+) -> None:
+	"""Allow four sockets; block overflow without affecting peers."""
+	from fastapi import WebSocketException
+
+	from exceptions.security import EntityBlockedException
+	from schemas.security.monitoring.blocked import (
+		BlockedEntity,
+		BlockedRecord,
+	)
+
+	now = get_utc_datetime_now()
+	block = AsyncMock(
+		side_effect=EntityBlockedException(
+			BlockedRecord(
+				entity=BlockedEntity.USER,
+				entity_id='user',
+				blocked_at=now,
+				blocked_until=now + timedelta(hours=24),
+				reason='Active WebSocket connection limit exceeded.',
+			)
+		)
+	)
+	monkeypatch.setattr(module, 'apply_24h_block', block)
+	other = await registry.add_connection(
+		'other', 'one', socket_factory()
+	)
+	sockets = [socket_factory() for _ in range(5)]
+	for index in range(4):
+		await registry.add_connection(
+			'user', str(index), sockets[index]
+		)
+	assert await registry.count_connections('user') == 4
+	block.assert_not_awaited()
+	if concurrent:
+		results = await asyncio.gather(
+			registry.add_connection('user', 'four', sockets[4]),
+			registry.add_connection('user', 'five', socket_factory()),
+			return_exceptions=True,
+		)
+		assert all(isinstance(r, WebSocketException) for r in results)
+	else:
+		with pytest.raises(WebSocketException) as error:
+			await registry.add_connection('user', 'four', sockets[4])
+		assert error.value.code == 1008
+	block.assert_awaited_once_with(
+		BlockedEntity.USER,
+		'user',
+		'Active WebSocket connection limit exceeded.',
+	)
+	assert not await registry.has_user('user')
+	assert not other.is_closed
+	for socket in sockets:
+		socket.close.assert_awaited_once_with(
+			code=1008, reason='Access is blocked.'
+		)
+
+
+async def test_connection_block_write_failure_still_closes_sockets(
+	registry: WebSocketRegistry,
+	socket_factory: Callable[[], AsyncMock],
+	monkeypatch: pytest.MonkeyPatch,
+) -> None:
+	"""Fail closed and release the admission guard on DB failure."""
+	block = AsyncMock(
+		side_effect=RuntimeError('Database unavailable')
+	)
+	monkeypatch.setattr(module, 'apply_24h_block', block)
+	sockets = [socket_factory() for _ in range(5)]
+	for index in range(4):
+		await registry.add_connection(
+			'user', str(index), sockets[index]
+		)
+	with pytest.raises(RuntimeError, match='Database unavailable'):
+		await registry.add_connection('user', 'four', sockets[4])
+	assert not await registry.has_user('user')
+	assert 'user' not in registry._blocking_users
+	assert all(socket.close.await_count == 1 for socket in sockets)
+
+
+async def test_released_capacity_and_duplicate_do_not_block(
+	registry: WebSocketRegistry,
+	socket_factory: Callable[[], AsyncMock],
+	monkeypatch: pytest.MonkeyPatch,
+) -> None:
+	"""Count distinct tracked connections and reuse freed slots."""
+	block = AsyncMock()
+	monkeypatch.setattr(module, 'apply_24h_block', block)
+	for index in range(4):
+		await registry.add_connection(
+			'user', str(index), socket_factory()
+		)
+	with pytest.raises(WebSocketRegistryException):
+		await registry.add_connection('user', '0', socket_factory())
+	await registry.remove_connection('user', '0')
+	await registry.add_connection(
+		'user', 'replacement', socket_factory()
+	)
+	assert await registry.count_connections('user') == 4
+	block.assert_not_awaited()

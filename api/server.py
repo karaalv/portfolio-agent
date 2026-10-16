@@ -1,5 +1,6 @@
 """Configure the FastAPI application and its lifecycle."""
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -25,21 +26,31 @@ from api.utils.cors import get_allowed_origins
 from api.utils.requests import get_request_id
 from api.utils.responses import create_http_response
 from exceptions.core import PortfolioAgentException
+from shared.logging import LogStyle, rich_print
 
 # --- Lifecycle Management ---
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-	"""Start services and stop background work before clients."""
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+	"""Start services and clean up when server shutdown begins.
+
+	Uvicorn handles SIGINT and SIGTERM and ends this lifespan.
+	The cleanup path also covers interrupted or failed startup.
+	"""
 	maintenance_manager = MaintenanceManager()
 	security_manager = SecurityManager()
-	await start_api_lifecycle()
 	try:
+		await start_api_lifecycle()
 		await security_manager.start()
 		maintenance_manager.start()
 		yield
 	finally:
+		rich_print(
+			'Server termination detected. Shutting down services...',
+			style=LogStyle.INFO,
+			prefix='api.server',
+		)
 		try:
 			await maintenance_manager.stop()
 		finally:
@@ -47,6 +58,11 @@ async def lifespan(app: FastAPI):
 				await security_manager.stop()
 			finally:
 				await stop_api_lifecycle()
+		rich_print(
+			'Server shutdown complete.',
+			style=LogStyle.SUCCESS,
+			prefix='api.server',
+		)
 
 
 # --- FastAPI App Initialization ---
@@ -65,7 +81,7 @@ app = FastAPI(
 
 
 @app.exception_handler(PortfolioAgentException)
-async def PORTFOLIO_AGENT_exception_handler(
+async def portfolio_agent_exception_handler(
 	request: Request, exc: PortfolioAgentException
 ) -> JSONResponse:
 	# Handle PortfolioAgentException

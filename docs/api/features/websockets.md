@@ -205,7 +205,22 @@ _registry: dict[str, dict[str, WebSocketManager]]
 ```
 
 `add_connection()` expects an accepted socket and starts its
-manager. Duplicate user/connection keys are rejected rather
+manager. The per-user limit comes from the user `ACTIVE_WS`
+usage policy, currently four connections. Attempting a fifth
+persists a 24-hour user block and closes both the attempted
+socket and all that user's tracked sockets with code `1008`.
+Other users are unaffected. Duplicate registration is an error,
+not a new connection, and does not trigger a block.
+
+Admission checks run under the registry lock. While a block is
+being persisted, further connections for that user are rejected.
+Database writes and socket closure run outside the lock. Block
+persistence failures still close the user's sockets and propagate
+the error. Subsequent authenticated handshakes use the existing
+persisted-block access checks. This limit uses local registry
+state under the single-instance operating model.
+
+Duplicate user/connection keys are rejected rather
 than replacing and leaking an existing manager.
 
 Queries include `has_user`, `has_connection`, `get_connection`

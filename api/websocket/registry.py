@@ -4,11 +4,16 @@ import asyncio
 import logging
 from datetime import timedelta
 
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketException
 
 from api.websocket.manager import WebSocketManager
+from exceptions.security import EntityBlockedException
 from exceptions.websocket import WebSocketRegistryException
 from schemas.api.ws.response import WebSocketResponse
+from schemas.security.monitoring.blocked import BlockedEntity
+from schemas.security.monitoring.usage import UsageEntity, UsageScope
+from security.monitoring.blocked.enforcement import apply_24h_block
+from security.monitoring.usage.config import get_usage_policy
 from shared.time import get_utc_datetime_now
 
 _INACTIVE_CONNECTION_SECONDS = 60 * 60
@@ -28,10 +33,9 @@ class WebSocketRegistry:
 		"""
 		Prepare tracking state without starting background work.
 		"""
-		self._registry: dict[
-			str, dict[str, WebSocketManager]
-		] = {}
+		self._registry: dict[str, dict[str, WebSocketManager]] = {}
 		self._lock = asyncio.Lock()
+		self._blocking_users: set[str] = set()
 		self._pruner_task: asyncio.Task[None] | None = None
 		self._is_stopped = False
 
@@ -85,9 +89,7 @@ class WebSocketRegistry:
 		Find a manager without holding a lock for later I/O.
 		"""
 		async with self._lock:
-			return self._registry.get(user_id, {}).get(
-				connection_id
-			)
+			return self._registry.get(user_id, {}).get(connection_id)
 
 	async def count_connections(self, user_id: str) -> int:
 		"""Count tracked connections for one user."""
@@ -104,6 +106,7 @@ class WebSocketRegistry:
 		"""Track an accepted socket and start its manager.
 
 		Reject duplicate keys rather than leaking an old manager.
+		Block on the fifth connection using the user usage policy.
 		"""
 		async with self._lock:
 			if self._is_stopped:
@@ -116,14 +119,56 @@ class WebSocketRegistry:
 					'The connection is already registered.',
 					'add_connection',
 				)
-			manager = WebSocketManager(
-				user_id, connection_id, websocket, request_id
+			blocking = user_id in self._blocking_users
+			limit = get_usage_policy(
+				UsageEntity.USER, UsageScope.ACTIVE_WS
+			).limit
+			exceeded = len(connections) >= limit
+			if not blocking and not exceeded:
+				manager = WebSocketManager(
+					user_id, connection_id, websocket, request_id
+				)
+				manager.start()
+				self._registry.setdefault(user_id, {})[
+					connection_id
+				] = manager
+				return manager
+			if not blocking:
+				self._blocking_users.add(user_id)
+
+		# Keep database writes and socket closure outside the lock.
+		if blocking:
+			await websocket.close(
+				code=1008, reason='Access is blocked.'
 			)
-			manager.start()
-			self._registry.setdefault(user_id, {})[
-				connection_id
-			] = manager
-			return manager
+			raise WebSocketException(
+				code=1008, reason='Access is blocked.'
+			)
+		try:
+			try:
+				await apply_24h_block(
+					BlockedEntity.USER,
+					user_id,
+					'Active WebSocket connection limit exceeded.',
+				)
+			except EntityBlockedException as exc:
+				raise WebSocketException(
+					code=1008, reason='Access is blocked.'
+				) from exc
+			finally:
+				try:
+					await self.remove_user_connections(
+						user_id,
+						reason='Access is blocked.',
+						close_code=1008,
+					)
+				finally:
+					await websocket.close(
+						code=1008, reason='Access is blocked.'
+					)
+		finally:
+			async with self._lock:
+				self._blocking_users.discard(user_id)
 
 	async def remove_connection(
 		self,
@@ -200,9 +245,7 @@ class WebSocketRegistry:
 		"""
 		Queue output on one tracked connection, if still open.
 		"""
-		manager = await self.get_connection(
-			user_id, connection_id
-		)
+		manager = await self.get_connection(user_id, connection_id)
 		if manager is None:
 			return False
 		return await manager.send_message(message)
@@ -230,9 +273,7 @@ class WebSocketRegistry:
 		)
 		managers: list[WebSocketManager] = []
 		async with self._lock:
-			for user_id, connections in list(
-				self._registry.items()
-			):
+			for user_id, connections in list(self._registry.items()):
 				for connection_id, manager in list(
 					connections.items()
 				):

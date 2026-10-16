@@ -102,7 +102,6 @@ async def agent_chat(
 				connection_id=connection_id,
 				timer=timer,
 			)
-
 		finally:
 			await send_agent_ws_response(
 				user_id,
