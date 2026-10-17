@@ -9,7 +9,7 @@
 - `clients/openai/functionality/`: embeddings, text, structured
   responses, streamed text and streamed function calls.
 - `clients/posthog/unit/`: configuration, threaded shutdown and
-  explicit exception capture, with no live telemetry.
+  explicit exception capture, plus in-memory OTLP logging checks.
 - `agent/unit/<scope>/`: streaming state, memory, chat and tools.
 - `agent/integration/<scope>/`: memory, chat, tools and main
   loop.
@@ -47,6 +47,7 @@ uv run pytest tests/users/unit
 uv run pytest tests/agent/unit
 uv run pytest tests/api/dependencies/unit tests/security/unit
 uv run pytest tests/clients/posthog tests/api/general
+uv run pytest tests/shared/test_logging.py
 ```
 
 PostHog starts with the API only in `development` and `production`.
@@ -54,6 +55,10 @@ Its startup requires non-blank `POSTHOG_API_KEY` and `POSTHOG_HOST`.
 The exception wrapper returns without accessing a client when
 `PORTFOLIO_AGENT_ENV=testing`; testing does not need PostHog settings.
 Do not use live PostHog credentials for unit tests.
+Logging tests use an in-memory OpenTelemetry exporter and verify
+typed fields, tracebacks, caller locations, environment gating,
+restart behaviour and threaded queue draining. Shared logging helpers
+remain available in testing without a remote exporter.
 
 ## Live integration tests
 

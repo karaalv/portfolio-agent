@@ -5,6 +5,7 @@ import asyncio
 from posthog import Posthog
 
 from exceptions.posthog import PostHogException
+from posthog_client._logging import start_logging, stop_logging
 from posthog_client.environment import require_environment_variable
 from shared.logging import LogStyle, rich_print
 
@@ -23,6 +24,7 @@ def start_posthog_client() -> None:
 		host=host,
 		enable_exception_autocapture=False,
 	)
+	start_logging(api_key, host)
 	rich_print(
 		'PostHog client started successfully.',
 		style=LogStyle.SUCCESS,
@@ -34,10 +36,14 @@ async def stop_posthog_client() -> None:
 	"""Detach the client and drain its queue off the event loop."""
 	global _posthog_client
 	client = _posthog_client
+	_posthog_client = None
+	try:
+		if client is not None:
+			await asyncio.to_thread(client.shutdown)
+	finally:
+		await stop_logging()
 	if client is None:
 		return
-	_posthog_client = None
-	await asyncio.to_thread(client.shutdown)
 	rich_print(
 		'PostHog client stopped successfully.',
 		style=LogStyle.SUCCESS,

@@ -34,6 +34,35 @@ uv pip compile --python .venv/bin/python requirements.in -o requirements.txt --c
 uv pip sync --python .venv/bin/python requirements.txt --cache-dir .uv/cache
 ```
 
+### Application logging
+
+Use the shared helpers for application logs:
+
+```python
+from shared.logging import log_error, log_info
+
+log_info('Maintenance completed', {'deleted_count': 3})
+
+try:
+    perform_operation()
+except Exception as exc:
+    log_error('Operation failed', {'operation': 'example'}, exc=exc)
+```
+
+Helpers are available for DEBUG, INFO, WARNING, ERROR and CRITICAL.
+The `portfolio_agent` logger writes INFO and above to the terminal.
+ERROR and CRITICAL accept an optional `exc` to retain the traceback.
+Pass typed attributes through `extra`, avoiding Python's reserved log
+record keys such as `message`, `name` and `levelname`.
+
+In development and production, PostHog startup attaches one batched
+OpenTelemetry handler to this logger. Logs go to
+`POSTHOG_HOST/i/v1/logs` with `POSTHOG_API_KEY` authentication.
+Shutdown detaches the handler and drains the provider in a thread.
+Testing keeps local logging but never creates the remote exporter.
+Existing `rich_print` output and module loggers are not automatically
+exported; use the shared helpers for application logs sent to PostHog.
+
 ### Environment configuration
 
 Set `PORTFOLIO_AGENT_ENV` to `testing`, `development` or

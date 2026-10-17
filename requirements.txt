@@ -31,6 +31,8 @@ dnspython==2.8.0
     # via pymongo
 fastapi==0.141.1
     # via -r requirements.in
+googleapis-common-protos==1.75.5
+    # via opentelemetry-exporter-otlp-proto-http
 h11==0.16.0
     # via
     #   httpcore
@@ -60,12 +62,53 @@ mdurl==0.1.2
     # via markdown-it-py
 openai==3.20.0
     # via -r requirements.in
+opentelemetry-api==1.45.1
+    # via
+    #   -r requirements.in
+    #   opentelemetry-exporter-http-transport
+    #   opentelemetry-exporter-otlp-proto-http
+    #   opentelemetry-instrumentation
+    #   opentelemetry-instrumentation-logging
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
+opentelemetry-exporter-http-transport==0.66b1
+    # via opentelemetry-exporter-otlp-proto-http
+opentelemetry-exporter-otlp-common==0.66b1
+    # via opentelemetry-exporter-otlp-proto-http
+opentelemetry-exporter-otlp-proto-common==1.45.1
+    # via opentelemetry-exporter-otlp-proto-http
+opentelemetry-exporter-otlp-proto-http==1.45.1
+    # via -r requirements.in
+opentelemetry-instrumentation==0.66b1
+    # via opentelemetry-instrumentation-logging
+opentelemetry-instrumentation-logging==0.66b1
+    # via -r requirements.in
+opentelemetry-proto==1.45.1
+    # via
+    #   opentelemetry-exporter-otlp-proto-common
+    #   opentelemetry-exporter-otlp-proto-http
+opentelemetry-sdk==1.45.1
+    # via
+    #   -r requirements.in
+    #   opentelemetry-exporter-otlp-common
+    #   opentelemetry-exporter-otlp-proto-http
+opentelemetry-semantic-conventions==0.66b1
+    # via
+    #   opentelemetry-instrumentation
+    #   opentelemetry-instrumentation-logging
+    #   opentelemetry-sdk
 packaging==26.3
-    # via pytest
+    # via
+    #   opentelemetry-instrumentation
+    #   pytest
 pluggy==1.6.0
     # via pytest
 posthog==7.71.0
     # via -r requirements.in
+protobuf==7.36.2
+    # via
+    #   googleapis-common-protos
+    #   opentelemetry-proto
 pydantic==2.13.5
     # via
     #   -r requirements.in
@@ -94,6 +137,8 @@ regex==2026.9.29
 requests==2.34.2
     # via
     #   -r requirements.in
+    #   opentelemetry-exporter-http-transport
+    #   opentelemetry-exporter-otlp-proto-http
     #   posthog
     #   tiktoken
 rich==15.0.0
@@ -113,6 +158,10 @@ typing-extensions==4.16.0
     #   anyio
     #   fastapi
     #   openai
+    #   opentelemetry-api
+    #   opentelemetry-exporter-otlp-proto-http
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
     #   posthog
     #   pydantic
     #   pydantic-core
@@ -129,3 +178,5 @@ uvicorn==0.54.0
     # via -r requirements.in
 websockets==17.1
     # via -r requirements.in
+wrapt==2.5.1
+    # via opentelemetry-instrumentation

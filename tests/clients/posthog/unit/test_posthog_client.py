@@ -1,7 +1,7 @@
 """Verify telemetry lifecycle and capture without network calls."""
 
 import threading
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -15,6 +15,8 @@ pytestmark = pytest.mark.unit
 def isolated_client(monkeypatch: pytest.MonkeyPatch) -> None:
 	"""Keep every test independent of credentials and live clients."""
 	monkeypatch.setattr(config, '_posthog_client', None)
+	monkeypatch.setattr(config, 'start_logging', Mock())
+	monkeypatch.setattr(config, 'stop_logging', AsyncMock())
 	monkeypatch.setenv('POSTHOG_API_KEY', ' test-project-key ')
 	monkeypatch.setenv('POSTHOG_HOST', ' https://example.com ')
 	monkeypatch.setenv('PORTFOLIO_AGENT_ENV', 'development')
