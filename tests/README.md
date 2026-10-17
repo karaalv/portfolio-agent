@@ -8,6 +8,8 @@
 - `clients/openai/connection/`: authenticated model listing.
 - `clients/openai/functionality/`: embeddings, text, structured
   responses, streamed text and streamed function calls.
+- `clients/posthog/unit/`: configuration, threaded shutdown and
+  explicit exception capture, with no live telemetry.
 - `agent/unit/<scope>/`: streaming state, memory, chat and tools.
 - `agent/integration/<scope>/`: memory, chat, tools and main
   loop.
@@ -44,7 +46,14 @@ No environment file or credentials are required:
 uv run pytest tests/users/unit
 uv run pytest tests/agent/unit
 uv run pytest tests/api/dependencies/unit tests/security/unit
+uv run pytest tests/clients/posthog tests/api/general
 ```
+
+PostHog starts with the API only in `development` and `production`.
+Its startup requires non-blank `POSTHOG_API_KEY` and `POSTHOG_HOST`.
+The exception wrapper returns without accessing a client when
+`PORTFOLIO_AGENT_ENV=testing`; testing does not need PostHog settings.
+Do not use live PostHog credentials for unit tests.
 
 ## Live integration tests
 

@@ -15,6 +15,10 @@ from openai_client.config import (
 	start_openai_client,
 	stop_openai_client,
 )
+from posthog_client.config import (
+	start_posthog_client,
+	stop_posthog_client,
+)
 from shared.logging import LogStyle, rich_print
 
 
@@ -28,6 +32,11 @@ async def start_api_lifecycle():
 		prefix='[API LIFECYCLE]',
 	)
 	load_environment_variables()
+	if getenv('PORTFOLIO_AGENT_ENV') in {
+		'development',
+		'production',
+	}:
+		start_posthog_client()
 	await start_mongo_client()
 	start_openai_client()
 	await start_websocket_registry()
@@ -58,7 +67,10 @@ async def stop_api_lifecycle():
 		try:
 			await stop_openai_client()
 		finally:
-			await stop_mongo_client()
+			try:
+				await stop_mongo_client()
+			finally:
+				await stop_posthog_client()
 
 	# Log successful shutdown
 	rich_print(

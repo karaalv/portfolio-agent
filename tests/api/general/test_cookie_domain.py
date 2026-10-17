@@ -21,6 +21,8 @@ def valid_environment(monkeypatch: pytest.MonkeyPatch) -> None:
 		'OPENAI_KEY': 'test-key',
 	}.items():
 		monkeypatch.setenv(name, value)
+	monkeypatch.delenv('POSTHOG_API_KEY', raising=False)
+	monkeypatch.delenv('POSTHOG_HOST', raising=False)
 
 
 @pytest.mark.parametrize('domain', [None, '', '   '])

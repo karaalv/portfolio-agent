@@ -3,6 +3,7 @@ aiolimiter
 APScheduler
 fastapi
 openai
+posthog>=7,<8
 pydantic
 pymongo
 PyJWT

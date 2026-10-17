@@ -58,22 +58,23 @@ def _check_environment_variable_int(name: str) -> None:
 		port = int(value) if value is not None else None
 	except ValueError as exc:
 		raise RuntimeError(
-			f"Environment variable '{name}' "
-			'must be an integer port.'
+			f"Environment variable '{name}' must be an integer port."
 		) from exc
 	if port is None or not 1 <= port <= 65535:
 		raise RuntimeError(
-			f"Environment variable '{name}' "
-			'must be a valid port.'
+			f"Environment variable '{name}' must be a valid port."
 		)
 
 
 def _check_environment() -> None:
 	"""Validate the settings needed to start the server."""
+	# Server settings
 	_check_environment_variable_str('PORTFOLIO_AGENT_ENV')
 	_check_environment_variable_int('PORTFOLIO_AGENT_PORT')
 	_check_environment_variable_str('CORS_ORIGINS')
 	_check_environment_variable_str('COOKIE_DOMAIN')
 	_check_environment_variable_str('JWT_SECRET')
+	# Database settings
 	_check_environment_variable_str('MONGODB_URI')
+	# OpenAI settings
 	_check_environment_variable_str('OPENAI_KEY')

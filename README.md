@@ -25,11 +25,13 @@ Use Python 3.14 and uv. Run all commands from the repository root.
 Dependencies follow the `uv pip` workflow: `requirements.in`
 contains direct dependencies and `requirements.txt` contains the
 resolved versions.
+This repository does not use `uv.lock`.
 
 ```sh
 uv python install 3.14
 uv venv --python 3.14
-uv pip sync requirements.txt
+uv pip compile --python .venv/bin/python requirements.in -o requirements.txt --cache-dir .uv/cache
+uv pip sync --python .venv/bin/python requirements.txt --cache-dir .uv/cache
 ```
 
 ### Environment configuration
