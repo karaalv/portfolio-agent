@@ -16,6 +16,32 @@ from shared.time import get_utc_datetime_now
 pytestmark = pytest.mark.unit
 
 
+async def test_replay_sessions_are_scoped_to_connections(
+	registry: WebSocketRegistry,
+	socket_factory: Callable[[], AsyncMock],
+) -> None:
+	"""One backend user may have different browser replay sessions."""
+	first = await registry.add_connection(
+		'user',
+		'one',
+		socket_factory(),
+		posthog_session_id='session-one',
+	)
+	second = await registry.add_connection(
+		'user',
+		'two',
+		socket_factory(),
+		posthog_session_id='session-two',
+	)
+	third = await registry.add_connection(
+		'user', 'three', socket_factory()
+	)
+	assert first.posthog_session_id == 'session-one'
+	assert second.posthog_session_id == 'session-two'
+	assert third.posthog_session_id is None
+	assert first.user_id == second.user_id == third.user_id == 'user'
+
+
 async def test_tracking_is_scoped_by_user_and_connection(
 	registry: WebSocketRegistry,
 	socket_factory: Callable[[], AsyncMock],

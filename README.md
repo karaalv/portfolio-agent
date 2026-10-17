@@ -63,14 +63,35 @@ Testing keeps local logging but never creates the remote exporter.
 Existing `rich_print` output and module loggers are not automatically
 exported; use the shared helpers for application logs sent to PostHog.
 
+### Browser replay context
+
+HTTP requests may send `X-POSTHOG-SESSION-ID`.
+`PostHogSessionIdMiddleware` stores the trimmed value on
+`request.state.posthog_session_id`; routes and exception handlers can
+read it using `api.utils.requests.get_posthog_session_id(request)`.
+Missing or blank values return `None`; no session ID is generated.
+
+WebSocket clients may include `session_id` in the `/agent/ws/agent-chat`
+handshake query string. The trimmed value is retained on
+`ws.state.posthog_session_id` and `WebSocketManager.posthog_session_id`
+for that connection. Reconnect with the current ID if the browser's
+replay session changes. Existing clients may omit it.
+
+When frontend tracking is implemented, configure PostHog
+`tracing_headers` with the backend hostname, without protocol, port or
+path. This supplies the HTTP header for fetch/XHR; the WebSocket query
+parameter must be supplied explicitly. Backend user IDs continue to
+come from application identity resolution, never the session ID or
+`X-POSTHOG-DISTINCT-ID` header. This scaffolding does not start replay
+recording or attach session IDs to telemetry yet.
+
 ### Environment configuration
 
 Set `PORTFOLIO_AGENT_ENV` to `testing`, `development` or
 `production`. The corresponding file must exist in the root:
 
-
 | Environment   | Required file      |
-| --------------- | -------------------- |
+|---------------| -------------------|
 | `testing`     | `.env.testing`     |
 | `development` | `.env.development` |
 | `production`  | `.env.production`  |
@@ -182,9 +203,8 @@ individual upload and index commands.
 
 ## Project structure
 
-
 | Path                                    | Responsibility                                                                  |
-| ----------------------------------------- | --------------------------------------------------------------------------------- |
+|-----------------------------------------| --------------------------------------------------------------------------------|
 | `run.py`                                | Environment validation and Uvicorn startup.                                     |
 | `api/`                                  | FastAPI routes, dependencies, middleware and service lifecycles.                |
 | `api/websocket/`                        | Connection managers, registry, protocol helpers and delivery.                   |

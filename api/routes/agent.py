@@ -35,13 +35,17 @@ async def agent_chat_ws(
 	ip_address: WSIPAccess,
 	access_token: str | None = None,
 	request_id: str | None = None,
+	session_id: str | None = None,
 ) -> None:
 	"""Resolve an identity and run sequential agent turns.
 
 	The optional access_token comes from the query string.
 	Use the query request_id for handshake response metadata.
+	Retain the query session_id as browser replay context only.
 	Issue a claim token after registering anonymous sockets.
 	"""
+	posthog_session_id = (session_id or '').strip() or None
+	ws.state.posthog_session_id = posthog_session_id
 	user_id, claim_token = await resolve_ws_user(access_token)
 	connection_id = generate_uuid_str()
 	request_id = request_id or generate_uuid_str()
@@ -49,7 +53,11 @@ async def agent_chat_ws(
 	await ws.accept()
 	try:
 		manager = await registry.add_connection(
-			user_id, connection_id, ws, request_id
+			user_id,
+			connection_id,
+			ws,
+			request_id,
+			posthog_session_id=posthog_session_id,
 		)
 		await send_claim_token(manager, claim_token)
 		while True:
@@ -70,9 +78,7 @@ async def agent_chat_ws(
 					)
 				)
 				continue
-			async with agent_message_rate_limit(
-				user_id, ip_address
-			):
+			async with agent_message_rate_limit(user_id, ip_address):
 				await agent_chat(
 					user_id=user_id,
 					user_input=user_input,

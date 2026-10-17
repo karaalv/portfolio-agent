@@ -38,12 +38,14 @@ class WebSocketManager:
 		connection_id: str,
 		websocket: WebSocket,
 		request_id: str | None = None,
+		posthog_session_id: str | None = None,
 	) -> None:
 		"""Prepare a bounded queue without starting tasks."""
 		self.user_id = user_id
 		self.connection_id = connection_id
 		self.websocket = websocket
 		self.request_id = request_id or generate_uuid_str()
+		self.posthog_session_id = posthog_session_id
 		self.created_at = get_utc_datetime_now()
 		self.last_message_at = self.created_at
 		self._message_queue: asyncio.Queue[WebSocketResponse] = (

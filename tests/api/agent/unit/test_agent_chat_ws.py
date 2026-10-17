@@ -2,6 +2,7 @@
 
 from typing import cast
 from unittest.mock import ANY, AsyncMock
+from urllib.parse import urlencode
 
 import pytest
 from fastapi import HTTPException
@@ -25,6 +26,54 @@ from security.lifecycle import get_limiter
 _PATH = '/agent/ws/agent-chat'
 
 
+@pytest.mark.parametrize(
+	'session_id', [None, '', '   ', ' session-1 ']
+)
+def test_handshake_retains_session_without_changing_identity(
+	ws_client: TestClient,
+	session_id: str | None,
+) -> None:
+	"""Keep replay context on the connection and socket state."""
+	observed: list[tuple[str, str | None, str | None]] = []
+
+	async def reply(user_id, user_input, connection_id):
+		registry = agent.get_websocket_registry()
+		manager = await registry.get_connection(
+			user_id, connection_id
+		)
+		assert manager is not None
+		observed.append(
+			(
+				manager.user_id,
+				manager.posthog_session_id,
+				manager.websocket.state.posthog_session_id,
+			)
+		)
+		await manager.send_message(
+			create_ws_warning_response('received')
+		)
+
+	cast(AsyncMock, agent.agent_chat).side_effect = reply
+	query = {
+		'access_token': create_token('visitor'),
+		'user_id': 'forged',
+	}
+	if session_id is not None:
+		query['session_id'] = session_id
+	with ws_client.websocket_connect(
+		f'{_PATH}?{urlencode(query)}',
+		headers={'X-POSTHOG-DISTINCT-ID': 'forged'},
+	) as ws:
+		for _ in range(2):
+			ws.send_json(
+				{'type': 'agent_message', 'payload': 'Hello'}
+			)
+			while ws.receive_json()['type'] != 'warning':
+				pass
+	expected = (session_id or '').strip() or None
+	assert observed == [('visitor', expected, expected)] * 2
+
+
 def test_anonymous_socket_issues_token_and_runs_agent(
 	ws_client: TestClient,
 ) -> None:
@@ -36,17 +85,10 @@ def test_anonymous_socket_issues_token_and_runs_agent(
 			response = ws.receive_json()
 			if response['type'] == 'set_user_token':
 				break
-		assert (
-			response['meta']['request_id'] == 'handshake-request'
-		)
-		assert (
-			validate_token(response['payload'])['sub']
-			== 'visitor'
-		)
+		assert response['meta']['request_id'] == 'handshake-request'
+		assert validate_token(response['payload'])['sub'] == 'visitor'
 		ws.send_json({'type': 'heartbeat', 'payload': 'pong'})
-		ws.send_json(
-			{'type': 'agent_message', 'payload': 'Hello'}
-		)
+		ws.send_json({'type': 'agent_message', 'payload': 'Hello'})
 		ws.send_text('invalid json')
 		with pytest.raises(WebSocketDisconnect) as exc:
 			while True:
@@ -83,9 +125,7 @@ def test_message_responses_use_current_request_id(
 	) -> None:
 		"""Queue mock output through the actual socket manager."""
 		registry = agent.get_websocket_registry()
-		manager = next(
-			iter(registry._registry[user_id].values())
-		)
+		manager = next(iter(registry._registry[user_id].values()))
 		await registry.send_connection(
 			user_id,
 			manager.connection_id,
@@ -187,9 +227,7 @@ def test_message_limit_closes_socket_before_agent(
 	with ws_client.websocket_connect(
 		f'{_PATH}?access_token={token}'
 	) as ws:
-		ws.send_json(
-			{'type': 'agent_message', 'payload': 'Hello'}
-		)
+		ws.send_json({'type': 'agent_message', 'payload': 'Hello'})
 		with pytest.raises(WebSocketDisconnect) as exc:
 			while True:
 				ws.receive_json()

@@ -16,6 +16,9 @@ from api.maintenance.maintenance_manager import (
 	MaintenanceManager,
 )
 from api.middleware.origin import OriginMiddleware
+from api.middleware.posthog_session_id import (
+	PostHogSessionIdMiddleware,
+)
 from api.middleware.request_id import RequestIdMiddleware
 from api.routes.agent import agent_router
 from api.routes.agent_memory import agent_memory_router
@@ -147,8 +150,9 @@ app.add_middleware(
 	allow_headers=['*'],
 )
 
-# - Request ID Middleware -
+# - Request Correlation Middleware -
 
+app.add_middleware(PostHogSessionIdMiddleware)
 app.add_middleware(RequestIdMiddleware)
 
 

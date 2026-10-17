@@ -1,4 +1,4 @@
-"""Retrieve request IDs and server-resolved client addresses."""
+"""Retrieve request correlation and server-resolved addresses."""
 
 from fastapi import (
 	HTTPException,
@@ -18,6 +18,14 @@ def get_request_id(request: Request) -> str:
 	if header_request_id:
 		return header_request_id
 	return getattr(request.state, 'request_id', '')
+
+
+def get_posthog_session_id(request: Request) -> str | None:
+	"""Return optional browser replay context from request state.
+
+	This client-supplied value never establishes user identity.
+	"""
+	return getattr(request.state, 'posthog_session_id', None)
 
 
 def get_http_ip(request: Request) -> str:

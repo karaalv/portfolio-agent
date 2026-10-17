@@ -102,6 +102,7 @@ class WebSocketRegistry:
 		connection_id: str,
 		websocket: WebSocket,
 		request_id: str | None = None,
+		posthog_session_id: str | None = None,
 	) -> WebSocketManager:
 		"""Track an accepted socket and start its manager.
 
@@ -126,7 +127,11 @@ class WebSocketRegistry:
 			exceeded = len(connections) >= limit
 			if not blocking and not exceeded:
 				manager = WebSocketManager(
-					user_id, connection_id, websocket, request_id
+					user_id,
+					connection_id,
+					websocket,
+					request_id,
+					posthog_session_id=posthog_session_id,
 				)
 				manager.start()
 				self._registry.setdefault(user_id, {})[
