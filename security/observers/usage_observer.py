@@ -5,6 +5,7 @@ from datetime import timedelta
 from time import perf_counter
 from typing import Any
 
+from posthog_client.tracing import start_span
 from security.monitoring.usage.config import USAGE_RETENTION_DAYS
 from security.monitoring.usage.deletion import (
 	prune_inactive_usage,
@@ -44,27 +45,28 @@ class UsageObserver:
 
 	async def run_once(self) -> None:
 		"""Reset older days and prune inactive records."""
-		started = perf_counter()
-		self._progress = {'operation': 'reset_daily_usage'}
-		reset_count = await reset_daily_usage()
-		self._progress = {
-			'operation': 'prune_inactive_usage',
-			'records_reset': reset_count,
-		}
-		deleted_count = await prune_inactive_usage()
-		log_info(
-			'usage_maintenance_completed',
-			log_properties(
+		with start_span('maintenance.usage.prune'):
+			started = perf_counter()
+			self._progress = {'operation': 'reset_daily_usage'}
+			reset_count = await reset_daily_usage()
+			self._progress = {
+				'operation': 'prune_inactive_usage',
+				'records_reset': reset_count,
+			}
+			deleted_count = await prune_inactive_usage()
+			log_info(
 				'usage_maintenance_completed',
-				records_reset=reset_count,
-				records_deleted=deleted_count,
-				cutoff=(
-					get_utc_datetime_now()
-					- timedelta(days=USAGE_RETENTION_DAYS)
-				).isoformat(),
-				duration_seconds=perf_counter() - started,
-			),
-		)
+				log_properties(
+					'usage_maintenance_completed',
+					records_reset=reset_count,
+					records_deleted=deleted_count,
+					cutoff=(
+						get_utc_datetime_now()
+						- timedelta(days=USAGE_RETENTION_DAYS)
+					).isoformat(),
+					duration_seconds=perf_counter() - started,
+				),
+			)
 
 	async def _run(self) -> None:
 		"""Reconcile at startup, then at each UTC midnight."""

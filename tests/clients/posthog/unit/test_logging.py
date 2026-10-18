@@ -8,11 +8,15 @@ from unittest.mock import Mock
 import pytest
 from opentelemetry._logs import get_logger_provider
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+	InMemorySpanExporter,
+)
 
 from agent.logging.events import log_turn_finished
 from agent.observability import AgentTimer
 from exceptions.core import PortfolioAgentException
 from posthog_client import _logging, config, error_tracking
+from posthog_client.tracing import start_span
 from shared.logging import log_error, log_info
 from shared.logging.logger import LOGGER_NAME
 
@@ -72,6 +76,11 @@ async def isolated_pipeline(
 	exporter = RecordingExporter()
 	factory = Mock(return_value=exporter)
 	monkeypatch.setattr(_logging, 'OTLPLogExporter', factory)
+	monkeypatch.setattr(
+		_logging,
+		'OTLPSpanExporter',
+		Mock(return_value=InMemorySpanExporter()),
+	)
 	try:
 		yield exporter, factory
 	finally:
@@ -123,6 +132,42 @@ async def test_pipeline_preserves_structured_fields_and_exception(
 		in error_attributes['exception.stacktrace']
 	)
 	assert get_logger_provider() is global_provider
+
+
+async def test_active_span_correlates_logs_and_drains_in_thread(
+	isolated_pipeline,
+	monkeypatch,
+):
+	"""Export matching trace IDs and drain spans during shutdown."""
+
+	class SpanExporter(InMemorySpanExporter):
+		def shutdown(self):
+			self.drained_spans = self.get_finished_spans()
+			self.shutdown_thread = threading.get_ident()
+			super().shutdown()
+
+	exporter = SpanExporter()
+	factory = Mock(return_value=exporter)
+	monkeypatch.setattr(_logging, 'OTLPSpanExporter', factory)
+	_logging.start_logging('key', 'https://example.com/')
+	factory.assert_called_once_with(
+		endpoint='https://example.com/i/v1/traces',
+		headers={'Authorization': 'Bearer key'},
+	)
+	with start_span('operation', 'visitor', 'session') as span:
+		log_info('Inside span')
+		context = span.get_span_context()
+	loop_thread = threading.get_ident()
+	await _logging.stop_logging()
+	assert len(exporter.drained_spans) == 1
+	assert exporter.shutdown_thread != loop_thread
+	record = isolated_pipeline[0].drained_logs[0].log_record
+	assert record.trace_id == context.trace_id
+	assert record.span_id == context.span_id
+	assert _logging._tracer_provider is None
+	_logging.start_logging('key', 'https://example.com')
+	with start_span('after_restart') as restarted:
+		assert restarted.is_recording()
 
 
 @pytest.mark.parametrize('environment', ['testing', None])

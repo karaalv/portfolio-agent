@@ -7,6 +7,7 @@ from time import perf_counter
 from aiolimiter import AsyncLimiter
 
 from posthog_client.error_tracking import report_exception
+from posthog_client.tracing import start_span
 from schemas.security.ratelimit import (
 	RateLimiter,
 	ResourceAccessor,
@@ -100,25 +101,28 @@ class RateLimitStore:
 
 	async def prune_once(self) -> None:
 		"""Remove limiters unused for more than three days."""
-		started = perf_counter()
-		async with self._limiters_lock:
-			cutoff = get_utc_datetime_now() - self._retention_period
-			keys = [
-				key
-				for key, record in self._limiters.items()
-				if record.last_accessed_at < cutoff
-			]
-			for key in keys:
-				del self._limiters[key]
-		log_info(
-			'rate_limit_cleanup_completed',
-			log_properties(
+		with start_span('maintenance.rate_limits.prune'):
+			started = perf_counter()
+			async with self._limiters_lock:
+				cutoff = (
+					get_utc_datetime_now() - self._retention_period
+				)
+				keys = [
+					key
+					for key, record in self._limiters.items()
+					if record.last_accessed_at < cutoff
+				]
+				for key in keys:
+					del self._limiters[key]
+			log_info(
 				'rate_limit_cleanup_completed',
-				limiters_deleted=len(keys),
-				cutoff=cutoff.isoformat(),
-				duration_seconds=perf_counter() - started,
-			),
-		)
+				log_properties(
+					'rate_limit_cleanup_completed',
+					limiters_deleted=len(keys),
+					cutoff=cutoff.isoformat(),
+					duration_seconds=perf_counter() - started,
+				),
+			)
 
 	async def _cleanup_loop(self) -> None:
 		"""Prune every twelve hours until cancelled."""

@@ -3,6 +3,7 @@
 import asyncio
 from time import perf_counter
 
+from posthog_client.tracing import start_span
 from security.monitoring.blocked.config import (
 	BLOCK_CLEANUP_INTERVAL_SECONDS,
 )
@@ -41,16 +42,17 @@ class BlockObserver:
 
 	async def run_once(self) -> None:
 		"""Delete expired block records from MongoDB."""
-		started = perf_counter()
-		deleted_count = await prune_expired_blocks()
-		log_info(
-			'block_cleanup_completed',
-			log_properties(
+		with start_span('maintenance.blocks.prune'):
+			started = perf_counter()
+			deleted_count = await prune_expired_blocks()
+			log_info(
 				'block_cleanup_completed',
-				blocks_deleted=deleted_count,
-				duration_seconds=perf_counter() - started,
-			),
-		)
+				log_properties(
+					'block_cleanup_completed',
+					blocks_deleted=deleted_count,
+					duration_seconds=perf_counter() - started,
+				),
+			)
 
 	async def _run(self) -> None:
 		"""Prune at startup and every six hours thereafter."""

@@ -4,9 +4,15 @@ Coordinate portfolio conversations, retrieval tools, and memory.
 
 import asyncio
 import sys
+from collections.abc import Callable
 from contextlib import aclosing
 
-from openai.types.responses import ResponseInputParam
+from openai.types.responses import (
+	Response,
+	ResponseInputParam,
+	ResponseStreamEvent,
+)
+from opentelemetry.trace import Span, StatusCode
 
 from agent.config.agent import AGENT_TOOL_RECURSION_LIMIT
 from agent.input_items import response_item_to_input_item
@@ -37,6 +43,7 @@ from api.websocket.helpers.responses import (
 	create_ws_warning_response,
 )
 from openai_client.main import stream_agent_response
+from posthog_client.tracing import start_span
 from schemas.agent.streaming.stream_manager import (
 	EventStreamState,
 )
@@ -64,72 +71,99 @@ async def agent_chat(
 	stream_manager = StreamManager(
 		user_id=user_id, verbosity_level=verbosity_level
 	)
-	try:
-		with timer.measure(
-			'interaction', 'Agent turn'
-		) as interaction:
-			try:
-				await send_agent_ws_response(
-					user_id,
-					connection_id,
-					create_ws_agent_start_response(
-						'Agent turn started.'
-					),
-				)
+	with start_span(
+		'agent.turn',
+		user_id,
+		posthog_session_id,
+		attributes={
+			'turn_id': stream_manager.get_turn_id(),
+			'connection_id': connection_id,
+		},
+	) as turn_span:
+		try:
+			with timer.measure(
+				'interaction', 'Agent turn'
+			) as interaction:
 				try:
-					history = await retrieve_agent_memory_param(
-						user_id=user_id
+					await send_agent_ws_response(
+						user_id,
+						connection_id,
+						create_ws_agent_start_response(
+							'Agent turn started.'
+						),
 					)
-					current_memory = await create_user_memory(
-						user_id=user_id,
-						turn_id=stream_manager.get_turn_id(),
-						sequence=stream_manager.increment_turn_sequence_counter(),
-						content=user_input,
-					)
-					history.append(current_memory.payload)
-					if verbosity_level > 1:
-						log_agent_history(history)
-					await _agent_response_handler(
-						stream_manager=stream_manager,
-						history=history,
-						verbosity_level=verbosity_level,
-						connection_id=connection_id,
-						timer=timer,
-						posthog_session_id=posthog_session_id,
-					)
-				finally:
-					pending = sys.exception()
 					try:
-						await send_agent_ws_response(
+						with start_span(
+							'agent.memory.retrieve',
 							user_id,
-							connection_id,
-							create_ws_agent_end_response(
-								'Agent turn ended.'
-							),
+							posthog_session_id,
+						) as memory_span:
+							history = (
+								await retrieve_agent_memory_param(
+									user_id=user_id
+								)
+							)
+							memory_span.set_attribute(
+								'history_count', len(history)
+							)
+						current_memory = await create_user_memory(
+							user_id=user_id,
+							turn_id=stream_manager.get_turn_id(),
+							sequence=stream_manager.increment_turn_sequence_counter(),
+							content=user_input,
 						)
-					except Exception as cleanup_error:
-						if pending is None:
-							raise
-						pending.add_note(
-							'Agent-end delivery also failed: '
-							f'{type(cleanup_error).__name__}'
+						history.append(current_memory.payload)
+						if verbosity_level > 1:
+							log_agent_history(history)
+						await _agent_response_handler(
+							stream_manager=stream_manager,
+							history=history,
+							verbosity_level=verbosity_level,
+							connection_id=connection_id,
+							timer=timer,
+							posthog_session_id=posthog_session_id,
 						)
-			except asyncio.CancelledError:
-				timer.mark_outcome('cancelled')
-				raise
-			except Exception:
-				timer.mark_outcome('failed')
-				raise
-			finally:
-				interaction.finish(timer.outcome)
-	finally:
-		log_turn_finished(
-			timer,
-			user_id,
-			stream_manager.get_turn_id(),
-			connection_id,
-			posthog_session_id,
-		)
+					finally:
+						pending = sys.exception()
+						try:
+							await send_agent_ws_response(
+								user_id,
+								connection_id,
+								create_ws_agent_end_response(
+									'Agent turn ended.'
+								),
+							)
+						except Exception as cleanup_error:
+							if pending is None:
+								raise
+							pending.add_note(
+								'Agent-end delivery also failed: '
+								f'{type(cleanup_error).__name__}'
+							)
+				except asyncio.CancelledError:
+					timer.mark_outcome('cancelled')
+					raise
+				except Exception:
+					timer.mark_outcome('failed')
+					raise
+				finally:
+					interaction.finish(timer.outcome)
+		finally:
+			turn_span.set_attribute('outcome', timer.outcome)
+			if timer.outcome in {
+				'failed',
+				'interrupted',
+				'incomplete',
+				'degraded',
+			}:
+				turn_span.set_status(StatusCode.ERROR)
+			log_turn_finished(
+				timer,
+				user_id,
+				stream_manager.get_turn_id(),
+				connection_id,
+				posthog_session_id,
+			)
 
 
 # --- Helper Functions ---
@@ -160,24 +194,27 @@ async def _agent_response_handler(
 	)
 
 	completed = False
+	completed_response: Response | None = None
 	user_id = stream_manager.get_user_id()
-	with timer.measure(
-		'openai', f'Response round {recursion_depth + 1}'
-	) as response_timing:
+	with (
+		start_span(
+			'agent.openai.stream',
+			user_id,
+			posthog_session_id,
+			attributes={'round': recursion_depth + 1},
+		) as response_span,
+		timer.measure(
+			'openai', f'Response round {recursion_depth + 1}'
+		) as response_timing,
+	):
 		async with aclosing(client_stream) as events:
 			async for event in events:
-				model = getattr(
-					getattr(event, 'response', None), 'model', None
+				_log_event_state(
+					event,
+					response_span,
+					timer,
+					response_timing.finish,
 				)
-				if model is not None:
-					timer.model = model
-				if event.type in {
-					'response.completed',
-					'response.failed',
-					'response.incomplete',
-					'error',
-				}:
-					response_timing.finish(event.type)
 				if verbosity_level > 1:
 					rich_print(
 						f'Received event: {event}',
@@ -209,104 +246,60 @@ async def _agent_response_handler(
 						stream_manager.set_idle_state()
 				elif event.type == 'response.completed':
 					completed = True
-					for item in event.response.output:
-						# Append the response item to the
-						# conversation history
-						payload = response_item_to_input_item(item)
-						await create_response_item_memory(
-							stream_manager=stream_manager,
-							payload=payload,
-						)
-						history.append(payload)
-
-						if item.type == 'function_call':
-							stream_manager.add_function_call(
-								call_id=item.call_id,
-								tool_name=item.name,
-								tool_args=item.arguments,
-							)
+					completed_response = event.response
 					break
-				elif event.type == 'response.failed':
-					timer.mark_outcome('failed')
-					log_stream_outcome(
-						event.type,
-						user_id,
-						stream_manager.get_turn_id(),
-						recursion_depth + 1,
-						connection_id,
-						posthog_session_id,
-						event,
-					)
-					await send_agent_ws_response(
-						user_id,
-						connection_id,
-						create_ws_error_response(
-							'I could not generate a response. '
+				elif event.type in {
+					'response.failed',
+					'response.incomplete',
+					'error',
+				}:
+					message = {
+						'response.failed': (
+							'Could not generate a response. '
 							'Please try again.'
 						),
-					)
-					return
-				elif event.type == 'response.incomplete':
-					timer.mark_outcome('incomplete')
-					log_stream_outcome(
-						event.type,
-						user_id,
-						stream_manager.get_turn_id(),
-						recursion_depth + 1,
-						connection_id,
-						posthog_session_id,
-						event,
-					)
-					await send_agent_ws_response(
-						user_id,
-						connection_id,
-						create_ws_warning_response(
+						'response.incomplete': (
 							'This response is incomplete. '
 							'Please try again.'
 						),
-					)
-					return
-				elif event.type == 'error':
-					timer.mark_outcome('failed')
-					log_stream_outcome(
-						event.type,
-						user_id,
-						stream_manager.get_turn_id(),
+						'error': (
+							'The response was interrupted. '
+							'Please try again.'
+						),
+					}[event.type]
+					await _record_failed_stream(
+						'incomplete'
+						if event.type == 'response.incomplete'
+						else 'failed',
+						message,
+						stream_manager,
+						timer,
 						recursion_depth + 1,
 						connection_id,
 						posthog_session_id,
 						event,
 					)
-					await send_agent_ws_response(
-						user_id,
-						connection_id,
-						create_ws_error_response(
-							'The response was interrupted. '
-							'Please try again.'
-						),
-					)
 					return
 		response_timing.finish('interrupted')
+		if not completed:
+			response_span.set_attribute('outcome', 'interrupted')
+			response_span.set_status(StatusCode.ERROR)
 
 	# Stream closed
 	if not completed:
-		timer.mark_outcome('interrupted')
-		log_stream_outcome(
-			'interrupted',
-			user_id,
-			stream_manager.get_turn_id(),
+		await _log_stream_as_interrupted(
+			stream_manager,
+			timer,
 			recursion_depth + 1,
 			connection_id,
 			posthog_session_id,
 		)
-		await send_agent_ws_response(
-			user_id,
-			connection_id,
-			create_ws_error_response(
-				'The response was interrupted. Please try again.'
-			),
-		)
 		return
+
+	if completed_response is not None:
+		await _capture_completed_response(
+			completed_response, stream_manager, history
+		)
 
 	# Run function calls from manager and
 	# return results.
@@ -347,6 +340,108 @@ async def _agent_response_handler(
 	# Base case: Successfully reached the
 	# terminal answer
 	return None
+
+
+async def _record_failed_stream(
+	outcome: str,
+	message: str,
+	stream_manager: StreamManager,
+	timer: AgentTimer,
+	round_index: int,
+	connection_id: str | None,
+	posthog_session_id: str | None,
+	event: ResponseStreamEvent | None = None,
+) -> None:
+	"""Record a terminal failure and send its socket response."""
+	timer.mark_outcome(outcome)
+	user_id = stream_manager.get_user_id()
+	log_stream_outcome(
+		event.type if event is not None else 'interrupted',
+		user_id,
+		stream_manager.get_turn_id(),
+		round_index,
+		connection_id,
+		posthog_session_id,
+		event,
+	)
+	response = (
+		create_ws_warning_response(message)
+		if outcome == 'incomplete'
+		else create_ws_error_response(message)
+	)
+	await send_agent_ws_response(user_id, connection_id, response)
+
+
+async def _log_stream_as_interrupted(
+	stream_manager: StreamManager,
+	timer: AgentTimer,
+	round_index: int,
+	connection_id: str | None,
+	posthog_session_id: str | None,
+) -> None:
+	"""Report a stream closed without a terminal provider event."""
+	await _record_failed_stream(
+		'interrupted',
+		'The response was interrupted. Please try again.',
+		stream_manager,
+		timer,
+		round_index,
+		connection_id,
+		posthog_session_id,
+	)
+
+
+async def _capture_completed_response(
+	completed_response: Response,
+	stream_manager: StreamManager,
+	history: ResponseInputParam,
+) -> None:
+	"""Persist response items and collect their pending tool calls."""
+	for item in completed_response.output:
+		# Append the response item to the
+		# conversation history
+		payload = response_item_to_input_item(item)
+		await create_response_item_memory(
+			stream_manager=stream_manager,
+			payload=payload,
+		)
+		history.append(payload)
+
+		if item.type == 'function_call':
+			stream_manager.add_function_call(
+				call_id=item.call_id,
+				tool_name=item.name,
+				tool_args=item.arguments,
+			)
+
+
+def _log_event_state(
+	event: ResponseStreamEvent,
+	span: Span,
+	timer: AgentTimer,
+	finish_timing: Callable[[str], None],
+) -> None:
+	"""Update span metadata and time terminal response events."""
+	response = getattr(event, 'response', None)
+	model = getattr(response, 'model', None)
+	if model is not None:
+		timer.model = model
+		span.set_attribute('model', model)
+	reasoning = getattr(
+		getattr(response, 'reasoning', None), 'effort', None
+	)
+	if reasoning is not None:
+		span.set_attribute('reasoning', reasoning)
+	if event.type in {
+		'response.completed',
+		'response.failed',
+		'response.incomplete',
+		'error',
+	}:
+		finish_timing(event.type)
+		span.set_attribute('outcome', event.type)
+		if event.type != 'response.completed':
+			span.set_status(StatusCode.ERROR)
 
 
 def _get_agent_system_prompt() -> str:

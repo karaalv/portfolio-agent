@@ -3,6 +3,7 @@
 import asyncio
 
 from openai.types.responses import ResponseInputParam
+from opentelemetry.trace import StatusCode, get_current_span
 from pydantic import ValidationError
 
 from agent.input_items import create_function_output_item
@@ -16,6 +17,7 @@ from agent.prompts.tools import (
 	format_tool_exception_response,
 )
 from agent.tools.context import fetch_context
+from posthog_client.tracing import start_span
 from schemas.agent.streaming.stream_manager import (
 	StreamManagerFunctionCall,
 )
@@ -73,27 +75,38 @@ async def _run_tool_call(
 	posthog_session_id: str | None,
 ) -> str:
 	"""Time each tool independently, preserving call identity."""
-	if timer is None:
-		return await _dispatch_tool_call(
-			user_id,
-			call.tool_name,
-			call.tool_args,
-			verbose,
-			connection_id,
-			posthog_session_id=posthog_session_id,
-			call_id=call.call_id,
-		)
-	with timer.measure('tool', f'{call.tool_name} ({call.call_id})'):
-		return await _dispatch_tool_call(
-			user_id,
-			call.tool_name,
-			call.tool_args,
-			verbose,
-			connection_id,
-			posthog_session_id=posthog_session_id,
-			call_id=call.call_id,
-			timer=timer,
-		)
+	with start_span(
+		'agent.tool',
+		user_id,
+		posthog_session_id,
+		attributes={
+			'tool_name': call.tool_name,
+			'tool_args': call.tool_args,
+		},
+	):
+		if timer is None:
+			return await _dispatch_tool_call(
+				user_id,
+				call.tool_name,
+				call.tool_args,
+				verbose,
+				connection_id,
+				posthog_session_id=posthog_session_id,
+				call_id=call.call_id,
+			)
+		with timer.measure(
+			'tool', f'{call.tool_name} ({call.call_id})'
+		):
+			return await _dispatch_tool_call(
+				user_id,
+				call.tool_name,
+				call.tool_args,
+				verbose,
+				connection_id,
+				posthog_session_id=posthog_session_id,
+				call_id=call.call_id,
+				timer=timer,
+			)
 
 
 async def _dispatch_tool_call(
@@ -117,6 +130,7 @@ async def _dispatch_tool_call(
 					connection_id=connection_id,
 				)
 			case _:
+				get_current_span().set_status(StatusCode.ERROR)
 				if timer is not None:
 					timer.mark_outcome('degraded')
 				log_tool_rejected(
@@ -132,6 +146,7 @@ async def _dispatch_tool_call(
 					rich_print(message, style=LogStyle.WARNING)
 				return format_failed_tool_response(message)
 	except ValidationError as error:
+		get_current_span().set_status(StatusCode.ERROR)
 		if timer is not None:
 			timer.mark_outcome('degraded')
 		log_tool_rejected(
@@ -148,6 +163,7 @@ async def _dispatch_tool_call(
 			rich_print(message, style=LogStyle.WARNING)
 		return format_failed_tool_response(message)
 	except Exception as error:
+		get_current_span().set_status(StatusCode.ERROR)
 		if timer is not None:
 			timer.mark_outcome('degraded')
 		capture_tool_failure(

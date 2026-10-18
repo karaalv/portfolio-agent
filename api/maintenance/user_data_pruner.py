@@ -11,6 +11,7 @@ from pymongo.asynchronous.collection import AsyncCollection
 from database.mongodb.collections import MongoDBCollection
 from database.mongodb.main import get_collection
 from posthog_client.error_tracking import report_exception
+from posthog_client.tracing import start_span
 from shared.logging import log_info
 from shared.logging.context import log_properties
 
@@ -49,44 +50,45 @@ class UserDataPruner:
 
 	async def prune_once(self) -> None:
 		"""Delete inactive user records and their messages."""
-		cutoff = datetime.now(timezone.utc) - timedelta(days=7)
-		started = perf_counter()
-		self._progress = {
-			'cutoff': cutoff.isoformat(),
-			'candidate_count': 0,
-			'users_deleted': 0,
-			'messages_deleted': 0,
-			'skipped_users': 0,
-		}
-		users = get_collection(MongoDBCollection.USERS)
-		messages = get_collection(MongoDBCollection.MEMORIES)
+		with start_span('maintenance.user_data.prune'):
+			cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+			started = perf_counter()
+			self._progress = {
+				'cutoff': cutoff.isoformat(),
+				'candidate_count': 0,
+				'users_deleted': 0,
+				'messages_deleted': 0,
+				'skipped_users': 0,
+			}
+			users = get_collection(MongoDBCollection.USERS)
+			messages = get_collection(MongoDBCollection.MEMORIES)
 
-		ids = await self._get_inactive_users(users, cutoff)
+			ids = await self._get_inactive_users(users, cutoff)
 
-		self._progress['candidate_count'] = len(ids)
+			self._progress['candidate_count'] = len(ids)
 
-		for batch in batched(tuple(ids), self._batch_size):
-			results = await asyncio.gather(
-				*(
-					self._delete_user_data(
-						user_id, cutoff, users, messages
-					)
-					for user_id in batch
-				),
-				return_exceptions=True,
-			)
-			for result in results:
-				if isinstance(result, BaseException):
-					raise result
+			for batch in batched(tuple(ids), self._batch_size):
+				results = await asyncio.gather(
+					*(
+						self._delete_user_data(
+							user_id, cutoff, users, messages
+						)
+						for user_id in batch
+					),
+					return_exceptions=True,
+				)
+				for result in results:
+					if isinstance(result, BaseException):
+						raise result
 
-		log_info(
-			'user_data_prune_completed',
-			log_properties(
+			log_info(
 				'user_data_prune_completed',
-				**self._progress,
-				duration_seconds=perf_counter() - started,
-			),
-		)
+				log_properties(
+					'user_data_prune_completed',
+					**self._progress,
+					duration_seconds=perf_counter() - started,
+				),
+			)
 
 	async def _get_inactive_users(
 		self, users: AsyncCollection, cutoff: datetime
