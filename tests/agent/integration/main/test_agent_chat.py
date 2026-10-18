@@ -85,7 +85,7 @@ def _check_turn(
 				'function_call_output'
 			] * len(calls)
 			assert [p['call_id'] for p in results] == [
-				p['call_id'] # type: ignore
+				p['call_id']  # type: ignore
 				for p in calls
 			]
 			expected.extend(results)

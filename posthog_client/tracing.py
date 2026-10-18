@@ -1,6 +1,6 @@
 """Create application spans with optional server-owned identity."""
 
-from collections.abc import Iterator, Mapping, Generator
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from os import getenv
 
