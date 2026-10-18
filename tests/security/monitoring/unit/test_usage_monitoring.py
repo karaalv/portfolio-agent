@@ -95,8 +95,7 @@ async def test_request_uses_updated_statistics() -> None:
 			return_value=collection,
 		),
 		patch(
-			'security.monitoring.usage.update.'
-			'enforce_usage_limits',
+			'security.monitoring.usage.update.enforce_usage_limits',
 			new_callable=AsyncMock,
 		) as enforce,
 	):
@@ -109,9 +108,7 @@ async def test_request_uses_updated_statistics() -> None:
 	call = collection.find_one_and_update.call_args
 	assert call.args[0] == {'entity': 'user', 'entity_id': 'id'}
 	assert isinstance(call.args[1], list)
-	assert call.kwargs == {
-		'return_document': ReturnDocument.AFTER
-	}
+	assert call.kwargs == {'return_document': ReturnDocument.AFTER}
 	collection.update_one.assert_not_awaited()
 
 
@@ -124,9 +121,7 @@ async def test_updates_require_a_created_usage_record() -> None:
 		return_value=collection,
 	):
 		with pytest.raises(LookupError):
-			await record_request_usage(
-				UsageEntity.USER, 'missing'
-			)
+			await record_request_usage(UsageEntity.USER, 'missing')
 	collection.insert_one.assert_not_awaited()
 
 
@@ -136,9 +131,7 @@ async def test_negative_tokens_do_not_write_usage() -> None:
 		'security.monitoring.usage.update.get_collection'
 	) as get_collection:
 		with pytest.raises(ValueError):
-			await record_request_usage(
-				UsageEntity.USER, 'id', -1
-			)
+			await record_request_usage(UsageEntity.USER, 'id', -1)
 		get_collection.assert_not_called()
 
 
@@ -153,8 +146,7 @@ async def test_reconciliation_preserves_current_day() -> None:
 			return_value=collection,
 		),
 		patch(
-			'security.monitoring.usage.update.'
-			'get_utc_datetime_now',
+			'security.monitoring.usage.update.get_utc_datetime_now',
 			return_value=now,
 		),
 	):

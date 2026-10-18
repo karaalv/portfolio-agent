@@ -27,9 +27,7 @@ def test_heartbeat_and_ordered_agent_envelopes(
 		assert heartbeat['type'] == 'heartbeat'
 		assert heartbeat['payload'] == 'ping'
 		ws.send_json({'type': 'heartbeat', 'payload': 'pong'})
-		ws.send_json(
-			{'type': 'agent_message', 'payload': 'Hello'}
-		)
+		ws.send_json({'type': 'agent_message', 'payload': 'Hello'})
 		messages = [ws.receive_json() for _ in range(3)]
 		assert [message['type'] for message in messages] == [
 			'agent_start',
@@ -57,8 +55,7 @@ def test_targeted_delivery_isolates_connections_and_users(
 		for socket in (first, second, other):
 			assert socket.receive_json()['type'] == 'heartbeat'
 		assert (
-			harness.call(harness.registry.count_connections, 'a')
-			== 2
+			harness.call(harness.registry.count_connections, 'a') == 2
 		)
 		assert harness.call(
 			harness.registry.send_connection,

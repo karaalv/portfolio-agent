@@ -27,9 +27,7 @@ async def test_insertion_keeps_bson_timestamp(
 
 
 @pytest.mark.parametrize('role', ['user', 'assistant'])
-async def test_creation_packages_message(
-	role, memory_collection
-):
+async def test_creation_packages_message(role, memory_collection):
 	"""
 	Construct a message with the supplied turn and sequence.
 	"""
@@ -84,8 +82,7 @@ async def test_response_upload_stops_on_failure(
 		None,
 	]
 	payloads: ResponseInputParam = [
-		create_function_output_item(str(i), 'x')
-		for i in range(3)
+		create_function_output_item(str(i), 'x') for i in range(3)
 	]
 	with pytest.raises(RuntimeError, match='write failed'):
 		await creation.create_response_input_memories(

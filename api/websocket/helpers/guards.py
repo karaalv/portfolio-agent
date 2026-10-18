@@ -41,9 +41,7 @@ async def _block_oversized_input(
 ) -> NoReturn:
 	"""Persist a user block and close all their local sockets."""
 	try:
-		await apply_24h_block(
-			BlockedEntity.USER, user_id, reason
-		)
+		await apply_24h_block(BlockedEntity.USER, user_id, reason)
 	except EntityBlockedException as exc:
 		raise WebSocketException(
 			code=1009, reason='Input size limit exceeded.'

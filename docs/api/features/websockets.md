@@ -119,7 +119,7 @@ from api import websocket
 
 registry = websocket.get_websocket_registry()
 queued = await websocket.send_connection(
-    user_id, connection_id, response
+	user_id, connection_id, response
 )
 ```
 

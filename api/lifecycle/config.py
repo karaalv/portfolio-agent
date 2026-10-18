@@ -1,8 +1,11 @@
 """Configuration for the API lifecycle"""
 
+import sys
 from os import getenv
+from time import perf_counter
 
 from api.lifecycle.environment import load_environment_variables
+from api.lifecycle.logging import stop_component
 from api.websocket import (
 	start_websocket_registry,
 	stop_websocket_registry,
@@ -19,7 +22,8 @@ from posthog_client.config import (
 	start_posthog_client,
 	stop_posthog_client,
 )
-from shared.logging import LogStyle, rich_print
+from shared.logging import LogStyle, log_info, rich_print
+from shared.logging.context import log_properties
 
 
 async def start_api_lifecycle():
@@ -37,9 +41,16 @@ async def start_api_lifecycle():
 		'production',
 	}:
 		start_posthog_client()
-	await start_mongo_client()
-	start_openai_client()
-	await start_websocket_registry()
+	component = 'mongodb'
+	try:
+		await start_mongo_client()
+		component = 'openai'
+		start_openai_client()
+		component = 'websocket_registry'
+		await start_websocket_registry()
+	except Exception as exc:
+		exc.__dict__['lifecycle_component'] = component
+		raise
 
 	# Log successful startup
 	env = getenv('PORTFOLIO_AGENT_ENV')
@@ -54,23 +65,45 @@ async def start_api_lifecycle():
 	)
 
 
-async def stop_api_lifecycle():
+async def stop_api_lifecycle(
+	*,
+	shutdown_failed: bool = False,
+	shutdown_started: float | None = None,
+):
 	"""Close sockets before shutting down service clients."""
 	rich_print(
 		message='Stopping Portfolio Backend...',
 		style=LogStyle.INFO,
 		prefix='[API LIFECYCLE]',
 	)
+	started = (
+		shutdown_started
+		if shutdown_started is not None
+		else perf_counter()
+	)
 	try:
-		await stop_websocket_registry()
+		await stop_component(
+			stop_websocket_registry, 'websocket_registry'
+		)
 	finally:
 		try:
-			await stop_openai_client()
+			await stop_component(stop_openai_client, 'openai')
 		finally:
 			try:
-				await stop_mongo_client()
+				await stop_component(stop_mongo_client, 'mongodb')
 			finally:
-				await stop_posthog_client()
+				log_info(
+					'server_stopped',
+					log_properties(
+						'server_stopped',
+						duration_seconds=perf_counter() - started,
+						status='failed'
+						if shutdown_failed
+						or sys.exception() is not None
+						else 'completed',
+					),
+				)
+				await stop_component(stop_posthog_client, 'posthog')
 
 	# Log successful shutdown
 	rich_print(

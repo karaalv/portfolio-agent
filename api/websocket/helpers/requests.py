@@ -20,7 +20,5 @@ async def receive_ws_request(
 			code=1008,
 			reason='Invalid WebSocket request.',
 		) from exc
-	request.request_id = (
-		request.request_id or generate_uuid_str()
-	)
+	request.request_id = request.request_id or generate_uuid_str()
 	return request

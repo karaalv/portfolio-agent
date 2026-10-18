@@ -44,9 +44,9 @@ from shared.logging import log_error, log_info
 log_info('Maintenance completed', {'deleted_count': 3})
 
 try:
-    perform_operation()
+	perform_operation()
 except Exception as exc:
-    log_error('Operation failed', {'operation': 'example'}, exc=exc)
+	log_error('Operation failed', {'operation': 'example'}, exc=exc)
 ```
 
 Helpers are available for DEBUG, INFO, WARNING, ERROR and CRITICAL.
@@ -62,6 +62,27 @@ Shutdown detaches the handler and drains the provider in a thread.
 Testing keeps local logging but never creates the remote exporter.
 Existing `rich_print` output and module loggers are not automatically
 exported; use the shared helpers for application logs sent to PostHog.
+
+HTTP handlers now log and capture failures with request/session context
+and server-resolved user identity. Application exceptions return 500;
+HTTP 4xx failures are warnings and 5xx/unexpected failures are errors.
+Application startup failures are critical and carry a UTC timestamp.
+`WebSocketConnectionException` has a registered handler for handshake,
+identity and chat-loop failures; connection workers, maintenance tasks
+and swallowed tool exceptions report at their local boundaries.
+
+Every operational record has a stable `event_name`; user/session logs
+include PostHog's default join keys `posthogDistinctId` and `sessionId`.
+Error events also carry `$session_id`. Custom exception `module` is
+exported as `exception_module` on logs to avoid Python's reserved key.
+The agent emits one `agent_turn_finished` summary containing queryable
+timing aggregates, an explicit outcome and the full `timings_json` list.
+Session context reaches tools; request IDs stay in the transport layer.
+
+Reporting boundaries attempt capture once and keep telemetry failures
+from replacing the original error. Failures before telemetry startup
+or after its shutdown remain local. Testing suppresses remote capture
+and remote log export while retaining local records.
 
 ### Browser replay context
 

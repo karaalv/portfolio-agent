@@ -15,9 +15,7 @@ async def delete_usage_statistics(
 	"""Delete matching usage records and report their count."""
 	result = await get_collection(
 		MongoDBCollection.USAGE
-	).delete_many(
-		{'entity': entity.value, 'entity_id': entity_id}
-	)
+	).delete_many({'entity': entity.value, 'entity_id': entity_id})
 	return result.deleted_count
 
 

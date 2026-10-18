@@ -80,9 +80,9 @@ async def test_pages_reach_every_artefact(
 		'visitor', offset
 	):
 		assert len(page) <= 4
-		assert [
+		assert [(m.created_at, m.sequence) for m in page] == sorted(
 			(m.created_at, m.sequence) for m in page
-		] == sorted((m.created_at, m.sequence) for m in page)
+		)
 		seen = [m.memory_id for m in page] + seen
 		offset += len(page)
 	assert seen == [m.memory_id for m in memories]

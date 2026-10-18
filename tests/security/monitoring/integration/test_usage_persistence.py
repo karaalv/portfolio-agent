@@ -52,9 +52,7 @@ async def test_monitoring_maps_to_analytics() -> None:
 @pytest.mark.parametrize('entity', list(UsageEntity))
 async def test_usage_create_retrieve_update_delete(
 	entity: UsageEntity,
-	security_collections: dict[
-		MongoDBCollection, AsyncCollection
-	],
+	security_collections: dict[MongoDBCollection, AsyncCollection],
 ) -> None:
 	"""Persist both entity kinds with BSON activity dates."""
 	created = await create_usage_statistics(entity, 'visitor')
@@ -62,9 +60,9 @@ async def test_usage_create_retrieve_update_delete(
 	assert stored is not None
 	assert stored.entity == entity
 	assert stored.last_request_at.tzinfo == UTC
-	assert abs(
-		stored.last_request_at - created.last_request_at
-	) < (timedelta(milliseconds=1))
+	assert abs(stored.last_request_at - created.last_request_at) < (
+		timedelta(milliseconds=1)
+	)
 	result = await record_request_usage(entity, 'visitor', 42)
 	assert result.daily_requests == 1
 	assert result.daily_input_tokens == 42
@@ -76,16 +74,11 @@ async def test_usage_create_retrieve_update_delete(
 	assert document['daily_input_tokens'] == 42
 	assert await delete_usage_statistics(entity, 'visitor') == 1
 	assert await delete_usage_statistics(entity, 'visitor') == 0
-	assert (
-		await retrieve_usage_statistics(entity, 'visitor')
-		is None
-	)
+	assert await retrieve_usage_statistics(entity, 'visitor') is None
 
 
 async def test_concurrent_creation_and_updates_preserve_usage(
-	security_collections: dict[
-		MongoDBCollection, AsyncCollection
-	],
+	security_collections: dict[MongoDBCollection, AsyncCollection],
 ) -> None:
 	"""Retain one record and all concurrent increments."""
 	await asyncio.gather(
@@ -109,17 +102,13 @@ async def test_concurrent_creation_and_updates_preserve_usage(
 	assert stored.daily_requests == 20
 	assert stored.daily_input_tokens == 60
 	assert (
-		await create_usage_statistics(
-			UsageEntity.USER, 'visitor'
-		)
+		await create_usage_statistics(UsageEntity.USER, 'visitor')
 		== stored
 	)
 
 
 async def test_new_day_resets_once_and_preserves_connections(
-	security_collections: dict[
-		MongoDBCollection, AsyncCollection
-	],
+	security_collections: dict[MongoDBCollection, AsyncCollection],
 	monkeypatch: pytest.MonkeyPatch,
 ) -> None:
 	"""Retain new usage during concurrent daily resets."""
@@ -129,9 +118,7 @@ async def test_new_day_resets_once_and_preserves_connections(
 		lambda: now,
 	)
 	await create_usage_statistics(UsageEntity.USER, 'visitor')
-	await security_collections[
-		MongoDBCollection.USAGE
-	].update_one(
+	await security_collections[MongoDBCollection.USAGE].update_one(
 		{'entity_id': 'visitor'},
 		{
 			'$set': {
@@ -186,9 +173,7 @@ async def test_fifth_connection_blocks() -> None:
 		UsageEntity.USER, 'visitor', 'socket-4'
 	)
 	with pytest.raises(EntityBlockedException):
-		await enforce_existing_block(
-			BlockedEntity.USER, 'visitor'
-		)
+		await enforce_existing_block(BlockedEntity.USER, 'visitor')
 
 
 async def test_connection_reset_preserves_counters() -> None:
@@ -196,14 +181,10 @@ async def test_connection_reset_preserves_counters() -> None:
 	for entity in UsageEntity:
 		await create_usage_statistics(entity, 'visitor')
 		await record_request_usage(entity, 'visitor', 10)
-		await add_active_ws_connection(
-			entity, 'visitor', 'socket'
-		)
+		await add_active_ws_connection(entity, 'visitor', 'socket')
 	assert await clear_active_ws_connections() == 2
 	for entity in UsageEntity:
-		stored = await retrieve_usage_statistics(
-			entity, 'visitor'
-		)
+		stored = await retrieve_usage_statistics(entity, 'visitor')
 		assert stored is not None
 		assert stored.active_ws_connections == []
 		assert stored.daily_requests == 1

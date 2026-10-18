@@ -28,14 +28,10 @@ def load_test_environment(
 ) -> None:
 	"""Load testing settings with scoped restoration."""
 	if os.getenv('PORTFOLIO_AGENT_ENV') != 'testing':
-		pytest.fail(
-			'Live tests require PORTFOLIO_AGENT_ENV=testing.'
-		)
+		pytest.fail('Live tests require PORTFOLIO_AGENT_ENV=testing.')
 	path = Path(__file__).resolve().parents[2] / '.env.testing'
 	if not path.is_file():
-		pytest.fail(
-			'Live tests require a root .env.testing file.'
-		)
+		pytest.fail('Live tests require a root .env.testing file.')
 	for key, value in dotenv_values(path).items():
 		if value is not None:
 			monkeypatch.setenv(key, value)

@@ -16,16 +16,12 @@ async def test_create_user_uses_one_utc_timestamp() -> None:
 	now = datetime(2026, 1, 1, tzinfo=timezone.utc)
 	collection = AsyncMock()
 	with (
-		patch(
-			'users.creation.generate_uuid_str', return_value='id'
-		),
+		patch('users.creation.generate_uuid_str', return_value='id'),
 		patch(
 			'users.creation.get_utc_datetime_now',
 			return_value=now,
 		),
-		patch(
-			'users.creation.does_user_exist', return_value=False
-		),
+		patch('users.creation.does_user_exist', return_value=False),
 		patch(
 			'users.creation.get_collection',
 			return_value=collection,
@@ -42,12 +38,8 @@ async def test_create_user_uses_one_utc_timestamp() -> None:
 async def test_create_user_rejects_duplicate_identity() -> None:
 	"""Reject generated identities that already exist."""
 	with (
-		patch(
-			'users.creation.generate_uuid_str', return_value='id'
-		),
-		patch(
-			'users.creation.does_user_exist', return_value=True
-		),
+		patch('users.creation.generate_uuid_str', return_value='id'),
+		patch('users.creation.does_user_exist', return_value=True),
 		patch('users.creation.get_collection') as collection,
 	):
 		with pytest.raises(ValueError, match='already exists'):
@@ -58,9 +50,7 @@ async def test_create_user_rejects_duplicate_identity() -> None:
 async def test_push_user_propagates_database_failure() -> None:
 	"""Propagate failed inserts to the caller."""
 	collection = AsyncMock()
-	collection.insert_one.side_effect = RuntimeError(
-		'Insert failed'
-	)
+	collection.insert_one.side_effect = RuntimeError('Insert failed')
 	with patch(
 		'users.creation.get_collection', return_value=collection
 	):

@@ -60,9 +60,7 @@ def test_oversized_envelope_closes_all_user_connections(
 		assert ws_client.portal is not None
 		registry = agent.get_websocket_registry()
 		assert ws_client.portal.call(registry.has_user, 'other')
-		assert not ws_client.portal.call(
-			registry.has_user, 'visitor'
-		)
+		assert not ws_client.portal.call(registry.has_user, 'visitor')
 		other.send_json({'type': 'heartbeat', 'payload': 'pong'})
 	cast(
 		AsyncMock, enforcement.create_block
@@ -84,9 +82,7 @@ def test_oversized_invalid_json_is_blocked_before_parsing(
 	) as ws:
 		ws.send_text('!' * 16385)
 		_assert_closed(ws, 1009)
-	cast(
-		AsyncMock, enforcement.create_block
-	).assert_awaited_once()
+	cast(AsyncMock, enforcement.create_block).assert_awaited_once()
 
 
 def test_token_guard_runs_before_truncation(
@@ -125,12 +121,11 @@ def test_noisy_input_warns_then_valid_input_is_cleaned(
 		user_id: str,
 		user_input: str,
 		connection_id: str,
+		posthog_session_id: str | None = None,
 	) -> None:
 		"""Expose the text passed to the mocked agent."""
 		registry = agent.get_websocket_registry()
-		manager = next(
-			iter(registry._registry[user_id].values())
-		)
+		manager = next(iter(registry._registry[user_id].values()))
 		await registry.send_connection(
 			user_id,
 			manager.connection_id,
@@ -160,14 +155,12 @@ def test_noisy_input_warns_then_valid_input_is_cleaned(
 			}
 		)
 		assert (
-			_receive_type(ws, 'warning')['payload']
-			== 'Hello Alvin'
+			_receive_type(ws, 'warning')['payload'] == 'Hello Alvin'
 		)
 	mock.assert_awaited_once_with(
 		user_id='visitor',
 		user_input='Hello Alvin',
 		connection_id=ANY,
+		posthog_session_id=None,
 	)
-	cast(
-		AsyncMock, enforcement.create_block
-	).assert_not_awaited()
+	cast(AsyncMock, enforcement.create_block).assert_not_awaited()

@@ -1,6 +1,7 @@
 """Prune access blocks after their minimum blocking period."""
 
 import asyncio
+from time import perf_counter
 
 from security.monitoring.blocked.config import (
 	BLOCK_CLEANUP_INTERVAL_SECONDS,
@@ -8,7 +9,9 @@ from security.monitoring.blocked.config import (
 from security.monitoring.blocked.deletion import (
 	prune_expired_blocks,
 )
-from shared.logging import LogStyle, rich_print
+from security.observers._logging import capture_maintenance_failure
+from shared.logging import log_info
+from shared.logging.context import log_properties
 
 
 class BlockObserver:
@@ -24,12 +27,6 @@ class BlockObserver:
 			loop = asyncio.get_running_loop()
 			self._task = loop.create_task(self._run())
 
-		rich_print(
-			message='Starting block observer...',
-			style=LogStyle.INFO,
-			prefix='security.observers',
-		)
-
 	async def stop(self) -> None:
 		"""Cancel maintenance and wait for it to finish."""
 		if self._task is None:
@@ -41,15 +38,19 @@ class BlockObserver:
 			pass
 		finally:
 			self._task = None
-			rich_print(
-				message='Stopping block observer...',
-				style=LogStyle.INFO,
-				prefix='security.observers',
-			)
 
 	async def run_once(self) -> None:
 		"""Delete expired block records from MongoDB."""
-		await prune_expired_blocks()
+		started = perf_counter()
+		deleted_count = await prune_expired_blocks()
+		log_info(
+			'block_cleanup_completed',
+			log_properties(
+				'block_cleanup_completed',
+				blocks_deleted=deleted_count,
+				duration_seconds=perf_counter() - started,
+			),
+		)
 
 	async def _run(self) -> None:
 		"""Prune at startup and every six hours thereafter."""
@@ -59,9 +60,5 @@ class BlockObserver:
 			except asyncio.CancelledError:
 				raise
 			except Exception as exc:
-				rich_print(
-					f'Block maintenance failed: {exc}',
-					style=LogStyle.ERROR,
-					prefix='security.observers',
-				)
+				capture_maintenance_failure(exc, 'block_observer')
 			await asyncio.sleep(BLOCK_CLEANUP_INTERVAL_SECONDS)

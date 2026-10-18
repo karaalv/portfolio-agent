@@ -1,7 +1,6 @@
 """Track local connections and close inactive managers."""
 
 import asyncio
-import logging
 from datetime import timedelta
 
 from fastapi import WebSocket, WebSocketException
@@ -9,17 +8,18 @@ from fastapi import WebSocket, WebSocketException
 from api.websocket.manager import WebSocketManager
 from exceptions.security import EntityBlockedException
 from exceptions.websocket import WebSocketRegistryException
+from posthog_client.error_tracking import report_exception
 from schemas.api.ws.response import WebSocketResponse
 from schemas.security.monitoring.blocked import BlockedEntity
 from schemas.security.monitoring.usage import UsageEntity, UsageScope
 from security.monitoring.blocked.enforcement import apply_24h_block
 from security.monitoring.usage.config import get_usage_policy
+from shared.logging import log_info
+from shared.logging.context import log_properties
 from shared.time import get_utc_datetime_now
 
 _INACTIVE_CONNECTION_SECONDS = 60 * 60
 _PRUNE_INTERVAL_SECONDS = 60 * 15
-
-_logger = logging.getLogger(__name__)
 
 
 class WebSocketRegistry:
@@ -263,10 +263,18 @@ class WebSocketRegistry:
 			await asyncio.sleep(_PRUNE_INTERVAL_SECONDS)
 			try:
 				await self._prune_inactive_connections()
-			except Exception:
-				_logger.exception(
-					'WebSocket connection cleanup failed.'
-				)
+			except Exception as exc:
+				self._capture_exception(exc, 'prune_connections')
+
+	def _capture_exception(
+		self, exc: Exception, operation: str
+	) -> None:
+		"""Report registry task failures outside request handlers."""
+		report_exception(
+			exc,
+			'websocket_registry_failed',
+			{'operation': operation, 'job': 'websocket_registry'},
+		)
 
 	async def _prune_inactive_connections(self) -> None:
 		"""
@@ -293,6 +301,13 @@ class WebSocketRegistry:
 					del self._registry[user_id]
 		await self._close_managers(
 			managers, 1001, 'Connection inactive'
+		)
+		log_info(
+			'websocket_cleanup_completed',
+			log_properties(
+				'websocket_cleanup_completed',
+				closed_connections=len(managers),
+			),
 		)
 
 	async def _close_managers(

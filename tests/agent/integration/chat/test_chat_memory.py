@@ -44,10 +44,7 @@ async def test_chat_creation_retrieval_and_deletion(
 	]
 	assert await delete_agent_memory(user_id) == 2
 	assert await retrieve_agent_chat_page(user_id, 0) == []
-	assert (
-		len(await retrieve_agent_chat_page(other_user_id, 0))
-		== 1
-	)
+	assert len(await retrieve_agent_chat_page(other_user_id, 0)) == 1
 
 
 async def test_chat_pagination_reaches_all_messages(
@@ -68,9 +65,7 @@ async def test_chat_pagination_reaches_all_messages(
 	]
 	seen = []
 	offset = 0
-	while page := await retrieve_agent_chat_page(
-		user_id, offset
-	):
+	while page := await retrieve_agent_chat_page(user_id, offset):
 		assert all(m.user_id == user_id for m in page)
 		seen = page + seen
 		offset += len(page)

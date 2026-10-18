@@ -14,9 +14,7 @@ pytestmark = pytest.mark.unit
 @pytest.mark.parametrize(
 	'modified, expected', [(1, True), (0, False)]
 )
-async def test_activity_update_uses_utc(
-	modified, expected
-) -> None:
+async def test_activity_update_uses_utc(modified, expected) -> None:
 	"""Persist UTC activity and report whether it changed."""
 	now = datetime(2026, 1, 1, tzinfo=timezone.utc)
 	collection = AsyncMock()
@@ -28,9 +26,7 @@ async def test_activity_update_uses_utc(
 			'users.update.get_collection',
 			return_value=collection,
 		),
-		patch(
-			'users.update.get_utc_datetime_now', return_value=now
-		),
+		patch('users.update.get_utc_datetime_now', return_value=now),
 	):
 		assert await update_last_active('id') is expected
 	collection.update_one.assert_awaited_once_with(

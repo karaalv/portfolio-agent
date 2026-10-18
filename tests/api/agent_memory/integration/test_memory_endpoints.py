@@ -48,9 +48,7 @@ async def test_fetch_returns_visible_chat_structure(
 		}
 		for item in items
 	)
-	parsed = [
-		AgentChatMemory.model_validate(item) for item in items
-	]
+	parsed = [AgentChatMemory.model_validate(item) for item in items]
 	assert [item.memory_id for item in parsed] == [
 		memories[0].memory_id,
 		memories[-1].memory_id,
@@ -61,8 +59,7 @@ async def test_fetch_returns_visible_chat_structure(
 	]
 	assert all(item.user_id == user_id for item in parsed)
 	assert all(
-		item.created_at.utcoffset() == timedelta(0)
-		for item in parsed
+		item.created_at.utcoffset() == timedelta(0) for item in parsed
 	)
 	assert [item.content for item in parsed] == [
 		'Question 0',
@@ -129,9 +126,7 @@ async def test_delete_removes_all_artefacts_for_verified_user(
 	assert body['meta']['success'] is True
 	assert body['data'] is None
 	assert (
-		await memory_collection.count_documents(
-			{'user_id': user_id}
-		)
+		await memory_collection.count_documents({'user_id': user_id})
 		== 0
 	)
 	assert await memory_collection.count_documents(
@@ -140,8 +135,6 @@ async def test_delete_removes_all_artefacts_for_verified_user(
 	page = await client.get('/agent-memory/fetch-chat-page')
 	assert page.status_code == 200
 	assert page.json()['data'] == []
-	second_delete = await client.delete(
-		'/agent-memory/delete-memory'
-	)
+	second_delete = await client.delete('/agent-memory/delete-memory')
 	assert second_delete.status_code == 200
 	assert second_delete.json()['data'] is None

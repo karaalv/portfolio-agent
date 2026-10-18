@@ -39,18 +39,14 @@ async def test_claim_sets_existing_token_with_bounded_expiry(
 	assert response.status_code == 200
 	assert response.json()['data'] is None
 	assert response.json()['meta']['success'] is True
-	assert (
-		response.json()['meta']['request_id'] == 'claim-request'
-	)
+	assert response.json()['meta']['request_id'] == 'claim-request'
 	cookie = SimpleCookie(response.headers['set-cookie'])['JWT']
 	assert cookie.value == token
 	assert cookie['httponly'] and cookie['secure']
 	assert cookie['samesite'] == 'lax'
 	assert cookie['path'] == '/'
 	assert cookie['domain'] == 'api.test'
-	payload = jwt.decode(
-		token, options={'verify_signature': False}
-	)
+	payload = jwt.decode(token, options={'verify_signature': False})
 	assert (
 		parsedate_to_datetime(cookie['expires']).timestamp()
 		== payload['exp']
@@ -72,9 +68,7 @@ async def test_claim_rejects_invalid_body(
 	user_lookup: AsyncMock,
 ) -> None:
 	"""Require a non-empty token string before user lookups."""
-	response = await client.post(
-		'/users/claim-cookie', json=body
-	)
+	response = await client.post('/users/claim-cookie', json=body)
 	assert response.status_code == 422
 	assert 'set-cookie' not in response.headers
 	user_lookup.assert_not_awaited()
@@ -133,8 +127,7 @@ async def test_claim_rejects_blocked_identity(
 					entity_id=identifier,
 					blocked_at=get_utc_datetime_now(),
 					blocked_until=(
-						get_utc_datetime_now()
-						+ timedelta(days=1)
+						get_utc_datetime_now() + timedelta(days=1)
 					),
 					reason='Private blocking reason',
 				)

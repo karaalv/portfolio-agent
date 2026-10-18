@@ -22,9 +22,7 @@ ENDPOINTS = [
 
 
 @pytest.mark.parametrize('method, path', ENDPOINTS)
-@pytest.mark.parametrize(
-	'token_state', ['missing', 'bad', 'old']
-)
+@pytest.mark.parametrize('token_state', ['missing', 'bad', 'old'])
 async def test_authentication_precedes_memory_operations(
 	client: httpx.AsyncClient,
 	retrieve_page: AsyncMock,
@@ -71,8 +69,7 @@ async def test_blocks_precede_memory_operations(
 					entity_id=identifier,
 					blocked_at=get_utc_datetime_now(),
 					blocked_until=(
-						get_utc_datetime_now()
-						+ timedelta(days=1)
+						get_utc_datetime_now() + timedelta(days=1)
 					),
 					reason='Private reason',
 				)

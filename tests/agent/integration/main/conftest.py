@@ -25,10 +25,7 @@ def agent_trace(monkeypatch) -> AgentTrace:
 		try:
 			async with aclosing(original(**kwargs)) as events:
 				async for event in events:
-					if (
-						event.type
-						== 'response.output_text.delta'
-					):
+					if event.type == 'response.output_text.delta':
 						trace.deltas.append(event.delta)
 					elif event.type == 'response.completed':
 						trace.outputs.append(

@@ -32,9 +32,7 @@ pytestmark = [
 
 
 async def test_usage_observer_resets_and_prunes_inactive_data(
-	security_collections: dict[
-		MongoDBCollection, AsyncCollection
-	],
+	security_collections: dict[MongoDBCollection, AsyncCollection],
 	monkeypatch: pytest.MonkeyPatch,
 ) -> None:
 	"""Reset older days while pruning only ten-day inactivity."""
@@ -61,17 +59,14 @@ async def test_usage_observer_resets_and_prunes_inactive_data(
 					'daily_requests': 5,
 					'daily_input_tokens': 50,
 					'active_ws_connections': ['socket'],
-					'last_request_at': now
-					- timedelta(days=days),
+					'last_request_at': now - timedelta(days=days),
 				}
 			},
 		)
 	await UsageObserver().run_once()
 	assert await collection.count_documents({}) == 3
 	assert (
-		await retrieve_usage_statistics(
-			UsageEntity.USER, 'inactive'
-		)
+		await retrieve_usage_statistics(UsageEntity.USER, 'inactive')
 		is None
 	)
 	for name, requests in (('old-day', 0), ('today', 5)):
@@ -87,16 +82,13 @@ async def test_usage_observer_resets_and_prunes_inactive_data(
 
 
 async def test_block_observer_removes_expired_duplicates(
-	security_collections: dict[
-		MongoDBCollection, AsyncCollection
-	],
+	security_collections: dict[MongoDBCollection, AsyncCollection],
 	monkeypatch: pytest.MonkeyPatch,
 ) -> None:
 	"""Deny expired blocks until all matches are pruned."""
 	now = datetime(2026, 10, 8, 12, tzinfo=UTC)
 	monkeypatch.setattr(
-		'security.monitoring.blocked.deletion.'
-		'get_utc_datetime_now',
+		'security.monitoring.blocked.deletion.get_utc_datetime_now',
 		lambda: now,
 	)
 	expired = BlockedRecord(
@@ -121,17 +113,10 @@ async def test_block_observer_removes_expired_duplicates(
 		]
 	)
 	with pytest.raises(EntityBlockedException):
-		await enforce_existing_block(
-			BlockedEntity.USER, 'expired'
-		)
+		await enforce_existing_block(BlockedEntity.USER, 'expired')
 	await BlockObserver().run_once()
 	assert await collection.count_documents({}) == 1
-	assert (
-		await retrieve_block(BlockedEntity.USER, 'expired')
-		is None
-	)
+	assert await retrieve_block(BlockedEntity.USER, 'expired') is None
 	await enforce_existing_block(BlockedEntity.USER, 'expired')
 	with pytest.raises(EntityBlockedException):
-		await enforce_existing_block(
-			BlockedEntity.USER, 'future'
-		)
+		await enforce_existing_block(BlockedEntity.USER, 'future')

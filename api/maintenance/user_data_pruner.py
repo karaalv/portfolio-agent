@@ -3,12 +3,16 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 from itertools import batched
+from time import perf_counter
+from typing import Any
 
 from pymongo.asynchronous.collection import AsyncCollection
 
 from database.mongodb.collections import MongoDBCollection
 from database.mongodb.main import get_collection
-from shared.logging import LogStyle, rich_print
+from posthog_client.error_tracking import report_exception
+from shared.logging import log_info
+from shared.logging.context import log_properties
 
 
 class UserDataPruner:
@@ -20,6 +24,7 @@ class UserDataPruner:
 		self._interval_seconds = 24 * 60 * 60  # 24 hours
 		self._inactive_user_ids: set[str] = set()
 		self._task: asyncio.Task[None] | None = None
+		self._progress: dict[str, Any] = {}
 
 	def start(self) -> None:
 		"""
@@ -45,16 +50,20 @@ class UserDataPruner:
 	async def prune_once(self) -> None:
 		"""Delete inactive user records and their messages."""
 		cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+		started = perf_counter()
+		self._progress = {
+			'cutoff': cutoff.isoformat(),
+			'candidate_count': 0,
+			'users_deleted': 0,
+			'messages_deleted': 0,
+			'skipped_users': 0,
+		}
 		users = get_collection(MongoDBCollection.USERS)
 		messages = get_collection(MongoDBCollection.MEMORIES)
 
 		ids = await self._get_inactive_users(users, cutoff)
 
-		rich_print(
-			f'Found {len(ids)} inactive users to prune...',
-			style=LogStyle.INFO,
-			prefix='api.maintenance',
-		)
+		self._progress['candidate_count'] = len(ids)
 
 		for batch in batched(tuple(ids), self._batch_size):
 			results = await asyncio.gather(
@@ -70,10 +79,13 @@ class UserDataPruner:
 				if isinstance(result, BaseException):
 					raise result
 
-		rich_print(
-			f'Finished pruning {len(ids)} inactive users.',
-			style=LogStyle.INFO,
-			prefix='api.maintenance',
+		log_info(
+			'user_data_prune_completed',
+			log_properties(
+				'user_data_prune_completed',
+				**self._progress,
+				duration_seconds=perf_counter() - started,
+			),
 		)
 
 	async def _get_inactive_users(
@@ -107,15 +119,24 @@ class UserDataPruner:
 		)
 		if inactive_user is None:
 			self._inactive_user_ids.discard(user_id)
+			self._progress['skipped_users'] += 1
 			return
 
-		await messages.delete_many({'user_id': user_id})
-		await users.delete_one(
+		message_result = await messages.delete_many(
+			{'user_id': user_id}
+		)
+		self._progress['messages_deleted'] += (
+			message_result.deleted_count
+		)
+		user_result = await users.delete_one(
 			{
 				'user_id': user_id,
 				'last_active_at': {'$lt': cutoff},
 			}
 		)
+		self._progress['users_deleted'] += user_result.deleted_count
+		if user_result.deleted_count == 0:
+			self._progress['skipped_users'] += 1
 		self._inactive_user_ids.discard(user_id)
 
 	async def _run(self) -> None:
@@ -126,9 +147,16 @@ class UserDataPruner:
 			except asyncio.CancelledError:
 				raise
 			except Exception as exc:
-				rich_print(
-					f'User data pruning failed: {exc}',
-					style=LogStyle.ERROR,
-					prefix='api.maintenance',
-				)
+				self._capture_exception(exc)
 			await asyncio.sleep(self._interval_seconds)
+
+	def _capture_exception(self, exc: Exception) -> None:
+		"""Include actual partial progress in failed pruning runs."""
+		report_exception(
+			exc,
+			'maintenance_failed',
+			{
+				'job': 'user_data_pruner',
+				**self._progress,
+			},
+		)

@@ -28,7 +28,5 @@ def memory_collection(monkeypatch) -> MemoryCollection:
 		retrieval,
 		chat_retrieval,
 	):
-		monkeypatch.setattr(
-			module, 'get_collection', get_collection
-		)
+		monkeypatch.setattr(module, 'get_collection', get_collection)
 	return collection

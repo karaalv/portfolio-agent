@@ -54,22 +54,16 @@ def _check_turn(
 	assert records
 	assert len({m.memory_id for m in memories}) == len(memories)
 	assert len({m.turn_id for m in records}) == 1
-	assert [m.sequence for m in records] == list(
-		range(len(records))
-	)
+	assert [m.sequence for m in records] == list(range(len(records)))
 	assert all(m.created_at.tzinfo is not None for m in records)
-	payloads = [
-		m.model_dump(mode='json')['payload'] for m in records
-	]
+	payloads = [m.model_dump(mode='json')['payload'] for m in records]
 	assert payloads[0] == {
 		'type': 'message',
 		'role': 'user',
 		'content': question,
 	}
 	assert trace.inputs[0] == history + [payloads[0]]
-	assert (
-		trace.closed == len(trace.inputs) == len(trace.outputs)
-	)
+	assert trace.closed == len(trace.inputs) == len(trace.outputs)
 	assert trace.deltas
 	assert payloads[-1]['type'] == 'message'
 	assert payloads[-1]['role'] == 'assistant'
@@ -80,7 +74,9 @@ def _check_turn(
 		assert trace.inputs[round_index] == history + expected
 		expected.extend(output)
 		calls = [
-			p for p in output if p['type'] == 'function_call' # type: ignore
+			p
+			for p in output
+			if p['type'] == 'function_call'  # type: ignore
 		]
 		if calls:
 			start = len(expected)
@@ -89,7 +85,8 @@ def _check_turn(
 				'function_call_output'
 			] * len(calls)
 			assert [p['call_id'] for p in results] == [
-				p['call_id'] for p in calls # type: ignore
+				p['call_id'] # type: ignore
+				for p in calls
 			]
 			expected.extend(results)
 	assert expected == payloads
@@ -120,18 +117,12 @@ async def test_agent_answers_without_tools(
 	Replay prior history for a greeting without portfolio facts.
 	"""
 	history = await _seed_history(user_id)
-	question = (
-		'Hello! Greet me using the nickname I gave earlier.'
-	)
+	question = 'Hello! Greet me using the nickname I gave earlier.'
 	await agent_chat(user_id, question)
 	memories = await retrieve_agent_memory(user_id, None)
-	payloads = _check_turn(
-		memories, agent_trace, history, question
-	)
+	payloads = _check_turn(memories, agent_trace, history, question)
 	assert len(agent_trace.inputs) == 1
-	assert not any(
-		p['type'] == 'function_call' for p in payloads
-	)
+	assert not any(p['type'] == 'function_call' for p in payloads)
 	answer = ''.join(agent_trace.deltas)
 	assert 'visitor cedar' in answer.casefold()
 
@@ -152,9 +143,7 @@ async def test_agent_retrieves_and_replays_tool_outputs(
 	)
 	await agent_chat(user_id, question)
 	memories = await retrieve_agent_memory(user_id, None)
-	payloads = _check_turn(
-		memories, agent_trace, history, question
-	)
+	payloads = _check_turn(memories, agent_trace, history, question)
 	calls = [p for p in payloads if p['type'] == 'function_call']
 	assert calls, 'The agent did not invoke the context tool.'
 	assert len(agent_trace.inputs) >= 2

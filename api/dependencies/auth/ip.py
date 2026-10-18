@@ -19,6 +19,10 @@ from api.utils.ratelimit import (
 	acquire_ws_rate_limit,
 )
 from api.utils.requests import get_http_ip, get_ws_ip
+from api.websocket.helpers.context import (
+	connection_exception,
+	initialise_connection_context,
+)
 from schemas.security.monitoring.blocked import BlockedEntity
 from schemas.security.ratelimit import ResourceAccessor
 
@@ -39,17 +43,27 @@ IPAccess = Annotated[str, Depends(require_ip_access)]
 
 async def require_ws_ip_access(websocket: WebSocket) -> str:
 	"""Apply IP access checks before accepting a socket."""
-	ip_address = get_ws_ip(websocket)
+	initialise_connection_context(websocket)
 	try:
+		ip_address = get_ws_ip(websocket)
 		limiter = await retrieve_application_limiter(
 			ResourceAccessor.IP, ip_address
 		)
 		await acquire_ws_rate_limit(limiter)
 		await check_entity_block(BlockedEntity.IP, ip_address)
 	except HTTPException as exc:
-		raise WebSocketException(
-			code=1011 if exc.status_code >= 500 else 1008,
-			reason=str(exc.detail),
+		raise connection_exception(
+			websocket,
+			1011 if exc.status_code >= 500 else 1008,
+			str(exc.detail),
+		) from exc
+	except WebSocketException as exc:
+		raise connection_exception(
+			websocket, exc.code, exc.reason
+		) from exc
+	except Exception as exc:
+		raise connection_exception(
+			websocket, 1011, 'Unable to check IP access.'
 		) from exc
 	return ip_address
 

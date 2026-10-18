@@ -55,9 +55,7 @@ async def security_collections(
 
 @pytest_asyncio.fixture(autouse=True, loop_scope='package')
 async def clean_security_records(
-	security_collections: dict[
-		MongoDBCollection, AsyncCollection
-	],
+	security_collections: dict[MongoDBCollection, AsyncCollection],
 ) -> AsyncIterator[None]:
 	"""Reset only the temporary collections between tests."""
 	try:

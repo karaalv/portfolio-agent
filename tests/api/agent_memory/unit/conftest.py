@@ -32,9 +32,7 @@ def retrieve_page(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
 def delete_memory(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
 	"""Replace deletion while retaining access checks."""
 	mock = AsyncMock(return_value=0)
-	monkeypatch.setattr(
-		agent_memory, 'delete_agent_memory', mock
-	)
+	monkeypatch.setattr(agent_memory, 'delete_agent_memory', mock)
 	return mock
 
 

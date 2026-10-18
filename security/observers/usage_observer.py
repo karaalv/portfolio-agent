@@ -2,12 +2,17 @@
 
 import asyncio
 from datetime import timedelta
+from time import perf_counter
+from typing import Any
 
+from security.monitoring.usage.config import USAGE_RETENTION_DAYS
 from security.monitoring.usage.deletion import (
 	prune_inactive_usage,
 )
 from security.monitoring.usage.update import reset_daily_usage
-from shared.logging import LogStyle, rich_print
+from security.observers._logging import capture_maintenance_failure
+from shared.logging import log_info
+from shared.logging.context import log_properties
 from shared.time import get_utc_datetime_now
 
 
@@ -17,18 +22,13 @@ class UsageObserver:
 	def __init__(self) -> None:
 		"""Prepare an observer without starting its task."""
 		self._task: asyncio.Task[None] | None = None
+		self._progress: dict[str, Any] = {}
 
 	def start(self) -> None:
 		"""Start once on the application's running event loop."""
 		if self._task is None or self._task.done():
 			loop = asyncio.get_running_loop()
 			self._task = loop.create_task(self._run())
-
-		rich_print(
-			message='Starting usage observer...',
-			style=LogStyle.INFO,
-			prefix='security.observers',
-		)
 
 	async def stop(self) -> None:
 		"""Cancel maintenance and wait for it to finish."""
@@ -41,16 +41,30 @@ class UsageObserver:
 			pass
 		finally:
 			self._task = None
-			rich_print(
-				message='Stopping usage observer...',
-				style=LogStyle.INFO,
-				prefix='security.observers',
-			)
 
 	async def run_once(self) -> None:
 		"""Reset older days and prune inactive records."""
-		await reset_daily_usage()
-		await prune_inactive_usage()
+		started = perf_counter()
+		self._progress = {'operation': 'reset_daily_usage'}
+		reset_count = await reset_daily_usage()
+		self._progress = {
+			'operation': 'prune_inactive_usage',
+			'records_reset': reset_count,
+		}
+		deleted_count = await prune_inactive_usage()
+		log_info(
+			'usage_maintenance_completed',
+			log_properties(
+				'usage_maintenance_completed',
+				records_reset=reset_count,
+				records_deleted=deleted_count,
+				cutoff=(
+					get_utc_datetime_now()
+					- timedelta(days=USAGE_RETENTION_DAYS)
+				).isoformat(),
+				duration_seconds=perf_counter() - started,
+			),
+		)
 
 	async def _run(self) -> None:
 		"""Reconcile at startup, then at each UTC midnight."""
@@ -60,10 +74,10 @@ class UsageObserver:
 			except asyncio.CancelledError:
 				raise
 			except Exception as exc:
-				rich_print(
-					f'Usage maintenance failed: {exc}',
-					style=LogStyle.ERROR,
-					prefix='security.observers',
+				capture_maintenance_failure(
+					exc,
+					'usage_observer',
+					getattr(self, '_progress', {}),
 				)
 			await asyncio.sleep(_seconds_until_utc_midnight())
 

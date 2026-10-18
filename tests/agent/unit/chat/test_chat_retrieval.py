@@ -75,9 +75,7 @@ async def test_chat_pages_reach_all_visible_messages(
 		),
 	],
 )
-def test_chat_conversion_handles_content_blocks(
-	blocks, expected
-):
+def test_chat_conversion_handles_content_blocks(blocks, expected):
 	"""
 	Render text blocks and refusals in their original order.
 	"""
@@ -96,16 +94,13 @@ def test_chat_conversion_handles_content_blocks(
 def test_non_message_cannot_be_rendered() -> None:
 	"""Reject a tool output instead of leaking internal text."""
 	with pytest.raises(ValueError, match='chat message'):
-		retrieval._to_agent_chat_memory(
-			make_memories('visitor')[3]
-		)
+		retrieval._to_agent_chat_memory(make_memories('visitor')[3])
 
 
 async def test_empty_and_invalid_chat_pages(memory_collection):
 	"""Return an empty page and reject a negative offset."""
 	assert (
-		await retrieval.retrieve_agent_chat_page('visitor', 0)
-		== []
+		await retrieval.retrieve_agent_chat_page('visitor', 0) == []
 	)
 	with pytest.raises(ValueError, match='offset'):
 		await retrieval.retrieve_agent_chat_page('visitor', -1)

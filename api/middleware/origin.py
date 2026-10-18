@@ -3,11 +3,18 @@
 from collections.abc import Sequence
 
 from starlette.datastructures import Headers
+from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.websockets import WebSocket
 
+from api.utils.exception_capture import capture_http_failure
 from api.utils.requests import get_request_id
 from api.utils.responses import create_http_response
+from api.websocket.helpers.context import connection_exception
+from api.websocket.helpers.exception_capture import (
+	handle_connection_exception,
+)
 
 
 class OriginMiddleware:
@@ -47,14 +54,18 @@ class OriginMiddleware:
 			await self.app(scope, receive, send)
 			return
 		if scope['type'] == 'websocket':
-			await send(
-				{
-					'type': 'websocket.close',
-					'code': 1008,
-					'reason': 'Origin is not allowed.',
-				}
+			websocket = WebSocket(scope, receive, send)
+			await handle_connection_exception(
+				websocket,
+				connection_exception(
+					websocket, 1008, 'Origin is not allowed.'
+				),
 			)
 			return
+		capture_http_failure(
+			Request(scope),
+			HTTPException(403, 'Origin is not allowed.'),
+		)
 		response = create_http_response(
 			request_id=get_request_id(Request(scope)),
 			success=False,

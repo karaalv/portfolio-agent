@@ -13,11 +13,7 @@ class AgentTrace:
 	Record model inputs, completed outputs and streamed text.
 	"""
 
-	inputs: list[ResponseInputParam] = field(
-		default_factory=list
-	)
-	outputs: list[ResponseInputParam] = field(
-		default_factory=list
-	)
+	inputs: list[ResponseInputParam] = field(default_factory=list)
+	outputs: list[ResponseInputParam] = field(default_factory=list)
 	deltas: list[str] = field(default_factory=list)
 	closed: int = 0

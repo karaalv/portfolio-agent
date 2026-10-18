@@ -48,9 +48,7 @@ async def test_cancellation_is_not_a_rate_error(
 	"""Propagate shutdown cancellation instead of 429 or 1013."""
 	limiter = AsyncLimiter(1, 3600)
 	await limiter.acquire()
-	task = asyncio.create_task(
-		helper(limiter, timeout_seconds=10)
-	)
+	task = asyncio.create_task(helper(limiter, timeout_seconds=10))
 	await asyncio.sleep(0)
 	task.cancel()
 	with pytest.raises(asyncio.CancelledError):

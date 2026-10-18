@@ -108,9 +108,7 @@ async def test_original_token_limit(
 	else:
 		await guards.guard_agent_input('visitor', 'original')
 		block.assert_not_awaited()
-	encode.assert_called_once_with(
-		'original', disallowed_special=()
-	)
+	encode.assert_called_once_with('original', disallowed_special=())
 
 
 async def test_tokeniser_treats_special_markers_as_text(

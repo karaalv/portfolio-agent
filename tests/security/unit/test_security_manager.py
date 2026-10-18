@@ -30,12 +30,8 @@ def manager_services():
 		block.return_value.stop = AsyncMock()
 		calls = Mock()
 		calls.attach_mock(start_client, 'start_client')
-		calls.attach_mock(
-			usage.return_value.start, 'start_usage'
-		)
-		calls.attach_mock(
-			block.return_value.start, 'start_block'
-		)
+		calls.attach_mock(usage.return_value.start, 'start_usage')
+		calls.attach_mock(block.return_value.start, 'start_block')
 		calls.attach_mock(block.return_value.stop, 'stop_block')
 		calls.attach_mock(usage.return_value.stop, 'stop_usage')
 		calls.attach_mock(stop_client, 'stop_client')

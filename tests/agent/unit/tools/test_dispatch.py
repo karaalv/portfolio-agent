@@ -1,17 +1,47 @@
 """Check ordered tool outputs and recoverable dispatch errors."""
 
 import asyncio
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from agent.observability import AgentTimer
 from agent.tools import dispatch
+from posthog_client import error_tracking
 from schemas.agent.streaming.stream_manager import (
 	StreamManagerFunctionCall,
 )
 
 pytestmark = pytest.mark.unit
+
+
+async def test_tool_failure_keeps_session_without_logging_arguments(
+	monkeypatch,
+):
+	"""Capture a swallowed fault with the correct tool and visitor."""
+	capture = Mock()
+	monkeypatch.setattr(error_tracking, 'capture_exception', capture)
+	exc = RuntimeError('backend unavailable')
+	monkeypatch.setattr(
+		dispatch, 'fetch_context', AsyncMock(side_effect=exc)
+	)
+	timer = AgentTimer()
+	await dispatch._dispatch_tool_call(
+		'visitor',
+		'fetch_context',
+		'{"user_input":"private text"}',
+		connection_id='connection',
+		posthog_session_id='session',
+		call_id='call-1',
+		timer=timer,
+	)
+	assert timer.outcome == 'degraded'
+	capture.assert_called_once()
+	assert capture.call_args.args[:2] == (exc, 'visitor')
+	properties = capture.call_args.args[2]
+	assert properties['sessionId'] == 'session'
+	assert properties['call_id'] == 'call-1'
+	assert 'private text' not in str(properties)
 
 
 async def test_parallel_calls_return_original_order(monkeypatch):
@@ -23,7 +53,12 @@ async def test_parallel_calls_return_original_order(monkeypatch):
 	started = []
 
 	async def run(
-		user_id, tool_name, tool_args, verbose, connection_id=None
+		user_id,
+		tool_name,
+		tool_args,
+		verbose,
+		connection_id=None,
+		**kwargs,
 	):
 		"""
 		Coordinate reverse completion without timing sleeps.

@@ -33,8 +33,7 @@ async def start_mongo_client() -> None:
 		try:
 			env = getenv('PORTFOLIO_AGENT_ENV')
 			rich_print(
-				f'Starting MongoDB client'
-				f' in environment: {env}...',
+				f'Starting MongoDB client in environment: {env}...',
 				style=LogStyle.INFO,
 				prefix='mongodb.config',
 			)

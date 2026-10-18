@@ -61,10 +61,7 @@ def harness() -> Iterator[WebSocketHarness]:
 				request = WebSocketRequest.model_validate_json(
 					await websocket.receive_text()
 				)
-				if (
-					request.type
-					== WebSocketRequestType.HEARTBEAT
-				):
+				if request.type == WebSocketRequestType.HEARTBEAT:
 					continue
 				manager.record_message('echo-request')
 				item = StreamManagerItem(
@@ -85,9 +82,7 @@ def harness() -> Iterator[WebSocketHarness]:
 		except WebSocketDisconnect:
 			pass
 		finally:
-			await registry.remove_connection(
-				user_id, connection_id
-			)
+			await registry.remove_connection(user_id, connection_id)
 
 	with TestClient(app) as client:
 		assert registry is not None

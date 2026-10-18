@@ -40,8 +40,7 @@ async def test_access_returns_identity_and_limits_ip_once(
 			wraps=get_limiter,
 		) as retrieve,
 		patch(
-			'api.dependencies.auth._checks.'
-			'enforce_existing_block',
+			'api.dependencies.auth._checks.enforce_existing_block',
 			new_callable=AsyncMock,
 		) as check,
 	):
@@ -70,9 +69,7 @@ async def test_access_returns_identity_and_limits_ip_once(
 	]
 
 
-@pytest.mark.parametrize(
-	'credential', ['missing', 'bad', 'expired']
-)
+@pytest.mark.parametrize('credential', ['missing', 'bad', 'expired'])
 async def test_invalid_credentials_still_pass_ip_gate(
 	client: httpx.AsyncClient, credential: str
 ) -> None:
@@ -150,18 +147,13 @@ async def test_application_failures_are_server_errors(
 		monkeypatch.delenv('JWT_SECRET')
 	elif failure == 'database':
 		monkeypatch.setattr(
-			'api.dependencies.auth._checks.'
-			'enforce_existing_block',
-			AsyncMock(
-				side_effect=RuntimeError('private failure')
-			),
+			'api.dependencies.auth._checks.enforce_existing_block',
+			AsyncMock(side_effect=RuntimeError('private failure')),
 		)
 	else:
 		monkeypatch.setattr(
 			'api.dependencies.auth._checks.get_limiter',
-			AsyncMock(
-				side_effect=RuntimeError('private failure')
-			),
+			AsyncMock(side_effect=RuntimeError('private failure')),
 		)
 	response = await client.get('/protected')
 	assert response.status_code == 500

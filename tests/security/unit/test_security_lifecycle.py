@@ -53,9 +53,7 @@ async def test_start_stop_manage_one_store() -> None:
 	await lifecycle.stop_security_client()
 
 
-async def test_missing_client_cannot_provide_allowances() -> (
-	None
-):
+async def test_missing_client_cannot_provide_allowances() -> None:
 	"""Require startup before using the forwarding helper."""
 	with pytest.raises(SecurityServiceException):
 		await lifecycle.get_limiter(

@@ -44,9 +44,7 @@ async def test_get_user_rejects_missing_identity() -> None:
 @pytest.mark.parametrize(
 	'record, expected', [(None, False), ({}, True)]
 )
-async def test_user_exists_checks_presence(
-	record, expected
-) -> None:
+async def test_user_exists_checks_presence(record, expected) -> None:
 	"""Use document presence, not document truthiness."""
 	collection = AsyncMock()
 	collection.find_one.return_value = record

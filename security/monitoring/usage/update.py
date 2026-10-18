@@ -89,9 +89,7 @@ async def remove_active_ws_connection(
 	entity: UsageEntity, entity_id: str, connection_id: str
 ) -> bool:
 	"""Remove a registration, tolerating absent records."""
-	result = await get_collection(
-		MongoDBCollection.USAGE
-	).update_one(
+	result = await get_collection(MongoDBCollection.USAGE).update_one(
 		{'entity': entity.value, 'entity_id': entity_id},
 		{'$pull': {'active_ws_connections': connection_id}},
 	)
@@ -103,9 +101,7 @@ async def reset_usage_day(
 ) -> bool:
 	"""Reset older counters without overwriting today's usage."""
 	today = get_utc_datetime_now().date().isoformat()
-	result = await get_collection(
-		MongoDBCollection.USAGE
-	).update_one(
+	result = await get_collection(MongoDBCollection.USAGE).update_one(
 		{
 			'entity': entity.value,
 			'entity_id': entity_id,

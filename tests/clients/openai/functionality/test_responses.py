@@ -84,9 +84,7 @@ async def test_stream_text(openai_client: AsyncOpenAI) -> None:
 				'response.failed',
 				'response.incomplete',
 			}:
-				pytest.fail(
-					f'Stream did not complete: {event.type}'
-				)
+				pytest.fail(f'Stream did not complete: {event.type}')
 	assert completed is not None
 	assert completed.status == 'completed'
 	assert deltas
@@ -113,9 +111,7 @@ async def test_stream_function_call(
 	]
 	stream = stream_agent_response(
 		system_prompt='Always invoke echo for the given value.',
-		input=[
-			{'role': 'user', 'content': 'Echo portfolio-test.'}
-		],
+		input=[{'role': 'user', 'content': 'Echo portfolio-test.'}],
 		tools=tools,
 		model=OpenAILanguageModel.GPT_6_LUNA,
 		reasoning=OpenAILanguageModelReasoning.LOW,
@@ -130,9 +126,7 @@ async def test_stream_function_call(
 				'response.failed',
 				'response.incomplete',
 			}:
-				pytest.fail(
-					f'Stream did not complete: {event.type}'
-				)
+				pytest.fail(f'Stream did not complete: {event.type}')
 	assert completed is not None
 	calls = [
 		item

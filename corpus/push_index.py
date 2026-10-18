@@ -64,9 +64,7 @@ async def push_index() -> None:
 	if not await collection.database.list_collection_names(
 		filter={'name': collection.name},
 	):
-		await collection.database.create_collection(
-			collection.name
-		)
+		await collection.database.create_collection(collection.name)
 	vector_index = SearchIndexModel(
 		name=index_name,
 		type='vectorSearch',

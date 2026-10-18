@@ -12,9 +12,9 @@ async def retrieve_usage_statistics(
 	entity: UsageEntity, entity_id: str
 ) -> UsageStatistics | None:
 	"""Return an entity's usage record, if present."""
-	document = await get_collection(
-		MongoDBCollection.USAGE
-	).find_one({'entity': entity.value, 'entity_id': entity_id})
+	document = await get_collection(MongoDBCollection.USAGE).find_one(
+		{'entity': entity.value, 'entity_id': entity_id}
+	)
 	if document is None:
 		return None
 	return UsageStatistics.model_validate(document)

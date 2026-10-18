@@ -18,6 +18,10 @@ from starlette.testclient import TestClient
 
 from api.middleware.origin import OriginMiddleware
 from api.middleware.request_id import RequestIdMiddleware
+from api.websocket.helpers.exception_capture import (
+	handle_connection_exception,
+)
+from exceptions.websocket import WebSocketConnectionException
 from schemas.security.monitoring.blocked import (
 	BlockedEntity,
 	BlockedRecord,
@@ -67,9 +71,7 @@ def ws_client(
 	monkeypatch.setattr(
 		access,
 		'create_user',
-		AsyncMock(
-			return_value=SimpleNamespace(user_id='visitor')
-		),
+		AsyncMock(return_value=SimpleNamespace(user_id='visitor')),
 	)
 	monkeypatch.setattr(
 		access, 'create_usage_statistics', AsyncMock()
@@ -97,6 +99,10 @@ def ws_client(
 		return '127.0.0.1'
 
 	app = FastAPI(lifespan=lifespan)
+	app.add_exception_handler(
+		WebSocketConnectionException, handle_connection_exception
+	)
+	monkeypatch.setenv('PORTFOLIO_AGENT_ENV', 'testing')
 	app.include_router(agent.agent_router, prefix='/agent')
 	app.dependency_overrides[require_ws_ip_access] = ip_access
 	with TestClient(app) as instance:

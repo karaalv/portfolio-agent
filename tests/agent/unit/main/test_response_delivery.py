@@ -1,10 +1,11 @@
 """Check streamed socket events, terminal states and recursion."""
 
+import asyncio
 from collections.abc import AsyncIterator
 from copy import deepcopy
 from types import SimpleNamespace
 from typing import cast
-from unittest.mock import AsyncMock
+from unittest.mock import ANY, AsyncMock, Mock
 
 import pytest
 from openai.types.responses import (
@@ -24,6 +25,26 @@ from openai.types.responses import (
 from agent import main
 from agent.observability import AgentTimer
 from agent.streaming import delivery
+
+
+async def test_cancelled_turn_survives_failed_end_delivery(
+	output: AsyncMock,
+	monkeypatch: pytest.MonkeyPatch,
+) -> None:
+	"""Do not replace cancellation with a secondary delivery error."""
+	timer = AgentTimer()
+	monkeypatch.setattr(
+		main,
+		'retrieve_agent_memory_param',
+		AsyncMock(side_effect=asyncio.CancelledError()),
+	)
+	output.side_effect = [True, RuntimeError('closed transport')]
+	with pytest.raises(asyncio.CancelledError):
+		await main.agent_chat(
+			'visitor', 'Hello', connection_id='socket', timer=timer
+		)
+	assert timer.outcome == 'cancelled'
+	assert timer.records[-1].status == 'cancelled'
 
 
 @pytest.fixture
@@ -196,7 +217,29 @@ async def test_terminal_failures_stop_without_persisting_output(
 	if kind != 'interrupted':
 		events.append(_completed([_message()]))
 	_, closed = _install_stream(monkeypatch, [events])
-	await main.agent_chat('visitor', 'Hello', connection_id='socket')
+	timer = AgentTimer()
+	summary = Mock()
+	monkeypatch.setattr(main, 'log_turn_finished', summary)
+	await main.agent_chat(
+		'visitor',
+		'Hello',
+		connection_id='socket',
+		timer=timer,
+		posthog_session_id='session-1',
+	)
+	assert (
+		timer.outcome
+		== {
+			'response.failed': 'failed',
+			'error': 'failed',
+			'response.incomplete': 'incomplete',
+			'interrupted': 'interrupted',
+		}[kind]
+	)
+	assert timer.records[-1].scope == 'interaction'
+	summary.assert_called_once_with(
+		timer, 'visitor', ANY, 'socket', 'session-1'
+	)
 	messages = [call.args[2] for call in output.await_args_list]
 	assert [m.type for m in messages] == [
 		'agent_start',

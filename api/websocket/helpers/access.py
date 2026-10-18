@@ -1,6 +1,6 @@
 """Resolve anonymous socket identities and access tokens."""
 
-from fastapi import HTTPException, WebSocketException
+from fastapi import HTTPException, WebSocket, WebSocketException
 
 from api.dependencies.auth.application import (
 	require_application_access,
@@ -22,6 +22,7 @@ from users.creation import create_user
 
 async def resolve_ws_user(
 	access_token: str | None,
+	websocket: WebSocket | None = None,
 ) -> tuple[str, str | None]:
 	"""Return an identity and a claim token for new visitors.
 
@@ -30,9 +31,9 @@ async def resolve_ws_user(
 	"""
 	if access_token is None:
 		user = await create_user()
-		await create_usage_statistics(
-			UsageEntity.USER, user.user_id
-		)
+		if websocket is not None:
+			websocket.state.user_id = user.user_id
+		await create_usage_statistics(UsageEntity.USER, user.user_id)
 		return user.user_id, create_token(user.user_id)
 	try:
 		payload = validate_token(access_token)
@@ -47,9 +48,9 @@ async def resolve_ws_user(
 			reason='Unable to validate access token.',
 		) from exc
 	try:
-		user_id = await require_application_access(
-			payload['sub']
-		)
+		if websocket is not None:
+			websocket.state.user_id = payload['sub']
+		user_id = await require_application_access(payload['sub'])
 	except HTTPException as exc:
 		code = 1008
 		if exc.status_code == 429:

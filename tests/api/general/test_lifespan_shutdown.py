@@ -1,12 +1,47 @@
 """Verify orderly cleanup when the server lifespan ends."""
 
 import asyncio
+import logging
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 pytestmark = pytest.mark.unit
+
+
+async def test_startup_failure_is_critical_and_timestamped(
+	services,
+	monkeypatch,
+	caplog,
+) -> None:
+	"""Report the original startup failure before cleanup."""
+	from posthog_client import error_tracking
+	from shared.logging.logger import LOGGER_NAME
+
+	logger = logging.getLogger(LOGGER_NAME)
+	logger.addHandler(caplog.handler)
+	capture = Mock()
+	monkeypatch.setattr(error_tracking, 'capture_exception', capture)
+	exc = RuntimeError('startup failed')
+	services.start.side_effect = exc
+	try:
+		with pytest.raises(RuntimeError, match='startup failed'):
+			async with services.server.lifespan(services.server.app):
+				pass
+	finally:
+		logger.removeHandler(caplog.handler)
+	capture.assert_called_once()
+	assert capture.call_args.args[0] is exc
+	assert (
+		datetime.fromisoformat(
+			capture.call_args.args[2]['timestamp']
+		).tzinfo
+		is not None
+	)
+	assert caplog.records[0].levelno == logging.CRITICAL
+	services.stop.assert_awaited_once()
 
 
 @pytest.fixture

@@ -37,9 +37,7 @@ async def test_create_and_retrieve_user(
 	)
 	assert stored.last_active_at == stored.created_at
 	collection = get_collection(MongoDBCollection.USERS)
-	document = await collection.find_one(
-		{'user_id': user.user_id}
-	)
+	document = await collection.find_one({'user_id': user.user_id})
 	assert document is not None
 	assert isinstance(document['created_at'], datetime)
 	assert isinstance(document['last_active_at'], datetime)

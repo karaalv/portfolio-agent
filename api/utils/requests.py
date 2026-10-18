@@ -46,10 +46,7 @@ def get_ws_ip(websocket: WebSocket) -> str:
 
 	Trusted proxy headers must be resolved by the server.
 	"""
-	if (
-		websocket.client is None
-		or not websocket.client.host.strip()
-	):
+	if websocket.client is None or not websocket.client.host.strip():
 		raise WebSocketException(
 			code=status.WS_1008_POLICY_VIOLATION,
 			reason='Client IP address is missing.',

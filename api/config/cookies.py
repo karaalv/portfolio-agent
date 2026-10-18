@@ -7,9 +7,7 @@ ACCESS_TOKEN_COOKIE_NAME = 'JWT'
 ACCESS_TOKEN_COOKIE_PATH = '/'
 ACCESS_TOKEN_COOKIE_SECURE = True
 ACCESS_TOKEN_COOKIE_HTTPONLY = True
-ACCESS_TOKEN_COOKIE_SAMESITE: Literal[
-	'lax', 'strict', 'none'
-] = 'lax'
+ACCESS_TOKEN_COOKIE_SAMESITE: Literal['lax', 'strict', 'none'] = 'lax'
 
 
 def get_cookie_domain() -> str:

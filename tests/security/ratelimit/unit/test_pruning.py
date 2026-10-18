@@ -30,9 +30,7 @@ async def test_prune_removes_only_inactive_limiters(
 		record.identifier_value: record
 		for record in (await store.get_all_limiters()).values()
 	}
-	records['stale'].last_accessed_at -= timedelta(
-		days=3, seconds=1
-	)
+	records['stale'].last_accessed_at -= timedelta(days=3, seconds=1)
 	records['boundary'].last_accessed_at -= timedelta(days=3)
 	records['refreshed'].last_accessed_at -= timedelta(days=4)
 	await store.get_limiter(
@@ -69,7 +67,7 @@ async def test_background_cleanup_runs_and_retries(
 			wraps=asyncio,
 		) as runtime,
 		patch(
-			'security.ratelimit.ratelimit_store.rich_print'
+			'security.ratelimit.ratelimit_store.report_exception'
 		) as log,
 	):
 		runtime.sleep = controlled_sleep

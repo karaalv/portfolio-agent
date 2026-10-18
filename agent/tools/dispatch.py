@@ -6,6 +6,10 @@ from openai.types.responses import ResponseInputParam
 from pydantic import ValidationError
 
 from agent.input_items import create_function_output_item
+from agent.logging.tools import (
+	capture_tool_failure,
+	log_tool_rejected,
+)
 from agent.observability import AgentTimer
 from agent.prompts.tools import (
 	format_failed_tool_response,
@@ -25,6 +29,7 @@ async def run_function_calls(
 	verbose: bool = False,
 	timer: AgentTimer | None = None,
 	connection_id: str | None = None,
+	posthog_session_id: str | None = None,
 ) -> ResponseInputParam:
 	"""Run calls concurrently; return dictionary insertion order.
 
@@ -43,7 +48,12 @@ async def run_function_calls(
 			tasks.append(
 				group.create_task(
 					_run_tool_call(
-						user_id, call, verbose, timer, connection_id
+						user_id,
+						call,
+						verbose,
+						timer,
+						connection_id,
+						posthog_session_id,
 					)
 				)
 			)
@@ -60,6 +70,7 @@ async def _run_tool_call(
 	verbose: bool,
 	timer: AgentTimer | None,
 	connection_id: str | None,
+	posthog_session_id: str | None,
 ) -> str:
 	"""Time each tool independently, preserving call identity."""
 	if timer is None:
@@ -69,6 +80,8 @@ async def _run_tool_call(
 			call.tool_args,
 			verbose,
 			connection_id,
+			posthog_session_id=posthog_session_id,
+			call_id=call.call_id,
 		)
 	with timer.measure('tool', f'{call.tool_name} ({call.call_id})'):
 		return await _dispatch_tool_call(
@@ -77,6 +90,9 @@ async def _run_tool_call(
 			call.tool_args,
 			verbose,
 			connection_id,
+			posthog_session_id=posthog_session_id,
+			call_id=call.call_id,
+			timer=timer,
 		)
 
 
@@ -86,6 +102,9 @@ async def _dispatch_tool_call(
 	tool_args: str,
 	verbose: bool = False,
 	connection_id: str | None = None,
+	posthog_session_id: str | None = None,
+	call_id: str | None = None,
+	timer: AgentTimer | None = None,
 ) -> str:
 	"""Dispatch a tool and report recoverable failures."""
 	try:
@@ -98,17 +117,47 @@ async def _dispatch_tool_call(
 					connection_id=connection_id,
 				)
 			case _:
+				if timer is not None:
+					timer.mark_outcome('degraded')
+				log_tool_rejected(
+					user_id,
+					tool_name,
+					call_id,
+					connection_id,
+					posthog_session_id,
+					'unknown_tool',
+				)
 				message = f'Unknown tool: {tool_name!r}.'
 				if verbose:
 					rich_print(message, style=LogStyle.WARNING)
 				return format_failed_tool_response(message)
 	except ValidationError as error:
+		if timer is not None:
+			timer.mark_outcome('degraded')
+		log_tool_rejected(
+			user_id,
+			tool_name,
+			call_id,
+			connection_id,
+			posthog_session_id,
+			'invalid_arguments',
+		)
 		details = error.errors(include_input=False, include_url=False)
 		message = f'Invalid arguments for {tool_name}: {details}'
 		if verbose:
 			rich_print(message, style=LogStyle.WARNING)
 		return format_failed_tool_response(message)
 	except Exception as error:
+		if timer is not None:
+			timer.mark_outcome('degraded')
+		capture_tool_failure(
+			error,
+			user_id,
+			tool_name,
+			call_id,
+			connection_id,
+			posthog_session_id,
+		)
 		message = (
 			f'Unexpected error for {tool_name}: '
 			f'{type(error).__name__}: {error}'

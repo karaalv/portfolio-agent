@@ -1,7 +1,7 @@
 """Check socket identity, request handling and close codes."""
 
 from typing import cast
-from unittest.mock import ANY, AsyncMock
+from unittest.mock import ANY, AsyncMock, Mock
 from urllib.parse import urlencode
 
 import pytest
@@ -16,6 +16,7 @@ from api.websocket.helpers.responses import (
 )
 from authorisation.jwt.create import create_token
 from authorisation.jwt.validate import validate_token
+from posthog_client import error_tracking
 from schemas.security.monitoring.usage import UsageEntity
 from schemas.security.ratelimit import (
 	ResourceAccessor,
@@ -24,6 +25,76 @@ from schemas.security.ratelimit import (
 from security.lifecycle import get_limiter
 
 _PATH = '/agent/ws/agent-chat'
+
+
+def test_handshake_access_failure_retains_verified_user(
+	ws_client: TestClient,
+	monkeypatch,
+) -> None:
+	"""Keep validated identity when a later access check fails."""
+	capture = Mock()
+	monkeypatch.setattr(error_tracking, 'capture_exception', capture)
+	cast(
+		AsyncMock, access.require_application_access
+	).side_effect = HTTPException(403, 'Blocked')
+	token = create_token('visitor')
+	with pytest.raises(WebSocketDisconnect):
+		with ws_client.websocket_connect(
+			f'{_PATH}?access_token={token}&session_id=session'
+		):
+			pass
+	capture.assert_called_once()
+	assert capture.call_args.args[1] == 'visitor'
+	assert capture.call_args.args[2]['sessionId'] == 'session'
+
+
+def test_failed_handshake_captures_session_before_identity(
+	ws_client: TestClient,
+	monkeypatch,
+) -> None:
+	"""Do not invent a user identity for an invalid access token."""
+	capture = Mock()
+	monkeypatch.setattr(error_tracking, 'capture_exception', capture)
+	with pytest.raises(WebSocketDisconnect) as failure:
+		with ws_client.websocket_connect(
+			f'{_PATH}?access_token=invalid&request_id=handshake&session_id=session-1'
+		):
+			pass
+	assert failure.value.code == 1008
+	capture.assert_called_once()
+	assert capture.call_args.args[1] is None
+	properties = capture.call_args.args[2]
+	assert properties['request_id'] == 'handshake'
+	assert properties['sessionId'] == 'session-1'
+	assert properties['connection_id']
+
+
+def test_chat_exception_is_captured_once_and_registry_is_cleaned(
+	ws_client: TestClient,
+	monkeypatch,
+) -> None:
+	"""Report internal failures once and clean up their connection."""
+	capture = Mock()
+	monkeypatch.setattr(error_tracking, 'capture_exception', capture)
+	cast(AsyncMock, agent.agent_chat).side_effect = RuntimeError(
+		'failed'
+	)
+	token = create_token('visitor')
+	with ws_client.websocket_connect(
+		f'{_PATH}?access_token={token}&session_id=session-1'
+	) as ws:
+		ws.send_json({'type': 'agent_message', 'payload': 'Hello'})
+		with pytest.raises(WebSocketDisconnect) as failure:
+			while True:
+				ws.receive_json()
+	assert failure.value.code == 1011
+	capture.assert_called_once()
+	assert capture.call_args.args[1] == 'visitor'
+	assert capture.call_args.args[2]['sessionId'] == 'session-1'
+	assert ws_client.portal is not None
+	assert not ws_client.portal.call(
+		agent.get_websocket_registry().has_user, 'visitor'
+	)
 
 
 @pytest.mark.parametrize(
@@ -36,7 +107,9 @@ def test_handshake_retains_session_without_changing_identity(
 	"""Keep replay context on the connection and socket state."""
 	observed: list[tuple[str, str | None, str | None]] = []
 
-	async def reply(user_id, user_input, connection_id):
+	async def reply(
+		user_id, user_input, connection_id, posthog_session_id=None
+	):
 		registry = agent.get_websocket_registry()
 		manager = await registry.get_connection(
 			user_id, connection_id
@@ -99,7 +172,10 @@ def test_anonymous_socket_issues_token_and_runs_agent(
 		AsyncMock, access.create_usage_statistics
 	).assert_awaited_once_with(UsageEntity.USER, 'visitor')
 	cast(AsyncMock, agent.agent_chat).assert_awaited_once_with(
-		user_id='visitor', user_input='Hello', connection_id=ANY
+		user_id='visitor',
+		user_input='Hello',
+		connection_id=ANY,
+		posthog_session_id=None,
 	)
 	assert ws_client.portal is not None
 	assert not ws_client.portal.call(
@@ -122,6 +198,7 @@ def test_message_responses_use_current_request_id(
 		user_id: str,
 		user_input: str,
 		connection_id: str,
+		posthog_session_id: str | None = None,
 	) -> None:
 		"""Queue mock output through the actual socket manager."""
 		registry = agent.get_websocket_registry()

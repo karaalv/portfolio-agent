@@ -32,6 +32,7 @@ async def require_access_token(
 			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
 			detail='Unable to validate access token.',
 		) from exc
+	request.state.user_id = payload['sub']
 	return payload['sub']
 
 

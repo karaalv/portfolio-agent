@@ -18,9 +18,7 @@ USAGE_POLICY_MAPPING: dict[
 		UsageScope.DAILY_TOKENS: UsagePolicy(
 			UsageScope.DAILY_TOKENS, 500_000
 		),
-		UsageScope.ACTIVE_WS: UsagePolicy(
-			UsageScope.ACTIVE_WS, 4
-		),
+		UsageScope.ACTIVE_WS: UsagePolicy(UsageScope.ACTIVE_WS, 4),
 	},
 	UsageEntity.IP: {
 		UsageScope.DAILY_REQUESTS: UsagePolicy(
@@ -29,9 +27,7 @@ USAGE_POLICY_MAPPING: dict[
 		UsageScope.DAILY_TOKENS: UsagePolicy(
 			UsageScope.DAILY_TOKENS, 25_000_000
 		),
-		UsageScope.ACTIVE_WS: UsagePolicy(
-			UsageScope.ACTIVE_WS, 200
-		),
+		UsageScope.ACTIVE_WS: UsagePolicy(UsageScope.ACTIVE_WS, 200),
 	},
 }
 

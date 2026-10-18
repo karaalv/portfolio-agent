@@ -55,12 +55,10 @@ async def test_memory_pagination_reaches_all_records(
 		await insert_agent_memory(memory)
 	seen = []
 	offset = 0
-	while page := await retrieve_agent_memory_page(
-		user_id, offset
-	):
-		assert [
+	while page := await retrieve_agent_memory_page(user_id, offset):
+		assert [(m.created_at, m.sequence) for m in page] == sorted(
 			(m.created_at, m.sequence) for m in page
-		] == sorted((m.created_at, m.sequence) for m in page)
+		)
 		assert all(m.user_id == user_id for m in page)
 		seen = page + seen
 		offset += len(page)
@@ -69,8 +67,7 @@ async def test_memory_pagination_reaches_all_records(
 	]
 	assert len(seen) == len({m.memory_id for m in seen})
 	assert (
-		await retrieve_agent_memory_page_param(user_id, offset)
-		== []
+		await retrieve_agent_memory_page_param(user_id, offset) == []
 	)
 
 

@@ -49,8 +49,7 @@ async def test_identifiers_scopes_and_accessors_are_isolated(
 		(ResourceScope.APPLICATION, ResourceAccessor.IP, 'a'),
 	]
 	limiters = [
-		await store.get_limiter(*identity)
-		for identity in identities
+		await store.get_limiter(*identity) for identity in identities
 	]
 	assert len({id(limiter) for limiter in limiters}) == 4
 	records = (await store.get_all_limiters()).values()
@@ -66,9 +65,7 @@ async def test_lookup_refreshes_access_time(
 	first = await store.get_limiter(
 		ResourceScope.APPLICATION, ResourceAccessor.USER, 'a'
 	)
-	record = next(
-		iter((await store.get_all_limiters()).values())
-	)
+	record = next(iter((await store.get_all_limiters()).values()))
 	assert record.last_accessed_at == utc_clock.now
 	utc_clock.now += timedelta(hours=1)
 	second = await store.get_limiter(

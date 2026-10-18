@@ -37,16 +37,16 @@ async def test_usage_observer_reconciles_and_prunes() -> None:
 	"""Run both daily jobs without starting background tasks."""
 	with (
 		patch(
-			'security.observers.usage_observer.'
-			'reset_daily_usage',
+			'security.observers.usage_observer.reset_daily_usage',
 			new_callable=AsyncMock,
 		) as reset,
 		patch(
-			'security.observers.usage_observer.'
-			'prune_inactive_usage',
+			'security.observers.usage_observer.prune_inactive_usage',
 			new_callable=AsyncMock,
 		) as prune,
 	):
+		reset.return_value = 3
+		prune.return_value = 2
 		await UsageObserver().run_once()
 		reset.assert_awaited_once()
 		prune.assert_awaited_once()

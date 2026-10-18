@@ -49,9 +49,7 @@ async def test_fetch_passes_offset_and_serialises_messages(
 		message.model_dump(mode='json') for message in messages
 	]
 	assert response.json()['meta']['success'] is True
-	assert (
-		response.json()['meta']['request_id'] == 'memory-request'
-	)
+	assert response.json()['meta']['request_id'] == 'memory-request'
 	retrieve_page.assert_awaited_once_with(
 		user_id='visitor', offset=offset or 0
 	)

@@ -20,9 +20,7 @@ async def create_usage_statistics(
 ) -> UsageStatistics:
 	"""Create once within the single application process."""
 	async with _creation_lock:
-		existing = await retrieve_usage_statistics(
-			entity, entity_id
-		)
+		existing = await retrieve_usage_statistics(entity, entity_id)
 		if existing is not None:
 			return existing
 		statistics = UsageStatistics(

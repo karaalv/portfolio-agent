@@ -38,23 +38,17 @@ async def main() -> None:
 		)
 
 		if index_exists:
-			rich_print(
-				'Corpus index already exists.', LogStyle.INFO
-			)
+			rich_print('Corpus index already exists.', LogStyle.INFO)
 		else:
 			await push_index()
 
 		if data_exists:
-			rich_print(
-				'Corpus data already exists.', LogStyle.INFO
-			)
+			rich_print('Corpus data already exists.', LogStyle.INFO)
 		else:
 			start_openai_client()
 			await push_corpus()
 
-		rich_print(
-			'Corpus bootstrap complete.', LogStyle.SUCCESS
-		)
+		rich_print('Corpus bootstrap complete.', LogStyle.SUCCESS)
 	finally:
 		try:
 			await stop_openai_client()

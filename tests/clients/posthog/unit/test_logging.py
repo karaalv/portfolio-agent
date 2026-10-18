@@ -9,11 +9,49 @@ import pytest
 from opentelemetry._logs import get_logger_provider
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 
-from posthog_client import _logging, config
+from agent.logging.events import log_turn_finished
+from agent.observability import AgentTimer
+from exceptions.core import PortfolioAgentException
+from posthog_client import _logging, config, error_tracking
 from shared.logging import log_error, log_info
 from shared.logging.logger import LOGGER_NAME
 
 pytestmark = pytest.mark.unit
+
+
+async def test_correlated_exception_and_turn_records_export(
+	isolated_pipeline,
+	monkeypatch,
+):
+	"""Keep identity aliases, custom exception fields and timings."""
+	monkeypatch.setattr(error_tracking, 'capture_exception', Mock())
+	_logging.start_logging('test-key', 'https://example.com')
+	error_tracking.report_exception(
+		PortfolioAgentException('failed', 'api', 'example', 'read'),
+		'http_request_failed',
+		{},
+		user_id='visitor',
+		posthog_session_id='browser-session',
+	)
+	timer = AgentTimer()
+	with timer.measure('interaction', 'Agent turn'):
+		pass
+	log_turn_finished(
+		timer, 'visitor', 'turn', 'connection', 'browser-session'
+	)
+	assert _logging._logger_provider is not None
+	assert _logging._logger_provider.force_flush()
+	logs = isolated_pipeline[0].get_finished_logs()
+	assert len(logs) == 2
+	attributes = logs[0].log_record.attributes
+	assert attributes is not None
+	assert attributes['posthogDistinctId'] == 'visitor'
+	assert attributes['sessionId'] == 'browser-session'
+	assert attributes['exception_module'] == 'example'
+	summary = logs[1].log_record.attributes
+	assert summary is not None
+	assert summary['status'] == 'completed'
+	assert isinstance(summary['timings_json'], str)
 
 
 class RecordingExporter(InMemoryLogRecordExporter):

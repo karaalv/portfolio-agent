@@ -21,6 +21,4 @@ async def user_ids(
 	finally:
 		if ids:
 			collection = get_collection(MongoDBCollection.USERS)
-			await collection.delete_many(
-				{'user_id': {'$in': ids}}
-			)
+			await collection.delete_many({'user_id': {'$in': ids}})

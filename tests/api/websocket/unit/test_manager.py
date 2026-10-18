@@ -60,8 +60,7 @@ async def test_delivery_preserves_order(
 		'2',
 	]
 	assert all(
-		item['meta']['request_id'] == 'request'
-		for item in messages
+		item['meta']['request_id'] == 'request' for item in messages
 	)
 
 
@@ -131,9 +130,7 @@ async def test_full_queue_closes_with_1013(
 	"""
 	Exhausted capacity closes the socket with code 1013.
 	"""
-	monkeypatch.setattr(
-		module, '_QUEUE_PUT_TIMEOUT_SECONDS', 0.01
-	)
+	monkeypatch.setattr(module, '_QUEUE_PUT_TIMEOUT_SECONDS', 0.01)
 	manager._message_queue = asyncio.Queue(maxsize=1)
 	assert await manager.send_message(response)
 	assert not await manager.send_message(response)
@@ -244,9 +241,7 @@ async def test_heartbeat_failure_closes_with_1011(
 	def fail(**_: object) -> None:
 		raise RuntimeError('Heartbeat construction failed')
 
-	monkeypatch.setattr(
-		module, 'create_ws_heartbeat_response', fail
-	)
+	monkeypatch.setattr(module, 'create_ws_heartbeat_response', fail)
 	manager.start()
 	await asyncio.wait_for(manager._close_complete.wait(), 1)
 	assert socket.close.await_args is not None
@@ -263,9 +258,7 @@ async def test_activity_ignores_heartbeats(
 	"""
 	created = manager.created_at
 	now = created + timedelta(minutes=2)
-	monkeypatch.setattr(
-		module, 'get_utc_datetime_now', lambda: now
-	)
+	monkeypatch.setattr(module, 'get_utc_datetime_now', lambda: now)
 	manager.start()
 	await asyncio.sleep(0)
 	await asyncio.wait_for(manager._message_queue.join(), 1)
@@ -285,8 +278,6 @@ async def test_close_failure_finishes_cleanup(
 	socket: AsyncMock,
 ) -> None:
 	"""A close transport error cannot strand shutdown waiters."""
-	socket.close.side_effect = RuntimeError(
-		'Already disconnected'
-	)
+	socket.close.side_effect = RuntimeError('Already disconnected')
 	await asyncio.gather(manager.close(), manager.close())
 	assert manager._close_complete.is_set()

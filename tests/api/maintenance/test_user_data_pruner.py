@@ -2,6 +2,7 @@
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 from api.maintenance import user_data_pruner
 from database.mongodb.collections import MongoDBCollection
@@ -22,7 +23,7 @@ class _Cursor:
 
 
 async def test_prunes_only_still_inactive_users(monkeypatch) -> None:
-	"""Delete messages before user records and skip reactivated users."""
+	"""Delete messages first and skip reactivated users."""
 	operations: list[tuple[str, str]] = []
 
 	class Users:
@@ -46,10 +47,12 @@ async def test_prunes_only_still_inactive_users(monkeypatch) -> None:
 
 		async def delete_one(self, query):
 			operations.append(('users', query['user_id']))
+			return SimpleNamespace(deleted_count=1)
 
 	class Messages:
 		async def delete_many(self, query):
 			operations.append(('messages', query['user_id']))
+			return SimpleNamespace(deleted_count=2)
 
 	users = Users()
 	messages = Messages()
@@ -71,10 +74,13 @@ async def test_prunes_only_still_inactive_users(monkeypatch) -> None:
 		('users', 'inactive'),
 	]
 	assert pruner._inactive_user_ids == set()
+	assert pruner._progress['users_deleted'] == 1
+	assert pruner._progress['messages_deleted'] == 2
+	assert pruner._progress['skipped_users'] == 1
 
 
 async def test_cutoff_is_seven_days(monkeypatch) -> None:
-	"""Query the documented activity field with a seven-day UTC cutoff."""
+	"""Use a seven-day UTC cutoff for inactive users."""
 	before = datetime.now(timezone.utc) - timedelta(days=7)
 	cutoffs: list[datetime] = []
 
@@ -166,10 +172,11 @@ async def test_prunes_in_batches_of_thirty(monkeypatch) -> None:
 
 		async def delete_one(self, query):
 			deleted_users.add(query['user_id'])
+			return SimpleNamespace(deleted_count=1)
 
 	class Messages:
 		async def delete_many(self, query):
-			return None
+			return SimpleNamespace(deleted_count=1)
 
 	collections = {
 		MongoDBCollection.USERS: Users(),

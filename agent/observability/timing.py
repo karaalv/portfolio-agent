@@ -61,6 +61,21 @@ class AgentTimer:
 	def __init__(self) -> None:
 		"""Prepare an empty collection without starting a clock."""
 		self._records: list[AgentTiming] = []
+		self.outcome = 'completed'
+		self.model: str | None = None
+
+	def mark_outcome(self, outcome: str) -> None:
+		"""Retain the most severe outcome across concurrent rounds."""
+		priority = {
+			'completed': 0,
+			'degraded': 1,
+			'incomplete': 2,
+			'interrupted': 3,
+			'failed': 4,
+			'cancelled': 5,
+		}
+		if priority[outcome] > priority[self.outcome]:
+			self.outcome = outcome
 
 	@property
 	def records(self) -> tuple[AgentTiming, ...]:

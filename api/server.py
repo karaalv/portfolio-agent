@@ -1,16 +1,24 @@
 """Configure the FastAPI application and its lifecycle."""
 
+import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from time import perf_counter
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException
 
 from api.dependencies.auth.ip import require_ip_access
 from api.lifecycle.config import (
 	start_api_lifecycle,
 	stop_api_lifecycle,
+)
+from api.lifecycle.logging import (
+	capture_lifecycle_failure,
+	log_server_started,
+	stop_component,
 )
 from api.maintenance.maintenance_manager import (
 	MaintenanceManager,
@@ -26,9 +34,14 @@ from api.routes.system import system_router
 from api.routes.users import users_router
 from api.security.security_manager import SecurityManager
 from api.utils.cors import get_allowed_origins
+from api.utils.exception_capture import capture_http_failure
 from api.utils.requests import get_request_id
 from api.utils.responses import create_http_response
+from api.websocket.helpers.exception_capture import (
+	handle_connection_exception,
+)
 from exceptions.core import PortfolioAgentException
+from exceptions.websocket import WebSocketConnectionException
 from shared.logging import LogStyle, rich_print
 
 # --- Lifecycle Management ---
@@ -43,24 +56,41 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 	"""
 	maintenance_manager = MaintenanceManager()
 	security_manager = SecurityManager()
+	started = perf_counter()
+	component = 'api_clients'
 	try:
-		await start_api_lifecycle()
-		await security_manager.start()
-		maintenance_manager.start()
+		try:
+			await start_api_lifecycle()
+			component = 'security'
+			await security_manager.start()
+			component = 'maintenance'
+			maintenance_manager.start()
+			log_server_started(app.version, started)
+		except Exception as exc:
+			capture_lifecycle_failure(exc, 'startup', component)
+			raise
 		yield
 	finally:
+		shutdown_started = perf_counter()
 		rich_print(
 			'Server termination detected. Shutting down services...',
 			style=LogStyle.INFO,
 			prefix='api.server',
 		)
 		try:
-			await maintenance_manager.stop()
+			await stop_component(
+				maintenance_manager.stop, 'maintenance'
+			)
 		finally:
 			try:
-				await security_manager.stop()
+				await stop_component(
+					security_manager.stop, 'security'
+				)
 			finally:
-				await stop_api_lifecycle()
+				await stop_api_lifecycle(
+					shutdown_failed=sys.exception() is not None,
+					shutdown_started=shutdown_started,
+				)
 		rich_print(
 			'Server shutdown complete.',
 			style=LogStyle.SUCCESS,
@@ -88,13 +118,14 @@ async def portfolio_agent_exception_handler(
 	request: Request, exc: PortfolioAgentException
 ) -> JSONResponse:
 	# Handle PortfolioAgentException
+	capture_http_failure(request, exc)
 	request_id = get_request_id(request)
 	return create_http_response(
 		request_id=request_id,
 		success=False,
 		message=exc.message,
 		data=None,
-		status_code=400,
+		status_code=500,
 	)
 
 
@@ -103,13 +134,12 @@ async def http_exception_handler(
 	request: Request, exc: HTTPException
 ) -> JSONResponse:
 	# Handle HTTPException
+	capture_http_failure(request, exc)
 	request_id = get_request_id(request)
 	exc_message = (
 		str(exc.detail) if hasattr(exc, 'detail') else str(exc)
 	)
-	exc_code = (
-		exc.status_code if hasattr(exc, 'status_code') else 500
-	)
+	exc_code = exc.status_code if hasattr(exc, 'status_code') else 500
 	return create_http_response(
 		request_id=request_id,
 		success=False,
@@ -124,6 +154,7 @@ async def general_exception_handler(
 	request: Request, exc: Exception
 ) -> JSONResponse:
 	# Handle general exceptions
+	capture_http_failure(request, exc)
 	request_id = get_request_id(request)
 	return create_http_response(
 		request_id=request_id,
@@ -132,6 +163,14 @@ async def general_exception_handler(
 		data=None,
 		status_code=500,
 	)
+
+
+@app.exception_handler(WebSocketConnectionException)
+async def websocket_connection_exception_handler(
+	websocket: WebSocket, exc: WebSocketConnectionException
+) -> None:
+	"""Report and close failed handshakes or active connections."""
+	await handle_connection_exception(websocket, exc)
 
 
 # - CORS Configuration -

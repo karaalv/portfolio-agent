@@ -2,23 +2,26 @@
 
 import asyncio
 from datetime import timedelta
+from time import perf_counter
 
 from aiolimiter import AsyncLimiter
 
+from posthog_client.error_tracking import report_exception
 from schemas.security.ratelimit import (
 	RateLimiter,
 	ResourceAccessor,
 	ResourceScope,
 )
 from security.ratelimit.config import get_rate_limit_config
-from shared.logging import LogStyle, rich_print
+from shared.logging import log_info
+from shared.logging.context import log_properties
 from shared.time import get_utc_datetime_now
 
 
 class RateLimitStore:
 	"""Keep caller allowances isolated within an app instance."""
 
-	_cleanup_interval_seconds = 12 * 60 * 60 # 12 hours
+	_cleanup_interval_seconds = 12 * 60 * 60  # 12 hours
 	_retention_period = timedelta(days=3)
 
 	def __init__(self) -> None:
@@ -97,10 +100,9 @@ class RateLimitStore:
 
 	async def prune_once(self) -> None:
 		"""Remove limiters unused for more than three days."""
+		started = perf_counter()
 		async with self._limiters_lock:
-			cutoff = (
-				get_utc_datetime_now() - self._retention_period
-			)
+			cutoff = get_utc_datetime_now() - self._retention_period
 			keys = [
 				key
 				for key, record in self._limiters.items()
@@ -108,6 +110,15 @@ class RateLimitStore:
 			]
 			for key in keys:
 				del self._limiters[key]
+		log_info(
+			'rate_limit_cleanup_completed',
+			log_properties(
+				'rate_limit_cleanup_completed',
+				limiters_deleted=len(keys),
+				cutoff=cutoff.isoformat(),
+				duration_seconds=perf_counter() - started,
+			),
+		)
 
 	async def _cleanup_loop(self) -> None:
 		"""Prune every twelve hours until cancelled."""
@@ -118,11 +129,13 @@ class RateLimitStore:
 			except asyncio.CancelledError:
 				raise
 			except Exception as exc:
-				rich_print(
-					f'Rate limiter cleanup failed: {exc}',
-					style=LogStyle.ERROR,
-					prefix='security.ratelimit',
-				)
+				self._capture_exception(exc)
+
+	def _capture_exception(self, exc: Exception) -> None:
+		"""Report a failed cleanup pass without stopping retries."""
+		report_exception(
+			exc, 'maintenance_failed', {'job': 'rate_limit_cleanup'}
+		)
 
 
 def _get_limiter_key(

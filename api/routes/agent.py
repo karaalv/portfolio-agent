@@ -15,6 +15,10 @@ from api.websocket.helpers.access import (
 	resolve_ws_user,
 	send_claim_token,
 )
+from api.websocket.helpers.context import (
+	connection_exception,
+	initialise_connection_context,
+)
 from api.websocket.helpers.guards import guard_agent_input
 from api.websocket.helpers.ratelimit import (
 	agent_message_rate_limit,
@@ -23,8 +27,8 @@ from api.websocket.helpers.requests import receive_ws_request
 from api.websocket.helpers.responses import (
 	create_ws_warning_response,
 )
+from exceptions.websocket import WebSocketConnectionException
 from schemas.api.ws.request import WebSocketRequestType
-from shared.ids import generate_uuid_str
 
 agent_router = APIRouter()
 
@@ -44,14 +48,20 @@ async def agent_chat_ws(
 	Retain the query session_id as browser replay context only.
 	Issue a claim token after registering anonymous sockets.
 	"""
-	posthog_session_id = (session_id or '').strip() or None
-	ws.state.posthog_session_id = posthog_session_id
-	user_id, claim_token = await resolve_ws_user(access_token)
-	connection_id = generate_uuid_str()
-	request_id = request_id or generate_uuid_str()
-	registry = get_websocket_registry()
-	await ws.accept()
+	initialise_connection_context(ws)
+	connection_id = ws.state.connection_id
+	request_id = ws.state.request_id
+	posthog_session_id = ws.state.posthog_session_id
+	registry = None
+	user_id = None
+	failed = False
 	try:
+		user_id, claim_token = await resolve_ws_user(
+			access_token, websocket=ws
+		)
+		ws.state.user_id = user_id
+		registry = get_websocket_registry()
+		await ws.accept()
 		manager = await registry.add_connection(
 			user_id,
 			connection_id,
@@ -59,6 +69,7 @@ async def agent_chat_ws(
 			request_id,
 			posthog_session_id=posthog_session_id,
 		)
+		ws.state.registered = True
 		await send_claim_token(manager, claim_token)
 		while True:
 			request = await receive_ws_request(ws, user_id)
@@ -83,24 +94,27 @@ async def agent_chat_ws(
 					user_id=user_id,
 					user_input=user_input,
 					connection_id=connection_id,
+					posthog_session_id=posthog_session_id,
 				)
 	except WebSocketDisconnect:
 		pass
-	except WebSocketException as exc:
-		await registry.remove_connection(
-			user_id,
-			connection_id,
-			reason=exc.reason or '',
-			close_code=exc.code,
-		)
-		return
-	except Exception:
-		await registry.remove_connection(
-			user_id,
-			connection_id,
-			reason='Unable to process chat.',
-			close_code=1011,
-		)
+	except WebSocketConnectionException:
+		failed = True
 		raise
+	except WebSocketException as exc:
+		failed = True
+		raise connection_exception(
+			ws, exc.code, exc.reason or ''
+		) from exc
+	except Exception as exc:
+		failed = True
+		raise connection_exception(
+			ws, 1011, 'Unable to process chat.'
+		) from exc
 	finally:
-		await registry.remove_connection(user_id, connection_id)
+		if (
+			not failed
+			and registry is not None
+			and user_id is not None
+		):
+			await registry.remove_connection(user_id, connection_id)

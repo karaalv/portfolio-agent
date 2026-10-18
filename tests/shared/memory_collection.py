@@ -74,9 +74,7 @@ class MemoryCollection:
 		self.insert_one = AsyncMock(side_effect=self._insert)
 		self.delete_many = AsyncMock(side_effect=self._delete)
 
-	def find(
-		self, query: dict, projection: dict
-	) -> MemoryCursor:
+	def find(self, query: dict, projection: dict) -> MemoryCursor:
 		"""
 		Select records for the supported agent query fields.
 		"""

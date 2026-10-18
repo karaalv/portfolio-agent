@@ -18,9 +18,7 @@ async def enforce_usage_limits(
 	values = {
 		UsageScope.DAILY_REQUESTS: statistics.daily_requests,
 		UsageScope.DAILY_TOKENS: statistics.daily_input_tokens,
-		UsageScope.ACTIVE_WS: len(
-			statistics.active_ws_connections
-		),
+		UsageScope.ACTIVE_WS: len(statistics.active_ws_connections),
 	}
 	for scope, value in values.items():
 		policy = get_usage_policy(statistics.entity, scope)

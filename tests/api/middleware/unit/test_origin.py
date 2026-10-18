@@ -111,9 +111,7 @@ async def test_socket_handshake_rejected_before_app(
 		app, [ALLOWED_ORIGIN], ['/users', '/agent']
 	)
 	headers = (
-		[(b'origin', origin.encode())]
-		if origin is not None
-		else []
+		[(b'origin', origin.encode())] if origin is not None else []
 	)
 	await middleware(
 		{
@@ -135,9 +133,7 @@ async def test_socket_handshake_rejected_before_app(
 	)
 
 
-async def test_allowed_sockets_and_lifespan_pass_through() -> (
-	None
-):
+async def test_allowed_sockets_and_lifespan_pass_through() -> None:
 	"""Pass trusted sockets and non-request scopes unchanged."""
 	app, receive, send = AsyncMock(), AsyncMock(), AsyncMock()
 	middleware = OriginMiddleware(

@@ -36,9 +36,7 @@ def make_memories(
 				'fetch_context',
 				'{"user_input":"education"}',
 			),
-			create_function_output_item(
-				call_id, 'Retrieved context'
-			),
+			create_function_output_item(call_id, 'Retrieved context'),
 			create_assistant_input_item(f'Answer {turn}'),
 		]
 		for sequence, payload in enumerate(payloads):

@@ -27,8 +27,7 @@ async def fetch_chat_page(
 			offset=offset,
 		)
 		data = [
-			message.model_dump(mode='json')
-			for message in messages
+			message.model_dump(mode='json') for message in messages
 		]
 	except Exception as exc:
 		raise HTTPException(

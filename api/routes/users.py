@@ -49,6 +49,7 @@ async def claim_cookie(
 			detail='Unable to validate access token.',
 		) from exc
 	user_id = payload['sub']
+	request.state.user_id = user_id
 	try:
 		user_exists = await does_user_exist(user_id)
 	except Exception as exc:

@@ -42,6 +42,4 @@ def test_single_token_boundary() -> None:
 def test_input_is_truncated() -> None:
 	"""Cap cleaned input without rejecting ordinary long text."""
 	value = 'word ' * 600
-	assert (
-		sanitise_input(value) == value[:MAX_INPUT_LENGTH].strip()
-	)
+	assert sanitise_input(value) == value[:MAX_INPUT_LENGTH].strip()

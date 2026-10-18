@@ -1,7 +1,7 @@
 """Queue and deliver messages for one accepted WebSocket."""
 
 import asyncio
-import logging
+import sys
 
 from fastapi import WebSocket
 
@@ -9,11 +9,14 @@ from api.websocket.helpers.responses import (
 	create_ws_heartbeat_response,
 )
 from exceptions.websocket import WebSocketManagerException
+from posthog_client.error_tracking import report_exception
 from schemas.api.ws.response import (
 	WebSocketResponse,
 	WebSocketResponseType,
 )
 from shared.ids import generate_uuid_str
+from shared.logging import log_error, log_info, log_warning
+from shared.logging.context import log_properties
 from shared.time import get_utc_datetime_now
 
 _MAX_QUEUE_SIZE = 333
@@ -21,8 +24,6 @@ _HEARTBEAT_INTERVAL_SECONDS = 30
 _QUEUE_PUT_TIMEOUT_SECONDS = 5
 _SEND_TIMEOUT_SECONDS = 10
 _CLOSE_TIMEOUT_SECONDS = 5
-
-_logger = logging.getLogger(__name__)
 
 
 class WebSocketManager:
@@ -61,9 +62,7 @@ class WebSocketManager:
 		"""Report whether shutdown has begun."""
 		return self._is_closed.is_set()
 
-	def record_message(
-		self, request_id: str | None = None
-	) -> None:
+	def record_message(self, request_id: str | None = None) -> None:
 		"""
 		Record an incoming non-heartbeat application message.
 		"""
@@ -114,14 +113,10 @@ class WebSocketManager:
 			]
 			for task in pending:
 				task.cancel()
-			await asyncio.gather(
-				*pending, return_exceptions=True
-			)
+			await asyncio.gather(*pending, return_exceptions=True)
 		finally:
 			try:
-				async with asyncio.timeout(
-					_CLOSE_TIMEOUT_SECONDS
-				):
+				async with asyncio.timeout(_CLOSE_TIMEOUT_SECONDS):
 					await self.websocket.close(
 						code=code, reason=reason
 					)
@@ -131,10 +126,28 @@ class WebSocketManager:
 				)
 			finally:
 				self._close_complete.set()
+				properties = log_properties(
+					'websocket_closed',
+					user_id=self.user_id,
+					posthog_session_id=self.posthog_session_id,
+					connection_id=self.connection_id,
+					request_id=self.request_id,
+					close_code=code,
+					reason=reason,
+					duration_seconds=(
+						get_utc_datetime_now() - self.created_at
+					).total_seconds(),
+				)
+				log = (
+					log_error
+					if code == 1011
+					else log_warning
+					if code in {1008, 1009, 1013}
+					else log_info
+				)
+				log('websocket_closed', properties)
 
-	async def send_message(
-		self, response: WebSocketResponse
-	) -> bool:
+	async def send_message(self, response: WebSocketResponse) -> bool:
 		"""Enqueue output; return acceptance, not client receipt.
 
 		Close slow connections if queue space stays unavailable.
@@ -152,9 +165,7 @@ class WebSocketManager:
 			}
 		)
 		try:
-			async with asyncio.timeout(
-				_QUEUE_PUT_TIMEOUT_SECONDS
-			):
+			async with asyncio.timeout(_QUEUE_PUT_TIMEOUT_SECONDS):
 				await self._message_queue.put(response)
 			return True
 		except asyncio.QueueShutDown:
@@ -185,9 +196,7 @@ class WebSocketManager:
 				)
 				if not await self.send_message(response):
 					if not self.is_closed:
-						await self.close(
-							1011, 'Heartbeat failed'
-						)
+						await self.close(1011, 'Heartbeat failed')
 					return
 				await asyncio.sleep(_HEARTBEAT_INTERVAL_SECONDS)
 		except asyncio.CancelledError:
@@ -205,9 +214,7 @@ class WebSocketManager:
 			while not self.is_closed:
 				response = await self._message_queue.get()
 				try:
-					async with asyncio.timeout(
-						_SEND_TIMEOUT_SECONDS
-					):
+					async with asyncio.timeout(_SEND_TIMEOUT_SECONDS):
 						await self.websocket.send_json(
 							response.model_dump(mode='json')
 						)
@@ -215,9 +222,7 @@ class WebSocketManager:
 						response.type
 						!= WebSocketResponseType.HEARTBEAT
 					):
-						self.last_message_at = (
-							get_utc_datetime_now()
-						)
+						self.last_message_at = get_utc_datetime_now()
 				except TimeoutError:
 					self._log_exception(
 						'Response delivery timed out.',
@@ -234,9 +239,7 @@ class WebSocketManager:
 						'send',
 						response.meta.request_id,
 					)
-					await self.close(
-						1011, 'Response delivery failed'
-					)
+					await self.close(1011, 'Response delivery failed')
 					return
 				finally:
 					self._message_queue.task_done()
@@ -277,14 +280,18 @@ class WebSocketManager:
 	) -> None:
 		"""Log failures with structured connection context."""
 		error = self._exception(message, operation, request_id)
-		_logger.error(
-			'%s',
+		error.__cause__ = sys.exception()
+		report_exception(
 			error,
-			extra={
+			'websocket_operation_failed',
+			{
 				'connection_id': error.connection_id,
-				'user_id': error.user_id,
 				'request_id': error.request_id,
 				'operation': error.operation,
 			},
-			exc_info=True,
+			user_id=self.user_id,
+			posthog_session_id=self.posthog_session_id,
+			severity='warning'
+			if isinstance(error.__cause__, TimeoutError)
+			else 'error',
 		)

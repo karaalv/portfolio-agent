@@ -45,9 +45,7 @@ class UsageStatistics(BaseModel):
 	)
 	daily_requests: int = Field(default=0, ge=0)
 	daily_input_tokens: int = Field(default=0, ge=0)
-	active_ws_connections: list[str] = Field(
-		default_factory=list
-	)
+	active_ws_connections: list[str] = Field(default_factory=list)
 	last_request_at: datetime = Field(
 		default_factory=get_utc_datetime_now
 	)

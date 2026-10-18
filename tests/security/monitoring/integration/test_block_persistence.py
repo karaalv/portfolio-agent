@@ -51,9 +51,7 @@ pytestmark = [
 async def test_daily_allowance_persists_block_after_limit(
 	entity: UsageEntity,
 	scope: UsageScope,
-	security_collections: dict[
-		MongoDBCollection, AsyncCollection
-	],
+	security_collections: dict[MongoDBCollection, AsyncCollection],
 ) -> None:
 	"""Allow the last slot and block the next counted request."""
 	await create_usage_statistics(entity, 'visitor')
@@ -63,9 +61,7 @@ async def test_daily_allowance_persists_block_after_limit(
 		if scope == UsageScope.DAILY_REQUESTS
 		else 'daily_input_tokens'
 	)
-	await security_collections[
-		MongoDBCollection.USAGE
-	].update_one(
+	await security_collections[MongoDBCollection.USAGE].update_one(
 		{'entity': entity.value, 'entity_id': 'visitor'},
 		{'$set': {field: limit - 1}},
 	)
@@ -87,15 +83,11 @@ async def test_daily_allowance_persists_block_after_limit(
 
 
 async def test_concurrent_block_creation_preserves_first_block(
-	security_collections: dict[
-		MongoDBCollection, AsyncCollection
-	],
+	security_collections: dict[MongoDBCollection, AsyncCollection],
 ) -> None:
 	"""Reuse one persisted block with stable timestamps."""
 	await create_block(BlockedEntity.USER, 'visitor', 'original')
-	original = await retrieve_block(
-		BlockedEntity.USER, 'visitor'
-	)
+	original = await retrieve_block(BlockedEntity.USER, 'visitor')
 	assert original is not None
 	records = await asyncio.gather(
 		*(
@@ -111,24 +103,20 @@ async def test_concurrent_block_creation_preserves_first_block(
 		== 1
 	)
 	with pytest.raises(EntityBlockedException) as error:
-		await apply_24h_block(
-			BlockedEntity.USER, 'visitor', 'new'
-		)
+		await apply_24h_block(BlockedEntity.USER, 'visitor', 'new')
 	assert error.value.record == original
 
 
 async def test_explicit_updates_and_duplicate_block_deletion(
-	security_collections: dict[
-		MongoDBCollection, AsyncCollection
-	],
+	security_collections: dict[MongoDBCollection, AsyncCollection],
 ) -> None:
 	"""Correct reasons and delete every duplicate block."""
 	await create_block(BlockedEntity.IP, 'visitor', 'original')
 	original = await retrieve_block(BlockedEntity.IP, 'visitor')
 	assert original is not None
-	await security_collections[
-		MongoDBCollection.BLOCKED
-	].insert_one(original.model_dump())
+	await security_collections[MongoDBCollection.BLOCKED].insert_one(
+		original.model_dump()
+	)
 	assert await update_block_reason(
 		BlockedEntity.IP, 'visitor', 'corrected'
 	)
@@ -140,8 +128,6 @@ async def test_explicit_updates_and_duplicate_block_deletion(
 	with pytest.raises(EntityBlockedException):
 		await enforce_existing_block(BlockedEntity.IP, 'visitor')
 	assert await delete_blocks(BlockedEntity.IP, 'visitor') == 2
-	assert (
-		await retrieve_block(BlockedEntity.IP, 'visitor') is None
-	)
+	assert await retrieve_block(BlockedEntity.IP, 'visitor') is None
 	await enforce_existing_block(BlockedEntity.IP, 'visitor')
 	assert await delete_blocks(BlockedEntity.IP, 'visitor') == 0
