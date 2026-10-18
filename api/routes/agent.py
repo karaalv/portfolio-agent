@@ -50,6 +50,7 @@ async def agent_chat_ws(
 	"""
 	initialise_connection_context(ws)
 	connection_id = ws.state.connection_id
+	ai_session_id = connection_id
 	request_id = ws.state.request_id
 	posthog_session_id = ws.state.posthog_session_id
 	registry = None
@@ -95,6 +96,7 @@ async def agent_chat_ws(
 					user_input=user_input,
 					connection_id=connection_id,
 					posthog_session_id=posthog_session_id,
+					ai_session_id=ai_session_id,
 				)
 	except WebSocketDisconnect:
 		pass

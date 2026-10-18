@@ -2,9 +2,10 @@
 
 from os import getenv
 
-from openai import AsyncOpenAI
+from posthog.ai.openai import AsyncOpenAI
 
 from exceptions.openai import OpenAIException
+from posthog_client.ai_observability import get_ai_posthog_client
 from shared.logging import LogStyle, rich_print
 
 # --- Configuration ---
@@ -26,7 +27,9 @@ def start_openai_client() -> None:
 				module='openai_client/config.py',
 				operation='start_openai_client',
 			)
-		_openai_client = AsyncOpenAI(api_key=api_key)
+		_openai_client = AsyncOpenAI(
+			api_key=api_key, posthog_client=get_ai_posthog_client()
+		)
 
 		rich_print(
 			'OpenAI client started successfully.',

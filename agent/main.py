@@ -43,10 +43,15 @@ from api.websocket.helpers.responses import (
 	create_ws_warning_response,
 )
 from openai_client.main import stream_agent_response
+from posthog_client.ai_observability import (
+	AIContext,
+	ai_observability_context,
+)
 from posthog_client.tracing import start_span
 from schemas.agent.streaming.stream_manager import (
 	EventStreamState,
 )
+from shared.ids import generate_uuid_str
 from shared.logging import LogStyle, rich_print
 
 
@@ -58,6 +63,7 @@ async def agent_chat(
 	connection_id: str | None = None,
 	timer: AgentTimer | None = None,
 	posthog_session_id: str | None = None,
+	ai_session_id: str | None = None,
 ) -> None:
 	"""Answer one turn and persist its input and final response.
 
@@ -80,90 +86,101 @@ async def agent_chat(
 			'connection_id': connection_id,
 		},
 	) as turn_span:
-		try:
-			with timer.measure(
-				'interaction', 'Agent turn'
-			) as interaction:
-				try:
-					await send_agent_ws_response(
-						user_id,
-						connection_id,
-						create_ws_agent_start_response(
-							'Agent turn started.'
-						),
-					)
-					try:
-						with start_span(
-							'agent.memory.retrieve',
-							user_id,
-							posthog_session_id,
-						) as memory_span:
-							history = (
-								await retrieve_agent_memory_param(
-									user_id=user_id
-								)
-							)
-							memory_span.set_attribute(
-								'history_count', len(history)
-							)
-						current_memory = await create_user_memory(
-							user_id=user_id,
-							turn_id=stream_manager.get_turn_id(),
-							sequence=stream_manager.increment_turn_sequence_counter(),
-							content=user_input,
-						)
-						history.append(current_memory.payload)
-						if verbosity_level > 1:
-							log_agent_history(history)
-						await _agent_response_handler(
-							stream_manager=stream_manager,
-							history=history,
-							verbosity_level=verbosity_level,
-							connection_id=connection_id,
-							timer=timer,
-							posthog_session_id=posthog_session_id,
-						)
-					finally:
-						pending = sys.exception()
-						try:
-							await send_agent_ws_response(
-								user_id,
-								connection_id,
-								create_ws_agent_end_response(
-									'Agent turn ended.'
-								),
-							)
-						except Exception as cleanup_error:
-							if pending is None:
-								raise
-							pending.add_note(
-								'Agent-end delivery also failed: '
-								f'{type(cleanup_error).__name__}'
-							)
-				except asyncio.CancelledError:
-					timer.mark_outcome('cancelled')
-					raise
-				except Exception:
-					timer.mark_outcome('failed')
-					raise
-				finally:
-					interaction.finish(timer.outcome)
-		finally:
-			turn_span.set_attribute('outcome', timer.outcome)
-			if timer.outcome in {
-				'failed',
-				'interrupted',
-				'incomplete',
-				'degraded',
-			}:
-				turn_span.set_status(StatusCode.ERROR)
-			log_turn_finished(
-				timer,
-				user_id,
-				stream_manager.get_turn_id(),
-				connection_id,
-				posthog_session_id,
+		ai_trace_id = _set_ai_tracing_attributes(
+			turn_span, ai_session_id
+		)
+		with ai_observability_context(
+			AIContext(
+				user_id=user_id,
+				session_id=posthog_session_id,
+				ai_trace_id=ai_trace_id,
+				ai_session_id=ai_session_id,
 			)
+		):
+			try:
+				with timer.measure(
+					'interaction', 'Agent turn'
+				) as interaction:
+					try:
+						await send_agent_ws_response(
+							user_id,
+							connection_id,
+							create_ws_agent_start_response(
+								'Agent turn started.'
+							),
+						)
+						try:
+							with start_span(
+								'agent.memory.retrieve',
+								user_id,
+								posthog_session_id,
+							) as memory_span:
+								history = (
+									await retrieve_agent_memory_param(
+										user_id=user_id
+									)
+								)
+								memory_span.set_attribute(
+									'history_count', len(history)
+								)
+							current_memory = await create_user_memory(
+								user_id=user_id,
+								turn_id=stream_manager.get_turn_id(),
+								sequence=stream_manager.increment_turn_sequence_counter(),
+								content=user_input,
+							)
+							history.append(current_memory.payload)
+							if verbosity_level > 1:
+								log_agent_history(history)
+							await _agent_response_handler(
+								stream_manager=stream_manager,
+								history=history,
+								verbosity_level=verbosity_level,
+								connection_id=connection_id,
+								timer=timer,
+								posthog_session_id=posthog_session_id,
+							)
+						finally:
+							pending = sys.exception()
+							try:
+								await send_agent_ws_response(
+									user_id,
+									connection_id,
+									create_ws_agent_end_response(
+										'Agent turn ended.'
+									),
+								)
+							except Exception as cleanup_error:
+								if pending is None:
+									raise
+								pending.add_note(
+									'Agent-end delivery also failed: '
+									f'{type(cleanup_error).__name__}'
+								)
+					except asyncio.CancelledError:
+						timer.mark_outcome('cancelled')
+						raise
+					except Exception:
+						timer.mark_outcome('failed')
+						raise
+					finally:
+						interaction.finish(timer.outcome)
+			finally:
+				turn_span.set_attribute('outcome', timer.outcome)
+				if timer.outcome in {
+					'failed',
+					'interrupted',
+					'incomplete',
+					'degraded',
+				}:
+					turn_span.set_status(StatusCode.ERROR)
+				log_turn_finished(
+					timer,
+					user_id,
+					stream_manager.get_turn_id(),
+					connection_id,
+					posthog_session_id,
+				)
 
 
 # --- Helper Functions ---
@@ -413,6 +430,22 @@ async def _capture_completed_response(
 				tool_name=item.name,
 				tool_args=item.arguments,
 			)
+
+
+def _set_ai_tracing_attributes(
+	span: Span, ai_session_id: str | None
+) -> str:
+	"""Set AI tracing attributes and return the turn trace ID."""
+	span_context = span.get_span_context()
+	ai_trace_id = (
+		f'{span_context.trace_id:032x}'
+		if span_context.is_valid
+		else generate_uuid_str()
+	)
+	span.set_attribute('ai_trace_id', ai_trace_id)
+	if ai_session_id is not None:
+		span.set_attribute('ai_session_id', ai_session_id)
+	return ai_trace_id
 
 
 def _log_event_state(

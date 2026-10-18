@@ -21,6 +21,9 @@ from api.maintenance import user_data_pruner
 from api.routes import agent_memory, users
 from exceptions.authorisation import JwtValidationException
 from posthog_client import _logging
+from posthog_client.ai_observability import (
+	generation_options_from_context,
+)
 from posthog_client.tracing import start_span
 from schemas.api.http.users import ClaimCookieRequest
 from security.observers import block_observer, usage_observer
@@ -113,9 +116,20 @@ async def test_agent_turn_spans_include_stream_and_tools(
 		main, 'create_response_input_memories', AsyncMock()
 	)
 	rounds = 0
+	attribution = []
 
 	async def stream(**kwargs):
 		nonlocal rounds
+		assert (
+			not {
+				'user_id',
+				'posthog_session_id',
+				'ai_trace_id',
+				'ai_session_id',
+			}
+			& kwargs.keys()
+		)
+		attribution.append(generation_options_from_context())
 		rounds += 1
 		output = []
 		if rounds == 1:
@@ -144,7 +158,10 @@ async def test_agent_turn_spans_include_stream_and_tools(
 		dispatch, 'fetch_context', AsyncMock(return_value='context')
 	)
 	await main.agent_chat(
-		'visitor', 'Hello', posthog_session_id='session'
+		'visitor',
+		'Hello',
+		posthog_session_id='session',
+		ai_session_id='socket',
 	)
 	recorded = spans.get_finished_spans()
 	turn = recorded[-1]
@@ -169,7 +186,24 @@ async def test_agent_turn_spans_include_stream_and_tools(
 	assert recorded[1].attributes['reasoning'] == 'medium'
 	assert recorded[2].attributes['tool_name'] == 'fetch_context'
 	assert recorded[2].attributes['tool_args'] == '{}'
+	for request in attribution:
+		assert request['posthog_distinct_id'] == 'visitor'
+		assert (
+			request['posthog_properties']['$session_id'] == 'session'
+		)
+		assert (
+			request['posthog_trace_id']
+			== f'{turn.context.trace_id:032x}'
+		)
+		assert (
+			request['posthog_properties']['$ai_session_id']
+			== 'socket'
+		)
 	await main.agent_chat('visitor', 'Again')
+	assert (
+		attribution[-1]['posthog_trace_id']
+		!= attribution[0]['posthog_trace_id']
+	)
 	assert (
 		spans.get_finished_spans()[-1].context.trace_id
 		!= turn.context.trace_id

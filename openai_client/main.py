@@ -10,6 +10,7 @@ from openai.types.responses import (
 	ResponseStreamEvent,
 	ToolParam,
 )
+from posthog.ai.stream import AsyncStreamWrapper
 from pydantic import BaseModel
 
 from exceptions.openai import OpenAIException
@@ -27,6 +28,9 @@ from openai_client.model_settings import (
 from openai_client.models import (
 	OpenAIEmbeddingModel,
 	OpenAILanguageModel,
+)
+from posthog_client.ai_observability import (
+	generation_options_from_context,
 )
 
 # Generic type for response models
@@ -54,7 +58,10 @@ async def get_embedding(
 	async with limiter:
 		async with semaphore:
 			response = await client.embeddings.create(
-				model=model.value, input=input, timeout=timeout
+				model=model.value,
+				input=input,
+				timeout=timeout,
+				**generation_options_from_context(),
 			)
 
 			if not response.data or not response.data[0].embedding:
@@ -95,6 +102,7 @@ async def text_response(
 	async with limiter:
 		async with semaphore:
 			response = await client.responses.create(
+				**generation_options_from_context(),
 				model=model,
 				instructions=system_prompt,
 				input=user_prompt,
@@ -139,6 +147,7 @@ async def structured_response(
 	async with limiter:
 		async with semaphore:
 			response = await client.responses.parse(
+				**generation_options_from_context(),
 				model=model,
 				instructions=system_prompt,
 				input=user_prompt,
@@ -194,7 +203,10 @@ async def stream_agent_response(
 	timeout = get_openai_response_timeout()
 
 	async with limiter, semaphore:
-		stream = await client.responses.create(
+		stream: AsyncStreamWrapper[
+			ResponseStreamEvent
+		] = await client.responses.create(
+			**generation_options_from_context(),
 			model=model,
 			instructions=system_prompt,
 			input=input,

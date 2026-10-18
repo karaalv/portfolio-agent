@@ -1,6 +1,7 @@
 """Embed and upload corpus documents to MongoDB file by file."""
 
 import asyncio
+from os import getenv
 
 from api.lifecycle.environment import load_environment_variables
 from corpus.helpers import (
@@ -17,6 +18,10 @@ from database.mongodb.main import get_collection
 from openai_client.config import (
 	start_openai_client,
 	stop_openai_client,
+)
+from posthog_client.config import (
+	start_posthog_client,
+	stop_posthog_client,
 )
 from schemas.corpus.item import CorpusItem
 from shared.logging import LogStyle, rich_print
@@ -57,6 +62,8 @@ async def _startup() -> None:
 	await start_mongo_client()
 	while not await is_mongo_connected():
 		await asyncio.sleep(1)
+	if getenv('PORTFOLIO_AGENT_ENV') in {'development', 'production'}:
+		start_posthog_client()
 	start_openai_client()
 
 
@@ -65,7 +72,10 @@ async def _shutdown() -> None:
 	try:
 		await stop_openai_client()
 	finally:
-		await stop_mongo_client()
+		try:
+			await stop_mongo_client()
+		finally:
+			await stop_posthog_client()
 
 
 async def insert_corpus_items(items: list[CorpusItem]) -> int:

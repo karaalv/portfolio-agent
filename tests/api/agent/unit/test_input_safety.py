@@ -122,6 +122,7 @@ def test_noisy_input_warns_then_valid_input_is_cleaned(
 		user_input: str,
 		connection_id: str,
 		posthog_session_id: str | None = None,
+		ai_session_id: str | None = None,
 	) -> None:
 		"""Expose the text passed to the mocked agent."""
 		registry = agent.get_websocket_registry()
@@ -162,5 +163,6 @@ def test_noisy_input_warns_then_valid_input_is_cleaned(
 		user_input='Hello Alvin',
 		connection_id=ANY,
 		posthog_session_id=None,
+		ai_session_id=ANY,
 	)
 	cast(AsyncMock, enforcement.create_block).assert_not_awaited()

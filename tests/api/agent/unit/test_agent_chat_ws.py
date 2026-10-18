@@ -106,15 +106,23 @@ def test_handshake_retains_session_without_changing_identity(
 ) -> None:
 	"""Keep replay context on the connection and socket state."""
 	observed: list[tuple[str, str | None, str | None]] = []
+	ai_sessions: list[str] = []
 
 	async def reply(
-		user_id, user_input, connection_id, posthog_session_id=None
+		user_id,
+		user_input,
+		connection_id,
+		posthog_session_id=None,
+		ai_session_id=None,
 	):
 		registry = agent.get_websocket_registry()
 		manager = await registry.get_connection(
 			user_id, connection_id
 		)
 		assert manager is not None
+		assert isinstance(ai_session_id, str)
+		assert ai_session_id == manager.connection_id
+		ai_sessions.append(ai_session_id)
 		observed.append(
 			(
 				manager.user_id,
@@ -145,6 +153,14 @@ def test_handshake_retains_session_without_changing_identity(
 				pass
 	expected = (session_id or '').strip() or None
 	assert observed == [('visitor', expected, expected)] * 2
+	assert ai_sessions[0] == ai_sessions[1]
+	with ws_client.websocket_connect(
+		f'{_PATH}?{urlencode(query)}',
+	) as ws:
+		ws.send_json({'type': 'agent_message', 'payload': 'Again'})
+		while ws.receive_json()['type'] != 'warning':
+			pass
+	assert ai_sessions[2] != ai_sessions[0]
 
 
 def test_anonymous_socket_issues_token_and_runs_agent(
@@ -176,6 +192,7 @@ def test_anonymous_socket_issues_token_and_runs_agent(
 		user_input='Hello',
 		connection_id=ANY,
 		posthog_session_id=None,
+		ai_session_id=ANY,
 	)
 	assert ws_client.portal is not None
 	assert not ws_client.portal.call(
@@ -199,6 +216,7 @@ def test_message_responses_use_current_request_id(
 		user_input: str,
 		connection_id: str,
 		posthog_session_id: str | None = None,
+		ai_session_id: str | None = None,
 	) -> None:
 		"""Queue mock output through the actual socket manager."""
 		registry = agent.get_websocket_registry()
