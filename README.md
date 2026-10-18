@@ -180,6 +180,106 @@ refresh edited documents or reconcile partial uploads.
 an update command. See the [corpus guide](corpus/README.md) for the
 individual upload and index commands.
 
+## Build and deploy
+
+Set your AWS profile and Kubernetes context before using the
+Makefile. It uses the AWS CLI, regular Docker, kubectl and
+`envsubst`. The default region is London (`eu-west-2`).
+`SERVICE_NAME` is defined in the Makefile, and the ECR repository
+name defaults to that value: `portfolio-agent`.
+
+### Deployment environment
+
+`PORTFOLIO_AGENT_ENV=production` selects production. Every other
+value, including an unset variable, selects staging.
+
+| Setting | Staging, default | Production |
+| --- | --- | --- |
+| Secrets Manager ID | `portfolio-agent/env/staging` | `portfolio-agent/env/production` |
+| Kubernetes environment secret | `portfolio-agent-env-staging` | `portfolio-agent-env-production` |
+| Deployment and Service name | `portfolio-agent-staging` | `portfolio-agent-production` |
+| NodePort | `30002` | `30001` |
+
+Both use namespace `default` and registry secret
+`regcred-portfolio-agent`. These defaults can be overridden with
+Make variables. Distinct names, selectors and NodePorts allow
+both deployments to coexist while keeping one replica per
+environment. `Recreate` prevents overlapping replicas during
+updates and means a deployment has downtime while it restarts.
+
+This is deployment selection. The application's actual runtime
+`PORTFOLIO_AGENT_ENV` comes from the selected environment secret;
+it must use a value accepted by the application environment
+loader (`testing`, `development` or `production`). The Makefile
+does not inject its default `staging` value into the container.
+
+### Targets
+
+| Target | Operation |
+| --- | --- |
+| `registry-login` | Authenticate Docker with ECR. |
+| `build` | Build the commit-tagged image and tag it as `latest`. |
+| `push` | Authenticate, then push both existing local image tags. |
+| `build-push` | Build, authenticate and push both tags. |
+| `reg-credentials-secret` | Refresh Kubernetes ECR pull credentials. |
+| `env-secret` | Refresh the selected environment's settings secret. |
+| `secrets` | Refresh both registry and environment secrets. |
+| `validate-manifest` | Check that the combined Deployment/Service manifest exists. |
+| `image-ref-available` | Check that the selected image tag exists in ECR. |
+| `deploy` | Check the image, refresh secrets, apply resources and wait for readiness. |
+| `rollout` | Refresh secrets, restart the deployment and wait for readiness. |
+| `rollout-status` | Inspect and wait for the selected deployment's rollout. |
+| `terminate` | Delete the selected Deployment and Service, stopping its pods. Secrets are retained. |
+
+`deploy` and `rollout` explicitly depend on `secrets`. The
+Makefile runs prerequisites serially, including with `make -j`,
+so image checks and secret refreshes complete before deployment
+operations. Updating secrets alone does not restart existing
+pods; use `rollout` to load changed environment values.
+
+```sh
+make build-push
+make deploy
+make rollout
+make rollout-status
+make terminate
+```
+
+Those commands select staging unless production is explicitly
+selected in the calling environment or on the command line:
+
+```sh
+PORTFOLIO_AGENT_ENV=production make deploy
+PORTFOLIO_AGENT_ENV=production make rollout
+PORTFOLIO_AGENT_ENV=production make terminate
+```
+
+`IMAGE_REF` is the canonical image reference passed to the single
+Deployment/Service manifest. Its default combines the resolved
+AWS account, London ECR registry, service repository and
+`IMAGE_TAG` (the current Git commit). Deployments use
+`IfNotPresent`; use a new commit tag for new image contents.
+`rollout` restarts the deployed image rather than selecting a
+new tag. Both health probes use `/api/system/health`.
+
+Regular `docker build` targets `linux/arm64`, matching the
+Graviton host. Non-ARM builders need ARM emulation; the GitHub
+workflow configures QEMU. `BUILD_PLATFORM` can be overridden.
+
+```sh
+make deploy IMAGE_TAG=<published-tag> ROLLOUT_TIMEOUT=300s
+make -n deploy
+```
+
+Dry runs print recipes without contacting AWS or Kubernetes.
+Temporary environment files are private and removed on exit,
+including on failure. Terraform now declares repository
+`portfolio-agent`; review its plan and provide the new repository
+and environment secret IDs before deploying. Existing resources
+named `portfolio-agent` and `portfolio-env-prod` are legacy names
+and are not renamed automatically by these commands. The older
+EC2 bootstrap scripts also require review against this flow.
+
 ## Project structure
 
 | Path                                    | Responsibility                                                                  |

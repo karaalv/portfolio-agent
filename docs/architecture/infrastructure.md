@@ -13,7 +13,7 @@ Apply `terraform-state` first, AWS second, and MongoDB third. The MongoDB root r
 | Area | Current configuration |
 | --- | --- |
 | DNS | Route 53 hosted zone for `alvinkaranja.dev`, with an alias record for `api.alvinkaranja.dev` pointing to CloudFront. |
-| Container registry | ECR repository `portfolio-repo`, image scanning on push and a 30-day untagged-image lifecycle policy. |
+| Container registry | ECR repository `portfolio-agent`, image scanning on push and a 30-day untagged-image lifecycle policy. |
 | Compute | ARM `t4g.small` EC2 instance in a supplied London VPC, using an Ubuntu ARM AMI and the startup script in `aws/scripts/`. The optional key pair must exist in the sandbox account. |
 | Network access | EC2 security group with outbound access, SSH from the supplied admin CIDR, and CloudFront origin-facing traffic on port 30001. |
 | Edge | CloudFront distribution for the API, with cache, origin-request and CORS response-header policies. Its ACM certificate ARN is supplied as an input and must refer to a certificate in `us-east-1`. |
@@ -31,3 +31,27 @@ These projects share one Terraform root and one state for now. Separate environm
 ## Current status
 
 The prior combined Terraform root and its old local state were removed after the user reported the infrastructure torn down. The previous variable file is retained as ignored `terraform/terraform.tfvars.legacy` for review; none of the new roots loads it. This restructuring has not provisioned cloud resources. Plans and applies require the new sandbox profile, account-specific AWS values, a chosen state bucket name, and the new Atlas organisation credentials.
+
+
+## Staging and production deployment
+
+The Makefile selects production only when `PORTFOLIO_AGENT_ENV`
+is `production`; other or unset values select staging. Each
+uses separate environment secrets and distinct Deployment and
+Service names within the shared manifest. Staging defaults to
+NodePort 30002, production to 30001. The current CloudFront and
+security-group configuration exposes production's port; staging
+external routing needs separate infrastructure configuration.
+
+Secrets Manager paths are `portfolio-agent/env/staging` and
+`portfolio-agent/env/production`. Deployments use the shared
+`regcred-portfolio-agent` pull secret and environment-specific
+settings secrets. Both deploy and rollout refresh both secrets
+before changing pods. Each environment retains the single-instance
+operating model, using the Recreate deployment strategy.
+
+The ECR repository name now matches `SERVICE_NAME`. This is an
+infrastructure source change, not an applied AWS migration.
+Review the Terraform plan before replacing any existing
+`portfolio-repo` resource. The legacy EC2 bootstrap/redeployment
+scripts still require reconciliation with this Makefile flow.

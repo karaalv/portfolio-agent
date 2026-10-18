@@ -1,7 +1,7 @@
 # - ECR Repository -
 
 resource "aws_ecr_repository" "portfolio_repo" {
-  name                 = "portfolio-repo"
+  name                 = "portfolio-agent"
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
