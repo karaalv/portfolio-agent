@@ -41,10 +41,10 @@ def get_tracer() -> trace.Tracer:
 
 
 def start_logging(api_key: str, host: str) -> None:
-	"""Attach batched log and span exporters in dev and production."""
+	"""Attach batched telemetry exporters in active environments."""
 	global _logger_provider, _logging_handler, _tracer_provider
 	environment = getenv('PORTFOLIO_AGENT_ENV')
-	if environment not in {'development', 'production'}:
+	if environment not in {'development', 'staging', 'production'}:
 		return
 	if _logger_provider is not None:
 		return

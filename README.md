@@ -42,7 +42,7 @@ exception ownership, log events, span boundaries, AI attribution and
 frontend responsibilities. Update that guide when changing the contract.
 
 The agent sends explicit exception events, structured application logs,
-OTLP spans and wrapped OpenAI telemetry in development/production.
+OTLP spans and wrapped OpenAI telemetry in development, staging and production.
 Those environments require `POSTHOG_API_KEY` (the project token) and
 `POSTHOG_HOST`. Testing retains local logs and uses disabled AI capture;
 it does not require PostHog credentials or send telemetry.
@@ -62,14 +62,19 @@ identification still need frontend implementation.
 
 ### Environment configuration
 
-Set `PORTFOLIO_AGENT_ENV` to `testing`, `development` or
+Set `PORTFOLIO_AGENT_ENV` to `testing`, `development`, `staging` or
 `production`. The corresponding file must exist in the root:
 
 | Environment   | Required file      |
 |---------------| -------------------|
 | `testing`     | `.env.testing`     |
 | `development` | `.env.development` |
+| `staging`     | `.env.staging`     |
 | `production`  | `.env.production`  |
+
+Testing and development files override existing environment variables.
+Staging and production preserve existing variables so deployment-injected
+settings take precedence over file values.
 
 Each file must configure:
 
@@ -81,11 +86,11 @@ Each file must configure:
 - `CORS_ORIGINS`: comma-separated permitted frontend origins.
 - `COOKIE_DOMAIN`: the domain used for the access cookie.
 
-Development and production also require `POSTHOG_API_KEY` and
+Development, staging and production also require `POSTHOG_API_KEY` and
 `POSTHOG_HOST`; testing does not. The API key is the PostHog project
 token, not a personal API key.
 
-Use separate MongoDB projects for testing, development and
+Use separate MongoDB projects for testing, development, staging and
 production. Client limits and other optional settings have defaults
 in their respective configuration modules.
 
@@ -210,7 +215,7 @@ updates and means a deployment has downtime while it restarts.
 This is deployment selection. The application's actual runtime
 `PORTFOLIO_AGENT_ENV` comes from the selected environment secret;
 it must use a value accepted by the application environment
-loader (`testing`, `development` or `production`). The Makefile
+loader (`testing`, `development`, `staging` or `production`). The Makefile
 does not inject its default `staging` value into the container.
 
 ### Targets

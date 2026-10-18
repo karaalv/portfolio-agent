@@ -38,6 +38,7 @@ async def start_api_lifecycle():
 	load_environment_variables()
 	if getenv('PORTFOLIO_AGENT_ENV') in {
 		'development',
+		'staging',
 		'production',
 	}:
 		start_posthog_client()

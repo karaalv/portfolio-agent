@@ -282,7 +282,9 @@ async def test_interrupted_stream_finalises_and_closes(
 	)
 
 
-@pytest.mark.parametrize('environment', ['development', 'production'])
+@pytest.mark.parametrize(
+	'environment', ['development', 'staging', 'production']
+)
 async def test_startup_reuses_active_posthog(
 	monkeypatch, environment
 ):

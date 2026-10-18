@@ -35,7 +35,7 @@ def lifecycle(monkeypatch: pytest.MonkeyPatch) -> Mock:
 
 
 @pytest.mark.parametrize(
-	'environment', ['development', 'production', 'testing']
+	'environment', ['development', 'staging', 'production', 'testing']
 )
 async def test_posthog_only_starts_in_active_environments(
 	lifecycle: Mock,

@@ -52,6 +52,7 @@ async def main() -> None:
 		else:
 			if getenv('PORTFOLIO_AGENT_ENV') in {
 				'development',
+				'staging',
 				'production',
 			}:
 				start_posthog_client()

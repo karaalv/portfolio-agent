@@ -10,6 +10,7 @@ _repo_root = Path(__file__).resolve().parents[2]
 _env_to_env_file: dict[str, str] = {
 	'testing': '.env.testing',
 	'development': '.env.development',
+	'staging': '.env.staging',
 	'production': '.env.production',
 }
 
@@ -33,7 +34,7 @@ def load_environment_variables() -> None:
 
 	load_dotenv(
 		dotenv_path=_repo_root / _env_to_env_file[env],
-		override=env != 'production',
+		override=env in {'testing', 'development'},
 	)
 	_check_environment()
 	_is_env_loaded = True

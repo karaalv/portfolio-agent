@@ -59,7 +59,7 @@ def log_server_started(version: str, started: float) -> None:
 			max_input_tokens=MAX_INPUT_TOKENS,
 			tool_recursion_limit=AGENT_TOOL_RECURSION_LIMIT,
 			telemetry_enabled=getenv('PORTFOLIO_AGENT_ENV')
-			in {'development', 'production'},
+			in {'development', 'staging', 'production'},
 			duration_seconds=perf_counter() - started,
 		),
 	)

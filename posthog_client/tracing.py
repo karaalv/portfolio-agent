@@ -37,6 +37,7 @@ def start_span(
 	tracer = get_tracer()
 	if getenv('PORTFOLIO_AGENT_ENV') not in {
 		'development',
+		'staging',
 		'production',
 	}:
 		tracer = NoOpTracer()

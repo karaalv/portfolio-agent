@@ -48,6 +48,7 @@ async def main(
 	if environment not in {
 		'testing',
 		'development',
+		'staging',
 		'production',
 	}:
 		raise RuntimeError('Set PORTFOLIO_AGENT_ENV first.')
@@ -55,7 +56,7 @@ async def main(
 		raise RuntimeError(f'Missing .env.{environment} file.')
 	load_environment_variables()
 	try:
-		if environment in {'development', 'production'}:
+		if environment in {'development', 'staging', 'production'}:
 			start_posthog_client()
 		await start_mongo_client()
 		if not await is_mongo_connected():

@@ -32,7 +32,7 @@ export PORTFOLIO_AGENT_ENV=development
 uv run python -m corpus.bootstrap
 ```
 
-Replace `development` with `testing` or `production` as needed.
+Replace `development` with `testing`, `staging` or `production` as needed.
 **Run bootstrap in every database environment.** Each has its
 own corpus collection and vector search index.
 

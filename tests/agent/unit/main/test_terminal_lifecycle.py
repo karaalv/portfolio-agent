@@ -48,7 +48,7 @@ def clients(monkeypatch):
 
 
 @pytest.mark.parametrize(
-	'environment', ['testing', 'development', 'production']
+	'environment', ['testing', 'development', 'staging', 'production']
 )
 async def test_terminal_telemetry_order(
 	clients, monkeypatch, environment

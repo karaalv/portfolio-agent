@@ -62,7 +62,11 @@ async def _startup() -> None:
 	await start_mongo_client()
 	while not await is_mongo_connected():
 		await asyncio.sleep(1)
-	if getenv('PORTFOLIO_AGENT_ENV') in {'development', 'production'}:
+	if getenv('PORTFOLIO_AGENT_ENV') in {
+		'development',
+		'staging',
+		'production',
+	}:
 		start_posthog_client()
 	start_openai_client()
 

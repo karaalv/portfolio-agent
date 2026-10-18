@@ -87,10 +87,14 @@ async def isolated_pipeline(
 		await _logging.stop_logging()
 
 
+@pytest.mark.parametrize(
+	'environment', ['development', 'staging', 'production']
+)
 async def test_pipeline_preserves_structured_fields_and_exception(
-	isolated_pipeline,
+	isolated_pipeline, monkeypatch, environment
 ):
 	"""Bridge helper records through the real batched processor."""
+	monkeypatch.setenv('PORTFOLIO_AGENT_ENV', environment)
 	global_provider = get_logger_provider()
 	_logging.start_logging('test-project-key', 'https://example.com/')
 	_logging.start_logging('test-project-key', 'https://example.com/')
@@ -121,7 +125,7 @@ async def test_pipeline_preserves_structured_fields_and_exception(
 	assert logs[0].resource.attributes['service.name'] == LOGGER_NAME
 	assert (
 		logs[0].resource.attributes['deployment.environment.name']
-		== 'development'
+		== environment
 	)
 	error_attributes = logs[1].log_record.attributes
 	assert error_attributes is not None

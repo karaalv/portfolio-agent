@@ -40,8 +40,12 @@ def ai_observability_context(
 
 
 def get_ai_posthog_client() -> Posthog:
-	"""Use the active client or a disabled SDK outside dev/prod."""
-	if getenv('PORTFOLIO_AGENT_ENV') in {'development', 'production'}:
+	"""Use active telemetry or return a disabled client."""
+	if getenv('PORTFOLIO_AGENT_ENV') in {
+		'development',
+		'staging',
+		'production',
+	}:
 		return get_posthog_client()
 	return Posthog(
 		project_api_key='disabled',
