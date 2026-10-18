@@ -1,6 +1,7 @@
 """Start production services on the ASGI client's loop."""
 
 from collections.abc import Iterator
+from importlib import reload
 
 import pytest
 from starlette.testclient import TestClient
@@ -22,7 +23,10 @@ def live_client() -> Iterator[TestClient]:
 	"""Run the real application lifespan with testing settings."""
 	with pytest.MonkeyPatch.context() as patch:
 		load_test_environment(patch)
-		from api.server import app
+		from api import server
+
+		# Build middleware after loading this fixture's environment.
+		app = reload(server).app
 
 		origins = get_allowed_origins()
 		assert origins, 'Testing CORS_ORIGINS must be configured.'

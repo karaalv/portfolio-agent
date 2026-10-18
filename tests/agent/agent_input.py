@@ -25,6 +25,10 @@ from openai_client.config import (
 	start_openai_client,
 	stop_openai_client,
 )
+from posthog_client.config import (
+	start_posthog_client,
+	stop_posthog_client,
+)
 from users.creation import create_user
 from users.retrieval import does_user_exist
 
@@ -37,7 +41,7 @@ async def main(
 
 	Create a new anonymous visitor unless an existing ID is
 	supplied. Retain conversation records for later inspection.
-	Close both clients even if startup or agent execution fails.
+	Close clients even if startup or agent execution fails.
 	"""
 	environment = getenv('PORTFOLIO_AGENT_ENV')
 	path = Path(__file__).resolve().parents[2]
@@ -51,6 +55,8 @@ async def main(
 		raise RuntimeError(f'Missing .env.{environment} file.')
 	load_environment_variables()
 	try:
+		if environment in {'development', 'production'}:
+			start_posthog_client()
 		await start_mongo_client()
 		if not await is_mongo_connected():
 			raise RuntimeError('MongoDB connection check failed.')
@@ -118,7 +124,10 @@ async def main(
 		try:
 			await stop_openai_client()
 		finally:
-			await stop_mongo_client()
+			try:
+				await stop_mongo_client()
+			finally:
+				await stop_posthog_client()
 
 
 def _parse_arguments() -> argparse.Namespace:

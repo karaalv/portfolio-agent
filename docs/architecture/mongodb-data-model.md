@@ -16,8 +16,9 @@ isolated from the others.
 | `analytics` | `blocked` | IP and user access blocks. |
 
 The `application` database holds data used by core application
-features. The `analytics` database holds monitoring data, logs,
-and other data outside core application features. The collection
+features. The `analytics` database holds access-monitoring usage and block data.
+Application logs, traces, exception events and AI telemetry go to
+PostHog, rather than a MongoDB log collection. The collection
 mapping is defined in `database/mongodb/collections.py` and
 resolved by `get_collection`.
 

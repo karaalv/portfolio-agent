@@ -118,6 +118,7 @@ async def test_socket_handshake_rejected_before_app(
 			'type': 'websocket',
 			'path': '/api/agent/chat',
 			'root_path': '/api',
+			'query_string': b'',
 			'headers': headers,
 		},
 		receive,

@@ -34,77 +34,31 @@ uv pip compile --python .venv/bin/python requirements.in -o requirements.txt --c
 uv pip sync --python .venv/bin/python requirements.txt --cache-dir .uv/cache
 ```
 
-### Application logging
+### Analytics and observability
 
-Use the shared helpers for application logs:
+The canonical [agent PostHog integration guide](https://github.com/karaalv/portfolio-documentation/blob/main/analytics/agent.md) lives in
+`portfolio-documentation/analytics/agent.md`. It documents identity,
+exception ownership, log events, span boundaries, AI attribution and
+frontend responsibilities. Update that guide when changing the contract.
 
-```python
-from shared.logging import log_error, log_info
+The agent sends explicit exception events, structured application logs,
+OTLP spans and wrapped OpenAI telemetry in development/production.
+Those environments require `POSTHOG_API_KEY` (the project token) and
+`POSTHOG_HOST`. Testing retains local logs and uses disabled AI capture;
+it does not require PostHog credentials or send telemetry.
 
-log_info('Maintenance completed', {'deleted_count': 3})
+Use `shared.logging.log_*` for structured logs and
+`posthog_client.tracing.start_span` around application operations.
+Failure boundaries use `posthog_client.error_tracking.report_exception`.
+`AIContext` is set once per agent turn; OpenAI helpers read it with
+`generation_options_from_context()`. Prompt and response capture is on.
 
-try:
-	perform_operation()
-except Exception as exc:
-	log_error('Operation failed', {'operation': 'example'}, exc=exc)
-```
-
-Helpers are available for DEBUG, INFO, WARNING, ERROR and CRITICAL.
-The `portfolio_agent` logger writes INFO and above to the terminal.
-ERROR and CRITICAL accept an optional `exc` to retain the traceback.
-Pass typed attributes through `extra`, avoiding Python's reserved log
-record keys such as `message`, `name` and `levelname`.
-
-In development and production, PostHog startup attaches one batched
-OpenTelemetry handler to this logger. Logs go to
-`POSTHOG_HOST/i/v1/logs` with `POSTHOG_API_KEY` authentication.
-Shutdown detaches the handler and drains the provider in a thread.
-Testing keeps local logging but never creates the remote exporter.
-Existing `rich_print` output and module loggers are not automatically
-exported; use the shared helpers for application logs sent to PostHog.
-
-HTTP handlers now log and capture failures with request/session context
-and server-resolved user identity. Application exceptions return 500;
-HTTP 4xx failures are warnings and 5xx/unexpected failures are errors.
-Application startup failures are critical and carry a UTC timestamp.
-`WebSocketConnectionException` has a registered handler for handshake,
-identity and chat-loop failures; connection workers, maintenance tasks
-and swallowed tool exceptions report at their local boundaries.
-
-Every operational record has a stable `event_name`; user/session logs
-include PostHog's default join keys `posthogDistinctId` and `sessionId`.
-Error events also carry `$session_id`. Custom exception `module` is
-exported as `exception_module` on logs to avoid Python's reserved key.
-The agent emits one `agent_turn_finished` summary containing queryable
-timing aggregates, an explicit outcome and the full `timings_json` list.
-Session context reaches tools; request IDs stay in the transport layer.
-
-Reporting boundaries attempt capture once and keep telemetry failures
-from replacing the original error. Failures before telemetry startup
-or after its shutdown remain local. Testing suppresses remote capture
-and remote log export while retaining local records.
-
-### Browser replay context
-
-HTTP requests may send `X-POSTHOG-SESSION-ID`.
-`PostHogSessionIdMiddleware` stores the trimmed value on
-`request.state.posthog_session_id`; routes and exception handlers can
-read it using `api.utils.requests.get_posthog_session_id(request)`.
-Missing or blank values return `None`; no session ID is generated.
-
-WebSocket clients may include `session_id` in the `/agent/ws/agent-chat`
-handshake query string. The trimmed value is retained on
-`ws.state.posthog_session_id` and `WebSocketManager.posthog_session_id`
-for that connection. Reconnect with the current ID if the browser's
-replay session changes. Existing clients may omit it.
-
-When frontend tracking is implemented, configure PostHog
-`tracing_headers` with the backend hostname, without protocol, port or
-path. This supplies the HTTP header for fetch/XHR; the WebSocket query
-parameter must be supplied explicitly. Backend user IDs continue to
-come from application identity resolution, never the session ID or
-`X-POSTHOG-DISTINCT-ID` header. This scaffolding does not start replay
-recording or attach session IDs to telemetry yet.
+The API, corpus entry points and terminal runner start PostHog before the
+wrapped OpenAI client in active environments and drain telemetry last.
+HTTP replay context arrives through `X-POSTHOG-SESSION-ID`; WebSockets
+use the handshake `session_id` query parameter. The backend remains the
+authority for visitor identity. Browser replay recording and frontend
+identification still need frontend implementation.
 
 ### Environment configuration
 
@@ -126,6 +80,10 @@ Each file must configure:
 - `JWT_SECRET`: the token signing secret.
 - `CORS_ORIGINS`: comma-separated permitted frontend origins.
 - `COOKIE_DOMAIN`: the domain used for the access cookie.
+
+Development and production also require `POSTHOG_API_KEY` and
+`POSTHOG_HOST`; testing does not. The API key is the PostHog project
+token, not a personal API key.
 
 Use separate MongoDB projects for testing, development and
 production. Client limits and other optional settings have defaults
@@ -238,8 +196,9 @@ individual upload and index commands.
 | `authorisation/jwt/`                    | JWT creation, validation and token configuration.                               |
 | `security/`                             | Rate limit store, usage and block records, observers and lifecycle.             |
 | `database/mongodb/`                     | MongoDB client lifecycle and database/collection resolution.                    |
-| `openai_client/`                        | OpenAI client lifecycle, model settings and request limits.                     |
-| `shared/`                               | UTC time, ID generation, formatting and terminal logging helpers.               |
+| `openai_client/`                        | Wrapped OpenAI client lifecycle, model settings and request limits.             |
+| `posthog_client/`                       | Event client, OTLP pipelines, exception reporting and AI context.               |
+| `shared/`                               | UTC time, ID generation, formatting and structured/terminal logging helpers.               |
 | `exceptions/`                           | Service-specific exceptions.                                                    |
 | `tests/`                                | Scoped unit/integration suites, shared fixtures and the terminal runner.        |
 | `docs/`                                 | API contracts, schemas, system features and architectural considerations.       |

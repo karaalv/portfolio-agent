@@ -8,8 +8,11 @@
 - `clients/openai/connection/`: authenticated model listing.
 - `clients/openai/functionality/`: embeddings, text, structured
   responses, streamed text and streamed function calls.
-- `clients/posthog/unit/`: configuration, threaded shutdown and
-  explicit exception capture, plus in-memory OTLP logging checks.
+- `clients/posthog/unit/`: configuration, reporting ownership, in-memory
+  OTLP logs/spans, correlation, environment gating and threaded shutdown.
+- `clients/openai/unit/`: real PostHog OpenAI wrapper with simulated
+  HTTP transport and local capture; SDK types, usage, full-content
+  capture, context isolation, stream finalisation and cancellation.
 - `agent/unit/<scope>/`: streaming state, memory, chat and tools.
 - `agent/integration/<scope>/`: memory, chat, tools and main
   loop.
@@ -24,13 +27,18 @@
 - `api/dependencies/unit/`: HTTPX access checks and limiter
   waits.
 - `api/users/unit/`: cookie claiming with scoped HTTP fixtures.
-- `api/agent/unit/`: client scaffold for upcoming agent routes.
+- `api/agent/unit/`: socket admission, identity, input handling and
+  stable AI sessions across turns, with fresh sessions on reconnect.
 - `api/agent_memory/unit/`: authenticated chat pages and
   deletion.
 - `api/agent_memory/integration/`: HTTP endpoints with live
   MongoDB.
 - `shared/`: reusable fixtures imported by scoped conftests.
 - `schemas/`: response models used only by tests.
+
+Test packages with `__init__.py` must also have package markers in
+their parent directories. This prevents identically named `integration`
+packages and conftests from colliding during full-suite collection.
 
 There is no root server bootstrap. Client fixtures are requested
 explicitly, start once per package and close at package teardown.
@@ -59,6 +67,9 @@ Logging tests use an in-memory OpenTelemetry exporter and verify
 typed fields, tracebacks, caller locations, environment gating,
 restart behaviour and threaded queue draining. Shared logging helpers
 remain available in testing without a remote exporter.
+AI tests inject a disabled PostHog client or replace capture locally.
+Live OpenAI tests still call the real provider, but their AI events are
+not sent to PostHog. See the [canonical agent analytics guide](https://github.com/karaalv/portfolio-documentation/blob/main/analytics/agent.md).
 
 ## Live integration tests
 
@@ -195,8 +206,9 @@ for SDK event diagnostics. Text deltas are displayed as they
 arrive. The runner observes the SDK stream until application
 publishing is implemented; production code is unchanged.
 
-The corresponding root environment file must exist. Clients
-start before interaction and close on exit or failure. Enter
+The corresponding root environment file must exist. In development and
+production, PostHog starts before OpenAI and drains after other clients.
+Testing uses disabled capture. Clients close on exit or failure. Enter
 `exit`, `quit` or Ctrl-D to finish; Ctrl-C cancels the session.
 A new visitor is created by default and its records are retained
 for inspection. Reuse the printed ID with `--user-id <id>` to
