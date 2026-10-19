@@ -1,0 +1,26 @@
+# Application
+aiolimiter
+APScheduler
+fastapi
+openai
+opentelemetry-api
+opentelemetry-instrumentation-logging
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-http
+posthog>=7,<8
+pydantic
+pymongo
+PyJWT
+python-dotenv
+rich
+uvicorn
+
+# Corpus tooling
+tiktoken
+
+# Tests
+httpx
+pytest
+pytest-asyncio
+requests
+websockets

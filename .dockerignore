@@ -1,52 +1,78 @@
-# Environment files
-.env
-.env.dev
-.env.prod
+# Environment files and local credentials
+**/.env*
+**/*.env
+keys/
+credentials.json
+token.json
+client_secret*.json
+**/*.pem
+**/*.key
 
-# Git files
-.git
+# Git and CI configuration
+.git/
 .gitignore
-.github
+.github/
 
-# Docker files
+# Container and deployment tooling
 Dockerfile
-docker-compose.yml
 .dockerignore
+docker-compose*.yml
+docker-compose*.yaml
+compose*.yml
+compose*.yaml
+makefile
+Makefile
+scripts/
+terraform/
+k8s/
+kubernetes/
 
-# Visual Studio Code files
-.vscode
-.vscode/*
+# Editor and agent tooling
+.vscode/
+.idea/
+.codex/
+.agents/
+postman/
+.postman/
 
-# Logs
-*.log
-*.tmp
-
-# System files
+# Logs, temporary files and system metadata
+**/*.log
+**/*.tmp
+**/*.bak
+**/*.pid
+tmp/
+.makefile-*/
+.docker-*/
 **/.DS_Store
 **/Thumbs.db
 **/Desktop.ini
 **/~
 
-# Python bytecode
+# Python bytecode, virtual environments and dependency caches
 **/__pycache__/
-**.py[cod]
-
-# Python test files
-.pytest_cache/
-
-# Virtual environment
+**/*.py[cod]
+**/.venv/
 **/venv/
+env/
+ENV/
+.uv/
+uv.lock
 
-# Test files
+# Tests and development configuration
 **/tests/
-
-# Markdown files
-**/*.md
-
-# Ruff
+**/test/
+.pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.pyright/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+pytest.ini
+requirements.in
+pyproject.toml
 
-# Terraform and infra resources
-terraform/
-scripts/
-kubernetes/
+# Documentation
+**/*.md
+docs/

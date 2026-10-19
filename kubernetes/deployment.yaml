@@ -2,26 +2,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: portfolio-agent
+  name: ${K8S_DEPLOYMENT}
+  namespace: ${K8S_NAMESPACE}
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
-      app: portfolio-agent
+      app: ${K8S_DEPLOYMENT}
   template:
     metadata:
       labels:
-        app: portfolio-agent
+        app: ${K8S_DEPLOYMENT}
     spec:
       containers:
-        - name: portfolio-agent
-          imagePullPolicy: Always
-          image: ${ECR_URI}:${IMAGE_TAG}
+        - name: ${SERVICE_NAME}
+          imagePullPolicy: IfNotPresent
+          image: ${IMAGE_REF}
           ports:
             - containerPort: 3001
           envFrom:
             - secretRef:
-                name: ${ENV_SECRET}
+                name: ${ENV_SECRET_NAME}
           resources:
             requests:
               cpu: "100m" # 0.1 vCPU guaranteed
@@ -29,28 +32,37 @@ spec:
             limits:
               cpu: "500m" # Max 0.5 vCPU allowed
               memory: "512Mi" # Max 512 MiB allowed
+          readinessProbe:
+            httpGet:
+              path: /api/system/health
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /api/health
+              path: /api/system/health
               port: 3001
             initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 3
       imagePullSecrets:
-        - name: regcred-portfolio
+        - name: ${REG_SECRET_NAME}
 
 ---
 # Portfolio Agent Service
 apiVersion: v1
 kind: Service
 metadata:
-  name: portfolio-agent
+  name: ${K8S_DEPLOYMENT}
+  namespace: ${K8S_NAMESPACE}
 spec:
   type: NodePort
   selector:
-    app: portfolio-agent
+    app: ${K8S_DEPLOYMENT}
   ports:
     - port: 80 # Internal service port
       targetPort: 3001 # Pod/container port
-      nodePort: 30001 # NodePort (external port on EC2)
+      nodePort: ${NODE_PORT} # NodePort (external port on EC2)

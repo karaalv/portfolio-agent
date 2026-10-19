@@ -1,0 +1,56 @@
+name: Testing on main
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portfolio-agent-main
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Run pytest
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PORTFOLIO_AGENT_ENV: testing
+    steps:
+      - name: Check out the tested revision
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python 3.14
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.14'
+          enable-cache: true
+          cache-dependency-glob: requirements.txt
+
+      - name: Install the pinned requirements
+        run: |
+          uv python install 3.14
+          uv venv --python 3.14
+          uv pip sync requirements.txt
+
+      - name: Restore testing configuration
+        env:
+          ENV_TEST_FILE: ${{ secrets.ENV_TEST_FILE }}
+        run: |
+          set -euo pipefail
+          : "${ENV_TEST_FILE:?Set the ENV_TEST_FILE repository secret}"
+          umask 077
+          printf '%s\n' "$ENV_TEST_FILE" > .env.testing
+
+      - name: Run the complete test suite
+        run: .venv/bin/python -m pytest
+
+      - name: Remove temporary testing configuration
+        if: always()
+        run: rm -f -- .env.testing

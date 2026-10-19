@@ -1,3 +1,1 @@
-"""
-This package contains functionality for agent memory management
-"""
+"""Manage stored conversation artefacts for model replay."""

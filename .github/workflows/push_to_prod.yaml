@@ -1,0 +1,149 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [production]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portfolio-agent-production
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-west-2
+  SCRIPT_BUCKET: 533267122031-portfolio-agent-ci-cd-scripts
+  CODEBUILD_PROJECT: portfolio-agent-arm-codebuild
+  SSM_LOG_GROUP: /aws/ssm/portfolio-agent/deployments
+  SCRIPT_PREFIX: ci/${{ github.sha }}/${{ github.run_id }}-${{ github.run_attempt }}
+
+jobs:
+  test:
+    name: Run pytest
+    if: github.ref == 'refs/heads/production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PORTFOLIO_AGENT_ENV: testing
+    steps:
+      - name: Check out the tested revision
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python 3.14
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.14'
+          enable-cache: true
+          cache-dependency-glob: requirements.txt
+
+      - name: Install the pinned requirements
+        run: |
+          uv python install 3.14
+          uv venv --python 3.14
+          uv pip sync requirements.txt
+
+      - name: Restore testing configuration
+        env:
+          ENV_TEST_FILE: ${{ secrets.ENV_TEST_FILE }}
+        run: |
+          set -euo pipefail
+          : "${ENV_TEST_FILE:?Set the ENV_TEST_FILE repository secret}"
+          umask 077
+          printf '%s\n' "$ENV_TEST_FILE" > .env.testing
+
+      - name: Run the complete test suite
+        run: .venv/bin/python -m pytest
+
+      - name: Remove temporary testing configuration
+        if: always()
+        run: rm -f -- .env.testing
+
+  build:
+    name: Build and push the ARM image
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out the tested revision and Git history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Authenticate with AWS through OIDC
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: '533267122031'
+
+      - name: Upload the tested source and CI scripts
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$COMMIT_SHA"
+          git bundle create "$RUNNER_TEMP/source.bundle" HEAD
+          aws s3 cp "$RUNNER_TEMP/source.bundle" \
+            "s3://$SCRIPT_BUCKET/$SCRIPT_PREFIX/source.bundle"
+          for script in build_service.sh deploy_service.sh; do
+            aws s3 cp "scripts/ci/$script" \
+              "s3://$SCRIPT_BUCKET/$SCRIPT_PREFIX/$script"
+          done
+
+      - name: Build on native ARM compute and wait for completion
+        uses: aws-actions/aws-codebuild-run-build@v1
+        with:
+          project-name: ${{ env.CODEBUILD_PROJECT }}
+          disable-source-override: true
+          disable-github-env-vars: true
+          stop-on-signals: SIGINT,SIGTERM
+          env-vars-for-codebuild: >-
+            BUCKET_NAME,SCRIPT_LOCATION,SOURCE_LOCATION,COMMIT_SHA,PORTFOLIO_AGENT_ENV
+        env:
+          BUCKET_NAME: ${{ env.SCRIPT_BUCKET }}
+          SCRIPT_LOCATION: ${{ env.SCRIPT_PREFIX }}/build_service.sh
+          SOURCE_LOCATION: ${{ env.SCRIPT_PREFIX }}/source.bundle
+          COMMIT_SHA: ${{ github.sha }}
+          PORTFOLIO_AGENT_ENV: production
+
+  deploy:
+    name: Deploy to EC2 through SSM
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: production
+      url: https://api.alvinkaranja.dev
+    steps:
+      - name: Authenticate with AWS through OIDC
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: '533267122031'
+
+      - name: Deploy the tested revision and stream CloudWatch logs
+        uses: karaalv/aws-ec2-ssm-script-runner@v0
+        with:
+          instance-name: portfolio-agent-production
+          bucket-name: ${{ env.SCRIPT_BUCKET }}
+          script-location: ${{ env.SCRIPT_PREFIX }}/deploy_service.sh
+          timeout-seconds: '1200'
+          cloudwatch-logs: 'true'
+          cloudwatch-log-group: ${{ env.SSM_LOG_GROUP }}
+          env-vars-for-script: |
+            BUCKET_NAME=${{ env.SCRIPT_BUCKET }}
+            SOURCE_LOCATION=${{ env.SCRIPT_PREFIX }}/source.bundle
+            COMMIT_SHA=${{ github.sha }}
+            PORTFOLIO_AGENT_ENV=production
