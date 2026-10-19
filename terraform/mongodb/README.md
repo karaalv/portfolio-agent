@@ -11,7 +11,7 @@ terraform -chdir=terraform/mongodb init -backend-config="bucket=$TF_STATE_BUCKET
 terraform -chdir=terraform/mongodb plan
 ```
 
-By default, the production Atlas access list reads `ec2_public_ip` from `aws/terraform.tfstate` and allows only that address. To bootstrap Atlas before AWS, set `read_aws_remote_state = false` in the ignored `terraform.tfvars`. This skips the AWS state lookup and creates no production IP access rule. Once AWS is deployed, set it to `true` and apply this root again.
+By default, the production Atlas access list reads `ec2_public_ip` from `aws/production/terraform.tfstate` and allows only that address. To bootstrap Atlas before AWS, set `read_aws_remote_state = false` in the ignored `terraform.tfvars`. This skips the AWS state lookup and creates no production IP access rule. Once AWS is deployed, set it to `true` and apply this root again.
 
 Set `development_access_cidr` to a trusted client IPv4 address with a `/32` prefix. Development and test allow only this address. Update it when the client's public IP changes. The bootstrap uses this machine's public IP at deployment time.
 

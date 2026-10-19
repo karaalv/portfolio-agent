@@ -203,14 +203,15 @@ value, including an unset variable, selects staging.
 | Secrets Manager ID | `portfolio-agent/env/staging` | `portfolio-agent/env/production` |
 | Kubernetes environment secret | `portfolio-agent-env-staging` | `portfolio-agent-env-production` |
 | Deployment and Service name | `portfolio-agent-staging` | `portfolio-agent-production` |
-| NodePort | `30002` | `30001` |
+| NodePort | `30001` | `30001` |
 
 Both use namespace `default` and registry secret
 `regcred-portfolio-agent`. These defaults can be overridden with
-Make variables. Distinct names, selectors and NodePorts allow
-both deployments to coexist while keeping one replica per
-environment. `Recreate` prevents overlapping replicas during
-updates and means a deployment has downtime while it restarts.
+Make variables. The environments run on separate EC2 nodes, each
+with one replica and NodePort `30001`. Distinct names and
+selectors identify their deployments. `Recreate` prevents
+overlapping replicas during updates and means a deployment has
+downtime while it restarts.
 
 This is deployment selection. The application's actual runtime
 `PORTFOLIO_AGENT_ENV` comes from the selected environment secret;
@@ -280,10 +281,10 @@ Dry runs print recipes without contacting AWS or Kubernetes.
 Temporary environment files are private and removed on exit,
 including on failure. Terraform now declares repository
 `portfolio-agent`; review its plan and provide the new repository
-and environment secret IDs before deploying. Existing resources
-named `portfolio-agent` and `portfolio-env-prod` are legacy names
-and are not renamed automatically by these commands. The older
-EC2 bootstrap scripts also require review against this flow.
+and environment secret IDs before deploying. The new
+[AWS roots and bootstrap](terraform/aws/README.md) use separate
+staging and production nodes. The previous AWS infrastructure
+was fully torn down, so no state migration is required.
 
 ## Project structure
 
@@ -307,7 +308,7 @@ EC2 bootstrap scripts also require review against this flow.
 | `exceptions/`                           | Service-specific exceptions.                                                    |
 | `tests/`                                | Scoped unit/integration suites, shared fixtures and the terminal runner.        |
 | `docs/`                                 | API contracts, schemas, system features and architectural considerations.       |
-| `terraform/aws/`, `terraform/mongodb/`  | Environment infrastructure definitions.                                         |
+| `terraform/aws/`, `terraform/mongodb/`  | Shared AWS, isolated environments and persistent Atlas infrastructure.          |
 | `kubernetes/`, `Dockerfile`, `makefile` | Deployment assets requiring review against the v2 runtime.                      |
 
 ## Further documentation

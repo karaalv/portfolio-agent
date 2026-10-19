@@ -35,7 +35,7 @@ K8S_MANIFEST ?= kubernetes/deployment.yaml
 K8S_DEPLOYMENT ?= $(SERVICE_NAME)-$(DEPLOY_ENV)
 REG_SECRET_NAME ?= regcred-portfolio-agent
 ENV_SECRET_NAME ?= $(SERVICE_NAME)-env-$(DEPLOY_ENV)
-NODE_PORT ?= $(if $(filter production,$(DEPLOY_ENV)),30001,30002)
+NODE_PORT ?= 30001
 ROLLOUT_TIMEOUT ?= 180s
 
 # --- Shared recipe setup ---

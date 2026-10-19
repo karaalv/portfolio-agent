@@ -1,57 +1,86 @@
-# Portfolio agent infrastructure
+# Portfolio Agent infrastructure
 
-The infrastructure configuration lives in three independent Terraform roots under `terraform/`. All AWS access uses the `karaalv-sandbox` profile and London (`eu-west-2`) for regional resources. Export `AWS_PROFILE=karaalv-sandbox` in the shell before using the AWS provider or S3 state backends. Verify the selected account with `aws sts get-caller-identity`.
+Infrastructure uses separate Terraform roots for shared AWS
+resources, staging, production and MongoDB Atlas. The existing
+S3 state bucket is managed by the local bootstrap root.
 
-## State and deployment order
+See the [Terraform guide](../../terraform/README.md) and
+[AWS configuration](../../terraform/aws/README.md).
+These documents describe source configuration, not a verified
+live deployment.
 
-`terraform-state/` creates the shared S3 bucket using local bootstrap state. `aws/` and `mongodb/` then store their state at separate S3 keys, `aws/terraform.tfstate` and `mongodb/terraform.tfstate`. Both use S3 lockfiles. The state bucket has versioning, AES-256 encryption and public access blocking. Keep the bootstrap state secure and keep all state and actual `terraform.tfvars` files out of Git.
+## Ownership and isolation
 
-Apply `terraform-state` first, AWS second, and MongoDB third. The MongoDB root reads the AWS root's state to obtain the EC2 public IP. The backend bucket name is provided during each service root's `terraform init`; it is also an input variable for MongoDB's remote-state data source. See [Terraform instructions](../../terraform/README.md) for commands.
+Shared state owns the CI scripts bucket, the `portfolio-agent`
+ECR repository, GitHub OIDC role, native ARM CodeBuild project
+and deployment log groups. It survives staging teardown.
 
-## AWS resources
+Staging and production reuse one environment module but have
+independent state, EC2 nodes, IAM profiles, CloudFront API
+policies/distributions, API aliases and health monitoring.
+The `alvinkaranja.dev` hosted zone is read as data. Vercel website
+hosting and frontend DNS remain separately managed. No WAF is
+configured.
 
-| Area | Current configuration |
-| --- | --- |
-| DNS | Route 53 hosted zone for `alvinkaranja.dev`, with an alias record for `api.alvinkaranja.dev` pointing to CloudFront. |
-| Container registry | ECR repository `portfolio-agent`, image scanning on push and a 30-day untagged-image lifecycle policy. |
-| Compute | ARM `t4g.small` EC2 instance in a supplied London VPC, using an Ubuntu ARM AMI and the startup script in `aws/scripts/`. The optional key pair must exist in the sandbox account. |
-| Network access | EC2 security group with outbound access, SSH from the supplied admin CIDR, and CloudFront origin-facing traffic on port 30001. |
-| Edge | CloudFront distribution for the API, with cache, origin-request and CORS response-header policies. Its ACM certificate ARN is supplied as an input and must refer to a certificate in `us-east-1`. |
-| Secrets and access | EC2 instance role with ECR read, Secrets Manager read, SSM and S3 read permissions; GitHub Actions OIDC role with ECR, SSM and deployment-bucket policies. |
-| Deployment storage | Versioned S3 bucket for deployment scripts, named from the sandbox account ID. This is separate from the Terraform state bucket. |
+Each environment uses one `t4g.small` node with a 40 GB encrypted
+gp3 root volume, IMDSv2, Docker and k3s. Both expose NodePort
+`30001` on different machines. API ingress is limited to
+CloudFront's origin-facing prefix list. Administration uses SSM.
+The bootstrap template installs the host software and attempts
+to deploy an existing image from the selected Git revision.
 
-The AWS root outputs `ec2_public_ip`. The current instance public IP is not reserved, so replacing the instance may require a subsequent MongoDB apply to update Atlas access. Existing bootstrap scripts and deployment permissions were carried over and should be reviewed before redeployment.
+## Public endpoints
 
-## MongoDB Atlas resources
+| Environment | API | Website health check |
+| --- | --- | --- |
+| Staging | `api.staging.alvinkaranja.dev` | `staging.alvinkaranja.dev` |
+| Production | `api.alvinkaranja.dev` | `alvinkaranja.dev` |
 
-The Atlas root uses a service account client ID and secret plus an Atlas organisation ID. Its `mongodb_environments` local explicitly defines development, test and production projects, each with an M0 cluster configured in Atlas region `EU_WEST_2` on AWS. The development and test project IP access lists currently permit all source IPs; production permits the AWS EC2 public IP read from the AWS Terraform state. Narrow development and test access before storing sensitive data.
+CloudFront terminates TLS and forwards uncached HTTP/WebSocket
+traffic to the node on HTTP port `30001`. Viewer headers,
+cookies and query parameters are forwarded, including PostHog
+session and distinct ID headers. Credentialled CORS uses the
+corresponding frontend/API origins. Certificates are supplied
+per environment and must be issued in `us-east-1`.
 
-These projects share one Terraform root and one state for now. Separate environment roots or workspaces are deferred. Confirm free-cluster availability and service-account permissions in the new Atlas organisation before applying.
+Route 53 checks the API at `/api/system/health` and the website
+at `/`. CloudWatch alarms and SNS notifications are hosted in
+`us-east-1`, where Route 53 health metrics are published.
+Recipients must confirm their SNS email subscriptions.
 
-## Current status
+## Persistent data
 
-The prior combined Terraform root and its old local state were removed after the user reported the infrastructure torn down. The previous variable file is retained as ignored `terraform/terraform.tfvars.legacy` for review; none of the new roots loads it. This restructuring has not provisioned cloud resources. Plans and applies require the new sandbox profile, account-specific AWS values, a chosen state bucket name, and the new Atlas organisation credentials.
+Atlas retains development, test and production projects in its
+own state. The M0 clusters use AWS Ireland (`EU_WEST_1`).
+Development and test access is restricted to the configured
+trusted client `/32`. Production reads the node IP from
+`aws/production/terraform.tfstate` when remote lookup is enabled.
+This lookup does not change MongoDB's own state location.
+Staging's selected database project also needs its node allowlist
+configured before the app can connect. No extra Atlas project
+is introduced by this AWS restructuring.
 
+EC2 public addresses can change on replacement or stop/start.
+Review the CloudFront origin and update Atlas access afterwards.
+Destroying staging AWS resources does not delete Atlas data,
+shared registry images, shared scripts or deployment logs.
 
-## Staging and production deployment
+## Deployment configuration
 
-The Makefile selects production only when `PORTFOLIO_AGENT_ENV`
-is `production`; other or unset values select staging. Each
-uses separate environment secrets and distinct Deployment and
-Service names within the shared manifest. Staging defaults to
-NodePort 30002, production to 30001. The current CloudFront and
-security-group configuration exposes production's port; staging
-external routing needs separate infrastructure configuration.
+Only `PORTFOLIO_AGENT_ENV=production` selects production in the
+Makefile; other values select staging. Both use port `30001`,
+separate Deployment/Service names and environment secrets.
+Secrets Manager paths default to `portfolio-agent/env/staging`
+and `portfolio-agent/env/production`. Bootstrap leaves secret selection
+to the Makefile. Deployment and rollout refresh
+registry and environment secrets before changing pods.
 
-Secrets Manager paths are `portfolio-agent/env/staging` and
-`portfolio-agent/env/production`. Deployments use the shared
-`regcred-portfolio-agent` pull secret and environment-specific
-settings secrets. Both deploy and rollout refresh both secrets
-before changing pods. Each environment retains the single-instance
-operating model, using the Recreate deployment strategy.
+The default AMI is pinned to Ubuntu 26.04 LTS ARM64 image serial
+`20261003` in London. Changing user data does not automatically
+replace or reprovision an existing node. Terraform completion
+also does not verify cloud-init or application startup.
 
-The ECR repository name now matches `SERVICE_NAME`. This is an
-infrastructure source change, not an applied AWS migration.
-Review the Terraform plan before replacing any existing
-`portfolio-repo` resource. The legacy EC2 bootstrap/redeployment
-scripts still require reconciliation with this Makefile flow.
+SSM deployment output uses the shared CloudWatch log group
+`/aws/ssm/portfolio-agent/deployments`, retained for 30 days.
+The caller must enable CloudWatch output on each Run Command.
+See the AWS guide for action integration and log correlation.

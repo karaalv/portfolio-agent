@@ -1,50 +1,43 @@
 # Terraform
 
-Each folder is an independent Terraform root with its own state. AWS and MongoDB Atlas use different S3 state keys. `terraform-state` creates their shared S3 bucket and keeps its own bootstrap state locally.
+The state bucket is
+`portfolio-agent-tfstate-eu-west-2-533267122031` in London.
+The bootstrap root manages it with local state; service roots
+use separate encrypted S3 state objects with native lockfiles.
 
-| Root | Manages | State |
+| Root | Responsibility | State |
 | --- | --- | --- |
-| `terraform-state/` | S3 state bucket | Local `terraform.tfstate` |
-| `aws/` | Portfolio agent AWS infrastructure | `aws/terraform.tfstate` in S3 |
-| `mongodb/` | Atlas projects, clusters and access lists | `mongodb/terraform.tfstate` in S3 |
-
-## Before any AWS or Terraform command
-
-Export the sandbox profile in each shell session. Do not depend on a profile saved in Terraform files:
+| `terraform-state/` | Existing shared state bucket | Local bootstrap state |
+| `aws/shared/` | CI/CD, ECR and deployment logs | `aws/shared/terraform.tfstate` |
+| `aws/staging/` | Disposable staging infrastructure | `aws/staging/terraform.tfstate` |
+| `aws/production/` | Production infrastructure | `aws/production/terraform.tfstate` |
+| `mongodb/` | Persistent Atlas projects and access lists | `mongodb/terraform.tfstate` |
 
 ```sh
 export AWS_PROFILE=karaalv-sandbox
 export AWS_REGION=eu-west-2
+export TF_STATE_BUCKET=portfolio-agent-tfstate-eu-west-2-533267122031
 aws sts get-caller-identity
-```
 
-Confirm that the returned account is the intended sandbox account before planning or applying. On 7 October 2026, the state bucket was created using `karaalv-sandbox`, authenticated as the `alvin` IAM Identity Centre user in account `533267122031`. This bootstrap did not apply the AWS or MongoDB service roots.
-
-## Bootstrap the state bucket
-
-1. Choose a globally unique S3 bucket name and put it in `terraform/terraform-state/terraform.tfvars`. Start from `terraform.tfvars.example`.
-2. Initialise, review and apply the state root:
-
-```sh
-terraform -chdir=terraform/terraform-state init
-terraform -chdir=terraform/terraform-state plan
-terraform -chdir=terraform/terraform-state apply
-```
-
-Preserve the resulting local bootstrap `terraform.tfstate`. It manages the bucket and is ignored by Git. The bucket has versioning, AES-256 server-side encryption, public access blocking and S3 lockfile support. See [terraform-state/README.md](terraform-state/README.md).
-
-## Configure the service roots
-
-Set the same bucket name in `TF_STATE_BUCKET`, then initialise the AWS and Atlas backends separately. Their backend blocks are partial: `bucket` is required by S3 and is supplied through `-backend-config` at initialisation. The `key` is the state object path inside that bucket. MongoDB also sets `bucket = var.state_bucket_name` in its separate `terraform_remote_state` data source so it can read the AWS state object at `aws/terraform.tfstate`.
-
-```sh
-export TF_STATE_BUCKET="$(terraform -chdir=terraform/terraform-state output -raw state_bucket_name)"
-terraform -chdir=terraform/aws init -backend-config="bucket=$TF_STATE_BUCKET"
+terraform -chdir=terraform/aws/shared init
+terraform -chdir=terraform/aws/staging init
+terraform -chdir=terraform/aws/production init
 terraform -chdir=terraform/mongodb init -backend-config="bucket=$TF_STATE_BUCKET"
 ```
 
-Copy each root's `terraform.tfvars.example` to `terraform.tfvars` and supply the required values before planning. The MongoDB root also needs `state_bucket_name` set to that same bucket. Apply in this order: `terraform-state`, `aws`, then `mongodb`. MongoDB reads the EC2 public IP from the AWS state for its production access list. The S3 backend uses native S3 lockfiles, not a DynamoDB lock table.
+Copy each root's `terraform.tfvars.example` and fill in its
+inputs. Keep actual variable files and all state out of Git.
+Apply shared before environment roots, then update Atlas network
+access. Atlas can be bootstrapped first with its AWS state lookup
+disabled. Node bootstrap needs an existing image, application
+secrets and working database access to complete deployment.
 
-Do not run `terraform apply` against the old repository-root configuration. Its state was removed after the previous infrastructure was torn down. The old, ignored `terraform.tfvars.legacy` was retained only so account-specific values can be reviewed before they are replaced. No scope uses it automatically.
+The previous AWS infrastructure was fully torn down. The new
+AWS roots start fresh at their separate state keys; no migration
+is required. Existing MongoDB and state-bucket resources retain
+their current state. See [AWS setup](aws/README.md).
 
-See [infrastructure architecture](../docs/architecture/infrastructure.md) for the resource inventory and current limitations.
+The existing bootstrap state remains local and must be retained
+securely. Do not recreate its bucket from a fresh local state.
+See [state bucket](terraform-state/README.md) and
+[Atlas setup](mongodb/README.md).

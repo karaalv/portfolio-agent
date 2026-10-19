@@ -1,0 +1,19 @@
+version: 0.2
+env:
+  shell: bash
+phases:
+  build:
+    commands:
+      - |
+        set -euo pipefail
+        : "${BUCKET_NAME:?Supply the script bucket}"
+        : "${SCRIPT_LOCATION:?Supply a versioned script object key}"
+        command -v docker >/dev/null
+        docker info >/dev/null
+        work_dir="$(mktemp -d)"
+        trap 'rm -rf -- "$work_dir"' EXIT
+        echo "Downloading the selected CI build script from S3."
+        aws s3 cp "s3://$BUCKET_NAME/$SCRIPT_LOCATION" "$work_dir/build.sh"
+        cd "$work_dir"
+        echo "Executing the build script on native ARM compute."
+        bash ./build.sh
