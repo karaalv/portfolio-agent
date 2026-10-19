@@ -1,5 +1,9 @@
 # Portfolio Agent v2
 
+[![Testing on main](https://github.com/karaalv/portfolio-agent/actions/workflows/push_to_main.yaml/badge.svg?branch=main)](https://github.com/karaalv/portfolio-agent/actions/workflows/push_to_main.yaml)
+[![Deploy to Staging](https://github.com/karaalv/portfolio-agent/actions/workflows/push_to_staging.yaml/badge.svg?branch=staging)](https://github.com/karaalv/portfolio-agent/actions/workflows/push_to_staging.yaml)
+[![Deploy to Production](https://github.com/karaalv/portfolio-agent/actions/workflows/push_to_prod.yaml/badge.svg?branch=production)](https://github.com/karaalv/portfolio-agent/actions/workflows/push_to_prod.yaml)
+
 Version 2 of my portfolio assistant, built to answer questions
 about my background, projects, skills and work through retrieval
 augmented generation (RAG). It speaks as an assistant on my
@@ -184,6 +188,16 @@ refresh edited documents or reconcile partial uploads.
 `corpus.push_corpus` appends records with fresh IDs, so it is not
 an update command. See the [corpus guide](corpus/README.md) for the
 individual upload and index commands.
+
+## CI/CD
+
+Pushes to `main` run pytest only. Pushes to `staging` or
+`production` run tests, build/push an ARM image through CodeBuild,
+then deploy to the matching EC2 instance through SSM. CloudWatch
+output is streamed into the deployment log.
+
+See [CI scripts and setup](scripts/ci/README.md) for repository
+secrets, test prerequisites and the source hand-off.
 
 ## Build and deploy
 

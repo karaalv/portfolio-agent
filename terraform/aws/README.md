@@ -188,9 +188,10 @@ EC2 helper action must include this option in `ssm send-command`:
   'CloudWatchOutputEnabled=true,CloudWatchLogGroupName=/aws/ssm/portfolio-agent/deployments'
 ```
 
-The currently reviewed helper action does not pass this option.
-Add it when updating the action or its fork. Terraform provides
-the destination and IAM permissions, not that action change.
+The CI/CD workflow enables this option through the personal
+`aws-ec2-ssm-script-runner` action and streams CloudWatch output
+into GitHub. Terraform supplies the destination and permissions.
+See the [CI script guide](../../scripts/ci/README.md).
 
 Streams identify the command, instance and execution plugin,
 with separate stdout/stderr streams. Use the returned command
