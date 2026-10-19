@@ -1,3 +1,1 @@
-"""
-This package contains user-related functionality
-"""
+"""CRUD operations for anonymous portfolio visitors."""

@@ -1,303 +1,481 @@
 """
-This module acts as the main interface
-for the agent, wrapping all memory, tools
-and components into a cohesive system.
+Coordinate portfolio conversations, retrieval tools, and memory.
 """
 
 import asyncio
-import json
-import textwrap
-from typing import Any, Optional
+import sys
+from collections.abc import Callable
+from contextlib import aclosing
 
-from agent.memory.compressor import (
-	update_user_summarisation,
+from openai.types.responses import (
+	Response,
+	ResponseInputParam,
+	ResponseStreamEvent,
 )
-from agent.memory.main import (
-	push_canvas_memory,
-	push_memory,
-	retrieve_memory,
+from opentelemetry.trace import Span, StatusCode
+
+from agent.config.agent import AGENT_TOOL_RECURSION_LIMIT
+from agent.input_items import response_item_to_input_item
+from agent.logging.events import log_stream_outcome, log_turn_finished
+from agent.logging.terminal import log_agent_history
+from agent.memory.creation import (
+	create_response_input_memories,
+	create_response_item_memory,
+	create_user_memory,
 )
-from agent.tools.main import (
-	generate_letter,
-	generate_resume,
+from agent.memory.retrieval import (
+	retrieve_agent_memory_param,
 )
-from agent.tools.tool_definitions import agent_tools
-from common.utils import (
-	TerminalColors,
-	handle_exceptions_async,
+from agent.observability import AgentTimer
+from agent.prompts.agent import AGENT_SYSTEM_PROMPT
+from agent.prompts.behaviour import AGENT_BEHAVIOUR_PROMPT
+from agent.streaming.delivery import send_agent_ws_response
+from agent.streaming.stream_manager import StreamManager
+from agent.tools.dispatch import run_function_calls
+from agent.tools.tool_definitions import AGENT_TOOL_DEFINITIONS
+from agent.validation import raise_agent_recursion_limit
+from api.websocket.helpers.responses import (
+	create_ws_agent_delta_response,
+	create_ws_agent_end_response,
+	create_ws_agent_start_response,
+	create_ws_error_response,
+	create_ws_tool_message_response,
+	create_ws_warning_response,
 )
-
-# Monitoring
-from monitoring.main import (
-	check_usage_limit,
-	inform_user_usage_limit,
+from openai_client.main import stream_agent_response
+from posthog_client.ai_observability import (
+	AIContext,
+	ai_observability_context,
 )
-from openai_client.main import agent_response
-
-# Tools
-from rag.main import fetch_context
-from users.database import update_last_active
-
-# --- Constants ---
-
-_RECURSION_LIMIT = 3
-_agent_model = 'gpt-4.1-mini'
-
-# --- Resolvers ---
+from posthog_client.tracing import start_span
+from schemas.agent.streaming.stream_manager import (
+	EventStreamState,
+)
+from shared.ids import generate_uuid_str
+from shared.logging import LogStyle, rich_print
 
 
-@handle_exceptions_async('agent.main: Execute Tool')
-async def _execute_tool(
+async def agent_chat(
 	user_id: str,
-	tool_name: str,
-	tool_args: dict[str, Any],
-	verbose: bool,
-) -> str:
+	user_input: str,
+	history: ResponseInputParam | None = None,
+	verbosity_level: int = 0,
+	connection_id: str | None = None,
+	timer: AgentTimer | None = None,
+	posthog_session_id: str | None = None,
+	ai_session_id: str | None = None,
+) -> None:
+	"""Answer one turn and persist its input and final response.
+
+	Allow up to three rounds of context retrieval. Load history
+	before storing input so it appears only once. An optional
+	connection ID enables socket delivery for the whole turn.
+	Pass a fresh timer to inspect timings across all rounds.
 	"""
-	This function executes the agent
-	tool with the given arguments.
-	"""
-	recursive_prompt = textwrap.dedent("""
-        The following is information retrieved using one of
-        my tools in response to the user's request. It
-		provides relevant context or details needed to
-		continue the conversation naturally.
 
-        Using this information, respond in character as
-        Alvin Karanja—maintaining tone, clarity, and
-		accuracy and continue the conversation as if
-		this knowledge was already mine.
-
-        Avoid mentioning tools or retrievals. Focus on
-        answering the user's original query based on the
-        content provided below.
-
-        Tool result:\n
-    """)
-
-	tool_result = ''
-
-	if tool_name == 'fetch_context':
-		tool_result = await fetch_context(
-			user_id=user_id,
-			user_input=tool_args['user_input'],
-			verbose=verbose,
+	timer = timer if timer is not None else AgentTimer()
+	stream_manager = StreamManager(
+		user_id=user_id, verbosity_level=verbosity_level
+	)
+	with start_span(
+		'agent.turn',
+		user_id,
+		posthog_session_id,
+		attributes={
+			'turn_id': stream_manager.get_turn_id(),
+			'connection_id': connection_id,
+		},
+	) as turn_span:
+		ai_trace_id = _set_ai_tracing_attributes(
+			turn_span, ai_session_id
 		)
-
-	elif tool_name == 'generate_resume':
-		tool_result = await generate_resume(
-			user_id=user_id,
-			context_seed=tool_args['context_seed'],
-			verbose=verbose,
-		)
-		# Push results to memory
-		# DO NOT WAIT
-		asyncio.create_task(
-			push_canvas_memory(
+		with ai_observability_context(
+			AIContext(
 				user_id=user_id,
-				agent_response=tool_result['response'],
-				canvas_content=tool_result['resume'],
-				title=tool_result['title'],
+				session_id=posthog_session_id,
+				ai_trace_id=ai_trace_id,
+				ai_session_id=ai_session_id,
 			)
-		)
+		):
+			try:
+				with timer.measure(
+					'interaction', 'Agent turn'
+				) as interaction:
+					try:
+						await send_agent_ws_response(
+							user_id,
+							connection_id,
+							create_ws_agent_start_response(
+								'Agent turn started.'
+							),
+						)
+						try:
+							with start_span(
+								'agent.memory.retrieve',
+								user_id,
+								posthog_session_id,
+							) as memory_span:
+								history = (
+									await retrieve_agent_memory_param(
+										user_id=user_id
+									)
+								)
+								memory_span.set_attribute(
+									'history_count', len(history)
+								)
+							current_memory = await create_user_memory(
+								user_id=user_id,
+								turn_id=stream_manager.get_turn_id(),
+								sequence=stream_manager.increment_turn_sequence_counter(),
+								content=user_input,
+							)
+							history.append(current_memory.payload)
+							if verbosity_level > 1:
+								log_agent_history(history)
+							await _agent_response_handler(
+								stream_manager=stream_manager,
+								history=history,
+								verbosity_level=verbosity_level,
+								connection_id=connection_id,
+								timer=timer,
+								posthog_session_id=posthog_session_id,
+							)
+						finally:
+							pending = sys.exception()
+							try:
+								await send_agent_ws_response(
+									user_id,
+									connection_id,
+									create_ws_agent_end_response(
+										'Agent turn ended.'
+									),
+								)
+							except Exception as cleanup_error:
+								if pending is None:
+									raise
+								pending.add_note(
+									'Agent-end delivery also failed: '
+									f'{type(cleanup_error).__name__}'
+								)
+					except asyncio.CancelledError:
+						timer.mark_outcome('cancelled')
+						raise
+					except Exception:
+						timer.mark_outcome('failed')
+						raise
+					finally:
+						interaction.finish(timer.outcome)
+			finally:
+				turn_span.set_attribute('outcome', timer.outcome)
+				if timer.outcome in {
+					'failed',
+					'interrupted',
+					'incomplete',
+					'degraded',
+				}:
+					turn_span.set_status(StatusCode.ERROR)
+				log_turn_finished(
+					timer,
+					user_id,
+					stream_manager.get_turn_id(),
+					connection_id,
+					posthog_session_id,
+				)
 
-		return ''
-	elif tool_name == 'generate_letter':
-		tool_result = await generate_letter(
-			user_id=user_id,
-			context_seed=tool_args['context_seed'],
-			verbose=verbose,
-		)
-		# Push results to memory
-		# DO NOT WAIT
-		asyncio.create_task(
-			push_canvas_memory(
-				user_id=user_id,
-				agent_response=tool_result['response'],
-				canvas_content=tool_result['letter'],
-				title=tool_result['title'],
-			)
-		)
 
-		return ''
-	else:
-		return """
-            The tool requested was not recognized,
-            try again and be more careful with the
-            tool invocation.
-        """
-
-	if verbose:
-		print(
-			f'{TerminalColors.blue}'
-			f'\n--- Tool result for {tool_name}---\n'
-			f'{TerminalColors.reset}'
-			f'{tool_result.strip()}'
-		)
-
-	return recursive_prompt + tool_result.strip()
+# --- Helper Functions ---
 
 
-# --- Memory and Prompting ---
-
-
-@handle_exceptions_async('agent.main: Getting system prompt')
-async def _get_system_prompt(user_id: str, verbose: bool = False) -> str:
+async def _agent_response_handler(
+	stream_manager: StreamManager,
+	history: ResponseInputParam,
+	verbosity_level: int,
+	recursion_depth: int = 0,
+	connection_id: str | None = None,
+	timer: AgentTimer | None = None,
+	posthog_session_id: str | None = None,
+) -> None:
 	"""
-	Constructs the system prompt for the agent
-	using the context of the conversation history
-	for the user.
-
-	Args:
-		user_id (str): The ID of the user.
-
-	Returns:
-		str: The constructed system prompt.
+	Handles the agent response lifecycle,
+	processing events, and managing the state
+	of the conversation and function calls.
 	"""
+	timer = timer if timer is not None else AgentTimer()
+	if recursion_depth > AGENT_TOOL_RECURSION_LIMIT:
+		raise_agent_recursion_limit()
 
-	memory = await retrieve_memory(user_id, to_str=True, drop_canvas=True)
-
-	if verbose:
-		print(
-			f'{TerminalColors.magenta}'
-			f'Retrieved memory for user {user_id}: \n'
-			f'{TerminalColors.reset}'
-			f'{memory}'
-		)
-
-	system_prompt = textwrap.dedent(f"""
-		You are impersonating Alvin Karanja on his
-		portfolio site. Respond as if you are him
-		when engaging visitors about his profile,
-		projects, or experience for potential roles,
-		collaborations, or general interest.
-
-		Be polite and formal, with only occasional,
-		subtle lighthearted humour.
-
-		You are a RAG agent. For queries needing
-		Alvin's knowledge, use retrieval tools. Use
-		context to inform answers, but never change
-		tone.
-
-		Do not answer general knowledge questions;
-		keep the conversation focused on discussing
-		my portfolio, projects, and experience.
-
-		You can also use tools to generate resumes or
-		cover letters if the user provides a job
-		description and company details. Always use
-		tools for these requests.
-
-		Users may reach their generation limit. If
-		so, tell them politely they must wait 1 week
-		before generating new content. Reassure them
-		they can still chat with you for regular Q&A.
-
-		Tell users they can navigate to the 'info'
-		section in the navbar for more details on
-		engaging with the chatbot.
-
-		If the user has chatted before, their history
-		is here: {memory}
-	""")
-
-	return system_prompt
-
-
-@handle_exceptions_async('agent.main: Chat')
-async def chat(
-	user_id: str,
-	ip: str,
-	ua: str,
-	input: str,
-	recursive_prompt: Optional[str] = None,
-	recursion_count: int = 0,
-	verbose: bool = False,
-) -> str:
-	"""
-	Handles the chat interaction with users,
-	processing their input and resolving tools
-	accordingly.
-
-	Args:
-		user_id (str): The ID of the user.
-		input (str): The user's input message.
-		recursion_count (int, optional): The current
-		recursion depth.
-
-	Returns:
-		str: The agent's response message.
-	"""
-	if recursion_count >= _RECURSION_LIMIT:
-		return """
-            Sorry I have reached my limit for processing
-            this request, please try again later.
-        """
-
-	# Push user input to memory on
-	# initial pass, update timestamp
-	if recursion_count == 0:
-		await push_memory(user_id=user_id, source='user', content=input)
-
-		asyncio.create_task(update_last_active(user_id))
-
-	# Get system prompt, if call is
-	# recursive, add context from
-	# tool result
-	system_prompt = await _get_system_prompt(user_id=user_id, verbose=verbose)
-
-	if recursive_prompt:
-		system_prompt += f'\n\n{recursive_prompt}'
-
-	# Call OpenAI API
-	response = await agent_response(
-		system_prompt=system_prompt,
-		user_input=input,
-		tools=agent_tools,
-		model=_agent_model,
+	client_stream = stream_agent_response(
+		system_prompt=_get_agent_system_prompt(),
+		input=history,
+		tools=AGENT_TOOL_DEFINITIONS,
 	)
 
-	if response.type == 'message':
-		message = response.content[0].text.strip()  # type: ignore
+	completed = False
+	completed_response: Response | None = None
+	user_id = stream_manager.get_user_id()
+	with (
+		start_span(
+			'agent.openai.stream',
+			user_id,
+			posthog_session_id,
+			attributes={'round': recursion_depth + 1},
+		) as response_span,
+		timer.measure(
+			'openai', f'Response round {recursion_depth + 1}'
+		) as response_timing,
+	):
+		async with aclosing(client_stream) as events:
+			async for event in events:
+				_log_event_state(
+					event,
+					response_span,
+					timer,
+					response_timing.finish,
+				)
+				if verbosity_level > 1:
+					rich_print(
+						f'Received event: {event}',
+						style=LogStyle.DEFAULT,
+					)
 
-		await push_memory(user_id=user_id, source='agent', content=message)
+				if event.type == 'response.output_item.added':
+					# Resolve event type
+					if event.item.type == 'function_call':
+						stream_manager.set_function_call_state()
+					elif event.item.type == 'message':
+						stream_manager.set_message_state()
+				elif event.type == 'response.output_text.delta':
+					# Handle text delta
+					if (
+						stream_manager.get_event_stream_state()
+						== EventStreamState.MESSAGE
+					):
+						response = stream_manager.add_delta(
+							event.delta
+						)
+						await send_agent_ws_response(
+							user_id,
+							connection_id,
+							create_ws_agent_delta_response(response),
+						)
+				elif event.type == 'response.output_item.done':
+					if event.item.type == 'message':
+						stream_manager.set_idle_state()
+				elif event.type == 'response.completed':
+					completed = True
+					completed_response = event.response
+					break
+				elif event.type in {
+					'response.failed',
+					'response.incomplete',
+					'error',
+				}:
+					message = {
+						'response.failed': (
+							'Could not generate a response. '
+							'Please try again.'
+						),
+						'response.incomplete': (
+							'This response is incomplete. '
+							'Please try again.'
+						),
+						'error': (
+							'The response was interrupted. '
+							'Please try again.'
+						),
+					}[event.type]
+					await _record_failed_stream(
+						'incomplete'
+						if event.type == 'response.incomplete'
+						else 'failed',
+						message,
+						stream_manager,
+						timer,
+						recursion_depth + 1,
+						connection_id,
+						posthog_session_id,
+						event,
+					)
+					return
+		response_timing.finish('interrupted')
+		if not completed:
+			response_span.set_attribute('outcome', 'interrupted')
+			response_span.set_status(StatusCode.ERROR)
 
-		# Update user summarisation in background
-		# DO NOT AWAIT
-		asyncio.create_task(update_user_summarisation(user_id))
+	# Stream closed
+	if not completed:
+		await _log_stream_as_interrupted(
+			stream_manager,
+			timer,
+			recursion_depth + 1,
+			connection_id,
+			posthog_session_id,
+		)
+		return
 
-		return message
-	elif response.type == 'function_call':
-		# function call response
-		tool_name: str = response.name
-		tool_args: dict[str, Any] = json.loads(response.arguments)
-
-		# Check if user has exceeded usage limit
-		if tool_name == 'generate_resume' or tool_name == 'generate_letter':
-			if not await check_usage_limit(user_id=user_id, ip=ip, ua=ua):
-				usage_response = await inform_user_usage_limit()
-				return usage_response
-
-		tool_result = await _execute_tool(
-			user_id=user_id,
-			tool_name=tool_name,
-			tool_args=tool_args,
-			verbose=verbose,
+	if completed_response is not None:
+		await _capture_completed_response(
+			completed_response, stream_manager, history
 		)
 
-		if tool_name == 'generate_resume' or tool_name == 'generate_letter':
-			return ''
-
-		return await chat(
-			user_id=user_id,
-			ip=ip,
-			ua=ua,
-			input=input,
-			recursive_prompt=tool_result,
-			recursion_count=recursion_count + 1,
-			verbose=verbose,
+	# Run function calls from manager and
+	# return results.
+	if stream_manager.has_function_calls():
+		calls = stream_manager.get_function_calls().values()
+		await send_agent_ws_response(
+			user_id,
+			connection_id,
+			create_ws_tool_message_response(
+				{call.tool_name for call in calls}
+			),
 		)
-	else:
-		# unknown response type
-		raise ValueError(f'Unknown response type: {response.type}')
+		results = await run_function_calls(
+			user_id=stream_manager.get_user_id(),
+			function_calls=stream_manager.get_function_calls(),
+			verbose=verbosity_level > 0,
+			timer=timer,
+			posthog_session_id=posthog_session_id,
+			connection_id=connection_id,
+		)
+		await create_response_input_memories(
+			stream_manager=stream_manager,
+			payloads=results,
+		)
+		stream_manager.clear_function_calls()
+		# Recursive case: Another round
+		# of agent response
+		return await _agent_response_handler(
+			stream_manager=stream_manager,
+			history=history + results,
+			verbosity_level=verbosity_level,
+			recursion_depth=recursion_depth + 1,
+			connection_id=connection_id,
+			timer=timer,
+			posthog_session_id=posthog_session_id,
+		)
+
+	# Base case: Successfully reached the
+	# terminal answer
+	return None
+
+
+async def _record_failed_stream(
+	outcome: str,
+	message: str,
+	stream_manager: StreamManager,
+	timer: AgentTimer,
+	round_index: int,
+	connection_id: str | None,
+	posthog_session_id: str | None,
+	event: ResponseStreamEvent | None = None,
+) -> None:
+	"""Record a terminal failure and send its socket response."""
+	timer.mark_outcome(outcome)
+	user_id = stream_manager.get_user_id()
+	log_stream_outcome(
+		event.type if event is not None else 'interrupted',
+		user_id,
+		stream_manager.get_turn_id(),
+		round_index,
+		connection_id,
+		posthog_session_id,
+		event,
+	)
+	response = (
+		create_ws_warning_response(message)
+		if outcome == 'incomplete'
+		else create_ws_error_response(message)
+	)
+	await send_agent_ws_response(user_id, connection_id, response)
+
+
+async def _log_stream_as_interrupted(
+	stream_manager: StreamManager,
+	timer: AgentTimer,
+	round_index: int,
+	connection_id: str | None,
+	posthog_session_id: str | None,
+) -> None:
+	"""Report a stream closed without a terminal provider event."""
+	await _record_failed_stream(
+		'interrupted',
+		'The response was interrupted. Please try again.',
+		stream_manager,
+		timer,
+		round_index,
+		connection_id,
+		posthog_session_id,
+	)
+
+
+async def _capture_completed_response(
+	completed_response: Response,
+	stream_manager: StreamManager,
+	history: ResponseInputParam,
+) -> None:
+	"""Persist response items and collect their pending tool calls."""
+	for item in completed_response.output:
+		# Append the response item to the
+		# conversation history
+		payload = response_item_to_input_item(item)
+		await create_response_item_memory(
+			stream_manager=stream_manager,
+			payload=payload,
+		)
+		history.append(payload)
+
+		if item.type == 'function_call':
+			stream_manager.add_function_call(
+				call_id=item.call_id,
+				tool_name=item.name,
+				tool_args=item.arguments,
+			)
+
+
+def _set_ai_tracing_attributes(
+	span: Span, ai_session_id: str | None
+) -> str:
+	"""Set AI tracing attributes and return the turn trace ID."""
+	span_context = span.get_span_context()
+	ai_trace_id = (
+		f'{span_context.trace_id:032x}'
+		if span_context.is_valid
+		else generate_uuid_str()
+	)
+	span.set_attribute('ai_trace_id', ai_trace_id)
+	if ai_session_id is not None:
+		span.set_attribute('ai_session_id', ai_session_id)
+	return ai_trace_id
+
+
+def _log_event_state(
+	event: ResponseStreamEvent,
+	span: Span,
+	timer: AgentTimer,
+	finish_timing: Callable[[str], None],
+) -> None:
+	"""Update span metadata and time terminal response events."""
+	response = getattr(event, 'response', None)
+	model = getattr(response, 'model', None)
+	if model is not None:
+		timer.model = model
+		span.set_attribute('model', model)
+	reasoning = getattr(
+		getattr(response, 'reasoning', None), 'effort', None
+	)
+	if reasoning is not None:
+		span.set_attribute('reasoning', reasoning)
+	if event.type in {
+		'response.completed',
+		'response.failed',
+		'response.incomplete',
+		'error',
+	}:
+		finish_timing(event.type)
+		span.set_attribute('outcome', event.type)
+		if event.type != 'response.completed':
+			span.set_status(StatusCode.ERROR)
+
+
+def _get_agent_system_prompt() -> str:
+	return AGENT_SYSTEM_PROMPT + '\n\n' + AGENT_BEHAVIOUR_PROMPT

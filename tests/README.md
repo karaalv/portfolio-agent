@@ -1,0 +1,322 @@
+# Tests
+
+## Structure
+
+- `users/unit/`: mocked user CRUD tests without service clients.
+- `users/integration/`: CRUD against the testing MongoDB project.
+- `clients/mongodb/connection/`: live ping and collection access.
+- `clients/openai/connection/`: authenticated model listing.
+- `clients/openai/functionality/`: embeddings, text, structured
+  responses, streamed text and streamed function calls.
+- `clients/posthog/unit/`: configuration, reporting ownership, in-memory
+  OTLP logs/spans, correlation, environment gating and threaded shutdown.
+- `clients/openai/unit/`: real PostHog OpenAI wrapper with simulated
+  HTTP transport and local capture; SDK types, usage, full-content
+  capture, context isolation, stream finalisation and cancellation.
+- `agent/unit/<scope>/`: streaming state, memory, chat and tools.
+- `agent/integration/<scope>/`: memory, chat, tools and main
+  loop.
+- `agent/agent_input.py`: interactive terminal runner, not a
+  test.
+- `rag/integration/`: index readiness, uploaded corpus and
+  query planning, vector retrieval and LLM-judged context.
+- `security/ratelimit/unit/`: limiter identity and cleanup.
+- `security/monitoring/unit/`: allowances and observer behaviour.
+- `security/monitoring/integration/`: persisted usage and blocks.
+- `security/unit/`: security client ownership and shutdown.
+- `api/dependencies/unit/`: HTTPX access checks and limiter
+  waits.
+- `api/users/unit/`: cookie claiming with scoped HTTP fixtures.
+- `api/agent/unit/`: socket admission, identity, input handling and
+  stable AI sessions across turns, with fresh sessions on reconnect.
+- `api/agent_memory/unit/`: authenticated chat pages and
+  deletion.
+- `api/agent_memory/integration/`: HTTP endpoints with live
+  MongoDB.
+- `shared/`: reusable fixtures imported by scoped conftests.
+- `schemas/`: response models used only by tests.
+
+Test packages with `__init__.py` must also have package markers in
+their parent directories. This prevents identically named `integration`
+packages and conftests from colliding during full-suite collection.
+
+There is no root server bootstrap. Client fixtures are requested
+explicitly, start once per package and close at package teardown.
+Async integration tests share their client package event loop.
+User-record cleanup remains per test.
+Package conftests do not start services during collection.
+
+## Unit tests
+
+No environment file or credentials are required:
+
+```sh
+uv run pytest tests/users/unit
+uv run pytest tests/agent/unit
+uv run pytest tests/api/dependencies/unit tests/security/unit
+uv run pytest tests/clients/posthog tests/api/general
+uv run pytest tests/shared/test_logging.py
+```
+
+PostHog starts with the API only in `development` and `production`.
+Its startup requires non-blank `POSTHOG_API_KEY` and `POSTHOG_HOST`.
+The exception wrapper returns without accessing a client when
+`PORTFOLIO_AGENT_ENV=testing`; testing does not need PostHog settings.
+Do not use live PostHog credentials for unit tests.
+Logging tests use an in-memory OpenTelemetry exporter and verify
+typed fields, tracebacks, caller locations, environment gating,
+restart behaviour and threaded queue draining. Shared logging helpers
+remain available in testing without a remote exporter.
+AI tests inject a disabled PostHog client or replace capture locally.
+Live OpenAI tests still call the real provider, but their AI events are
+not sent to PostHog. See the [canonical agent analytics guide](https://github.com/karaalv/portfolio-documentation/blob/main/analytics/agent.md).
+
+## Live integration tests
+
+Create `.env.testing` at the repository root. Set its testing
+project credentials and the required `MONGODB_URI`, `OPENAI_KEY`,
+`JWT_SECRET`, `PORTFOLIO_AGENT_PORT`, `CORS_ORIGINS` and
+`COOKIE_DOMAIN` values.
+Do not select a development or production environment.
+
+```sh
+export PORTFOLIO_AGENT_ENV=testing
+uv run pytest tests/users/integration
+uv run pytest tests/clients/mongodb/connection
+uv run pytest tests/clients/openai/connection
+uv run pytest tests/clients/openai/functionality
+uv run pytest tests/rag/integration
+uv run pytest tests/api/agent_memory/integration
+```
+
+Memory endpoint integration tests use temporary collections in
+the testing MongoDB project. JWT validation, block lookups and
+rate limits remain active. They verify chat response structure,
+pagination, owner isolation and deletion of all model artefacts.
+Temporary records and collections are removed at teardown.
+No OpenAI requests are made.
+
+The OpenAI connection test lists models. Functionality tests
+make real embedding and model requests and consume API usage.
+All four current OpenAI wrapper functions are exercised.
+
+User fixtures remove only the identities created by their test.
+They do not clear collections. MongoDB connection tests only
+read data. Each package fixture closes its client on teardown,
+including after test failures.
+
+## RAG integration tests
+
+Bootstrap the testing corpus before running these tests:
+
+```sh
+export PORTFOLIO_AGENT_ENV=testing
+uv run python -m corpus.bootstrap
+uv run pytest tests/rag/integration
+```
+
+The readiness checks require a queryable vector index with the
+configured path and 3072 dimensions. Every local corpus label
+must exist in MongoDB, and stored embeddings must be finite,
+non-zero vectors of the expected length. Label coverage does
+not verify that uploaded text matches the latest local edits.
+Bootstrap skips insertion when the collection already has data.
+
+The quality test asks about Alvin's Imperial MSc and calls the
+real planner, vector search and context refiner. A separate
+structured model request judges that context against fixed
+facts from `corpus/documents/education.md`. It requires the
+correct degree, institution, classification and source label.
+Failure output includes the verdict explanation and context.
+Update the reference if those source facts change.
+
+`test_query_planner.py` checks the live `QueryPlan` structure,
+query count and non-empty, distinct searches. An LLM judge
+checks their relevance and coverage of the education request.
+
+`test_query_executor.py` calls `_retrieve_query` directly and
+requires the expected education entry as a `CorpusItem`, with
+embedding data omitted. It also calls `execute_rag` with a fixed
+two-query plan and judges the refined context against the same
+education facts. This isolates executor quality from planning.
+
+All judge requests use `tests/shared/llm_judge.py`. The helper
+accepts system and user prompts and returns an `LLMJudgement`
+with `satisfactory` and `reason` fields. Each test owns its
+rubric
+and assertion; model settings and response parsing are shared.
+
+RAG tests share package-scoped MongoDB and OpenAI clients. They
+read existing data without creating users, memories or corpus
+entries. The quality test uses a fresh user ID for empty history.
+It consumes API usage and remains non-deterministic because both
+retrieval planning and judging involve language models. Passing
+these education cases is smoke coverage, not a broad benchmark.
+
+## Agent tests
+
+```sh
+uv run pytest tests/agent/unit
+export PORTFOLIO_AGENT_ENV=testing
+uv run pytest tests/agent/integration
+```
+
+The agent integration package shares MongoDB and OpenAI clients
+across its scope folders. Each test gets unique visitor IDs and
+removes only its own memories and user records during teardown.
+Memory and chat checks use real MongoDB without model requests.
+Tool and main-loop tests also require the bootstrapped corpus.
+
+Memory supports creation, insertion, retrieval and deletion.
+Chat is a read projection over the same stored artefacts, so
+its creation and deletion checks use memory writes. There is
+no memory or chat update operation to exercise at present.
+
+Pagination checks advance offsets until the final empty page.
+They verify chronological order, complete coverage, no duplicate
+IDs, timestamp ties and isolation from other visitors. Chat
+pages count visible messages, excluding tool and reasoning items.
+History checks retain all artefacts from the selected user-turn
+boundary, including the default twenty-turn window.
+
+The dispatcher deliberately returns recoverable error text for
+unknown names and invalid arguments. Unit tests check those
+responses, backend failures, parallel execution and ordered
+`function_call_output` results with matching `call_id` values.
+
+Live main-loop tests exercise a greeting without retrieval and
+an education request requiring the context tool. Stream observers
+forward real SDK events and record input/output snapshots. Tests
+compare these with stored artefacts, checking replayed history,
+unique memory IDs, one turn ID, contiguous sequences, tool-output
+pairing, stream closure before recursion and final assistant
+text.
+The education response is evaluated using the shared LLM judge.
+These live model checks remain non-deterministic and cost usage.
+
+### Interactive terminal session
+
+```sh
+export PORTFOLIO_AGENT_ENV=testing
+uv run python -m tests.agent.agent_input --verbosity 1
+```
+
+Verbosity defaults to 1. Use 0 for minimal agent diagnostics or 2
+for SDK event diagnostics. Text deltas are displayed as they
+arrive. The runner observes the SDK stream until application
+publishing is implemented; production code is unchanged.
+
+The corresponding root environment file must exist. In development and
+production, PostHog starts before OpenAI and drains after other clients.
+Testing uses disabled capture. Clients close on exit or failure. Enter
+`exit`, `quit` or Ctrl-D to finish; Ctrl-C cancels the session.
+A new visitor is created by default and its records are retained
+for inspection. Reuse the printed ID with `--user-id <id>` to
+continue that conversation. Bootstrap the corpus before asking
+questions requiring portfolio retrieval.
+
+Each interaction prints a timing summary, including each model
+round, each individual tool call and the full turn. Timing is
+collected by `agent.observability.AgentTimer`; terminal formatting
+lives in `agent.logging.terminal.log_agent_timing`. A fresh timer
+can be passed to `agent_chat(..., timer=timer)` by other callers.
+
+
+## Security integration tests
+
+```sh
+export PORTFOLIO_AGENT_ENV=testing
+uv run pytest tests/security/monitoring/integration
+```
+
+These tests use the shared package-scoped MongoDB client and
+temporary collections in the testing `analytics` database. They
+exercise real MongoDB updates and deletion, including bulk daily
+resets and observer pruning. Collection resolution is redirected
+to those temporary collections; the normal mapping to `usage`
+and `blocked` is checked separately without modifying them.
+
+Temporary records are cleared after each test and the collections
+are dropped at package teardown, including after test failures.
+OpenAI requests are not required.
+
+Coverage includes entity CRUD, concurrent creation and
+increments,
+daily rollover, IP and user allowances, duplicate connection IDs,
+fifth-connection blocking, block reuse, duplicate block deletion,
+ten-day retention and expiry cleanup.
+
+## Markers
+
+The migrated suites declare `unit` or `integration` markers:
+
+```sh
+uv run pytest tests/users tests/clients -m unit
+uv run pytest tests/users tests/clients --collect-only
+```
+
+Other existing test packages still need migration. API tests
+will use HTTPX when the new API contract is implemented.
+
+
+## WebSocket tests
+
+```sh
+uv run pytest tests/api/websocket
+```
+
+Unit tests cover request and response validation, helper metadata,
+ordered delivery, heartbeat activity, queue pressure, timeout
+close codes, cancellation, task cleanup, scoped registry lookup,
+concurrent duplicate registration, removal and inactivity cleanup.
+Transport operations use isolated asynchronous mocks. Controlled
+UTC timestamps and short test-local timeouts avoid long waits.
+
+Integration tests mount the real manager and registry in a small
+FastAPI application and use Starlette's `TestClient` WebSocket
+sessions. This exercises ASGI connection handling, JSON messages,
+targeted delivery, disconnect cleanup and server close codes.
+The harness echoes text through stream-item responses; it does
+not invoke the agent or mount the production chat route.
+
+The client context runs lifespan startup and shutdown. Registry
+state is created on the application's event loop. Operations from
+synchronous tests use the client's AnyIO portal through
+`tests/api/websocket/integration/websocket_harness.py`, keeping
+async resources on that loop.
+
+No server subprocess, listening port, environment file, MongoDB
+or OpenAI client is required. These tests do not exercise TCP,
+TLS, reverse proxies or Uvicorn worker behaviour.
+
+
+## Live agent WebSocket integration tests
+
+```sh
+export PORTFOLIO_AGENT_ENV=testing
+uv run pytest tests/api/agent/integration
+```
+
+These tests require `.env.testing`, working MongoDB and OpenAI
+credentials, and a populated testing corpus with its vector
+index. Bootstrap the corpus in the testing environment before
+running them if it has not already been uploaded.
+
+The actual application lifespan starts clients, security,
+maintenance and the WebSocket registry. Starlette's `TestClient`
+exercises the production chat route without a server subprocess.
+Database operations and model calls run on the application's
+loop through the client's portal. If COOKIE_DOMAIN is a bare
+localhost, the fixture temporarily uses `portfolio.test` so
+HTTPX accepts the domain-scoped secure cookie.
+
+Coverage includes anonymous visitor creation, token delivery,
+cookie claiming, authenticated chat retrieval, reconnection and
+history replay. A separate RAG conversation checks tool messages,
+ordered text deltas, request correlation, persisted turn ordering
+and matching tool call outputs. An LLM judge checks the retrieved
+answer against a factual reference. These tests make live OpenAI
+requests and remove their own visitor, memory and usage records.
+
+This verifies the application through ASGI. It does not test TCP,
+TLS, reverse proxies or Uvicorn's transport message size limit.

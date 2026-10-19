@@ -1,9 +1,20 @@
-# 👤 User Management
+# User management
 
-This directory contains files related to user management in the application.
+The package manages anonymous records in `application.users`.
+Visitors are identified by `user_id` without requiring login.
 
-## Overview
+## Modules
 
-Whenever a new person visits the application, they are created as a user by assigning them a unique ID as a session cookie. This ID is used to track their interactions and preferences within the application.
+- `creation.py`: `create_user()` generates a UUID and stores a
+  record. `push_user(user)` persists a supplied `AnonymousUser`.
+- `retrieval.py`: `get_user(user_id)` returns a record or raises
+  when missing. `does_user_exist(user_id)` checks existence.
+- `update.py`: `update_last_active(user_id)` records UTC activity
+  and returns whether the stored record changed.
+- `deletion.py`: `delete_user(user_id)` removes the user record
+  and returns whether a record was deleted.
 
-This cookie is set to expire after 5 days of inactivity, ensuring that user data is not retained indefinitely.
+Operations use the MongoDB collection resolver. The MongoDB
+client must be started before these functions are called.
+Creation and updates use the shared ID and UTC time helpers.
+Deleting a user here does not delete their conversation memories.

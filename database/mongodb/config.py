@@ -1,198 +1,109 @@
-"""
-This module is used to configure
-the connection to the MongoDB database.
-"""
+"""Configure MongoDB connections for the selected environment."""
 
-import os
-from typing import Optional
+from os import getenv
 
 from pymongo import AsyncMongoClient
 
-from common.utils import TerminalColors
+from exceptions.mongodb import MongoDBException
+from shared.logging import LogStyle, rich_print
 
-# --- Databases and Collections ---
+# --- Configuration ---
 
-DATABASES: list[str] = [
-	'application',
-	'analytics',
-]
-COLLECTIONS: list[str] = [
-	'users',
-	'messages',
-	'corpus',
-	'monitoring',
-]
-database_mappings: dict[str, str] = {
-	# Application Database
-	'users': 'application',
-	'messages': 'application',
-	'corpus': 'application',
-	'monitoring': 'application',
-}
+# Global MongoDB client
+_mongo_client: AsyncMongoClient | None = None
 
 # --- Connection Management ---
 
-MONGO_CLIENT: Optional[AsyncMongoClient] = None
 
-
-def resolve_cluster() -> str:
-	"""
-	Resolves cluster based on environment.
-	"""
-	env = os.getenv('ENVIRONMENT')
-
-	if env == 'test':
-		return str(os.getenv('MONGO_DEVELOPMENT'))
-	elif env == 'production':
-		return str(os.getenv('MONGO_PRODUCTION'))
-	else:
-		return str(os.getenv('MONGO_DEVELOPMENT'))
-
-
-async def connect_mongo() -> bool:
-	"""
-	Connects to the MongoDB database using
-	the connection string, if connection
-	fails exception is raised.
-
-	Returns:
-		bool: True if connection is successful,
-		False otherwise.
-	"""
-	global MONGO_CLIENT
-
-	try:
-		if MONGO_CLIENT is None:
-			MONGO_CLIENT = AsyncMongoClient(
-				resolve_cluster(),
+async def start_mongo_client() -> None:
+	"""Starts the global MongoDB client."""
+	global _mongo_client
+	if _mongo_client is None:
+		uri = getenv('MONGODB_URI')
+		if not uri:
+			raise MongoDBException(
+				message=(
+					'MONGODB_URI environment variable is not set.'
+				),
+				module='database/mongodb/config.py',
+				operation='start_mongo_client',
 			)
-			await MONGO_CLIENT.aconnect()
 
-		print('Connecting to MongoDB...')
-		response = await MONGO_CLIENT.admin.command('ping')
-
-		if response.get('ok') != 1:
-			raise Exception('Ping failed, connection not established.')
-
-		print(
-			f'{TerminalColors.green}'
-			f'Successfully connected to MongoDB'
-			f'{TerminalColors.reset}'
-			f' client: '
-			f'{TerminalColors.yellow}'
-			f'{os.getenv("ENVIRONMENT")}'
-			f'{TerminalColors.reset}'
-			f' cluster'
-		)
-		return True
-	except Exception as e:
-		print(
-			f'{TerminalColors.red}'
-			f'Failed to connect to MongoDB: '
-			f'{TerminalColors.reset}'
-			f'{e}'
-		)
-		return False
+		# Try to start client asynchronously
+		try:
+			env = getenv('PORTFOLIO_AGENT_ENV')
+			rich_print(
+				f'Starting MongoDB client in environment: {env}...',
+				style=LogStyle.INFO,
+				prefix='mongodb.config',
+			)
+			_mongo_client = AsyncMongoClient(uri)
+			await _mongo_client.aconnect()
+			rich_print(
+				'MongoDB client started successfully.',
+				style=LogStyle.SUCCESS,
+				prefix='mongodb.config',
+			)
+		except Exception as e:
+			raise MongoDBException(
+				message=f'Failed to start MongoDB client: {e}',
+				module='database/mongodb/config.py',
+				operation='start_mongo_client',
+			) from e
 
 
-async def close_mongo() -> bool:
-	"""
-	Closes the MongoDB connection.
-
-	Returns:
-		bool: True if connection is closed,
-		False otherwise.
-	"""
-	global MONGO_CLIENT
-
-	if MONGO_CLIENT is None:
-		print(
-			f'{TerminalColors.yellow}'
-			f'Mongo client is None, no closure'
-			f'{TerminalColors.reset}'
-		)
-		return False
-
-	try:
-		await MONGO_CLIENT.close()
-		MONGO_CLIENT = None
-		print(
-			f'{TerminalColors.green}'
-			f'Successfully closed MongoDB connection'
-			f'{TerminalColors.reset}'
-		)
-		return True
-	except Exception as e:
-		print(
-			f'{TerminalColors.red}'
-			f'Failed to close MongoDB connection: '
-			f'{TerminalColors.reset}'
-			f'{e}'
-		)
-		return False
+async def stop_mongo_client() -> None:
+	"""Stops the global MongoDB client."""
+	global _mongo_client
+	if _mongo_client is not None:
+		try:
+			rich_print(
+				'Stopping MongoDB client...',
+				style=LogStyle.INFO,
+				prefix='mongodb.config',
+			)
+			await _mongo_client.close()
+			set_mongo_client(None)
+			rich_print(
+				'MongoDB client stopped successfully.',
+				style=LogStyle.SUCCESS,
+				prefix='mongodb.config',
+			)
+		except Exception as e:
+			raise MongoDBException(
+				message=f'Failed to stop MongoDB client: {e}',
+				module='database/mongodb/config.py',
+				operation='stop_mongo_client',
+			) from e
 
 
 async def is_mongo_connected() -> bool:
-	"""
-	Checks if the MongoDB client is connected.
-
-	Returns:
-		bool: True if connected, False otherwise.
-	"""
-	global MONGO_CLIENT
-
-	if MONGO_CLIENT is None:
+	"""Checks if the global MongoDB client is connected."""
+	global _mongo_client
+	if _mongo_client is None:
 		return False
-
 	try:
-		response = await MONGO_CLIENT.admin.command('ping')
-
-		if response.get('ok') == 1:
-			return True
-		else:
-			print(
-				f'{TerminalColors.red}'
-				f'MongoDB connection check failed: '
-				f'{TerminalColors.reset}'
-				f'Ping response not OK'
-			)
-			return False
-	except Exception as e:
-		print(
-			f'{TerminalColors.red}'
-			f'MongoDB connection check failed: '
-			f'{TerminalColors.reset}'
-			f'{e}'
-		)
+		await _mongo_client.admin.command('ping')
+		return True
+	except Exception:
 		return False
+
+
+# --- Client Access ---
 
 
 def get_mongo_client() -> AsyncMongoClient:
-	"""
-	Returns the MongoDB client.
-
-	Returns:
-		AsyncMongoClient: The MongoDB client instance.
-	"""
-	global MONGO_CLIENT
-
-	if MONGO_CLIENT is None:
-		raise Exception(
-			'MongoDB client is not initialized. Call connect_mongo() first.'
+	"""Returns the global MongoDB client."""
+	if _mongo_client is None:
+		raise MongoDBException(
+			message='MongoDB client is not started.',
+			module='database/mongodb/config.py',
+			operation='get_mongo_client',
 		)
+	return _mongo_client
 
-	return MONGO_CLIENT
 
-
-if __name__ == '__main__':
-	import asyncio
-
-	from dotenv import load_dotenv
-
-	load_dotenv(override=True, dotenv_path=os.path.abspath('.env'))
-
-	async def main():
-		await connect_mongo()
-		await close_mongo()
-
-	asyncio.run(main())
+def set_mongo_client(client: AsyncMongoClient | None) -> None:
+	"""Sets the global MongoDB client."""
+	global _mongo_client
+	_mongo_client = client

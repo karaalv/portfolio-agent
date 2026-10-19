@@ -1,0 +1,95 @@
+#!/bin/bash
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+export PORTFOLIO_AGENT_ENV="${environment}"
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+# Decode configuration without interpreting its contents as shell code.
+DEPLOYMENT_REF="$(printf '%s' '${base64encode(deployment_ref)}' | base64 --decode)"
+REPO_SECRET_ARN="$(printf '%s' '${base64encode(repo_secret_arn)}' | base64 --decode)"
+
+bootstrap_dir="$(mktemp -d -t portfolio-agent-bootstrap.XXXXXX)"
+chmod 700 "$bootstrap_dir"
+trap 'rm -rf -- "$bootstrap_dir"' EXIT
+
+echo "[bootstrap] Installing host tools for $PORTFOLIO_AGENT_ENV."
+apt-get update
+apt-get install -y ca-certificates curl gnupg unzip git make \
+  gettext-base python3
+
+# Cloud images expand the root partition through cloud-init.
+echo "[bootstrap] Installing the ARM AWS CLI and enabling SSM."
+curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip \
+  -o "$bootstrap_dir/awscliv2.zip"
+unzip -q "$bootstrap_dir/awscliv2.zip" -d "$bootstrap_dir"
+"$bootstrap_dir/aws/install" --update
+if systemctl list-unit-files \
+  snap.amazon-ssm-agent.amazon-ssm-agent.service \
+  --no-legend | grep -q amazon-ssm-agent; then
+  systemctl enable --now snap.amazon-ssm-agent.amazon-ssm-agent.service
+else
+  curl -fsSL \
+    https://s3.eu-west-2.amazonaws.com/amazon-ssm-eu-west-2/latest/debian_arm64/amazon-ssm-agent.deb \
+    -o "$bootstrap_dir/amazon-ssm-agent.deb"
+  dpkg -i "$bootstrap_dir/amazon-ssm-agent.deb"
+  systemctl enable --now amazon-ssm-agent
+fi
+
+echo "[bootstrap] Installing Docker from its Ubuntu repository."
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+  -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+. /etc/os-release
+printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n' \
+  "$(dpkg --print-architecture)" "$VERSION_CODENAME" \
+  > /etc/apt/sources.list.d/docker.list
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io
+systemctl enable --now docker
+usermod -aG docker ubuntu
+
+echo "[bootstrap] Installing k3s with the existing Docker runtime model."
+curl -fsSL https://get.k3s.io -o "$bootstrap_dir/install-k3s.sh"
+INSTALL_K3S_EXEC="--docker --write-kubeconfig-mode=600" \
+  sh "$bootstrap_dir/install-k3s.sh"
+# Deployment commands run as root through cloud-init or SSM.
+for attempt in {1..60}; do
+  if kubectl get nodes --no-headers 2>/dev/null | grep -q .; then
+    break
+  fi
+  sleep 5
+done
+kubectl wait --for=condition=Ready nodes --all --timeout=180s
+
+echo "[bootstrap] Retrieving the repository key and trusted GitHub host keys."
+aws secretsmanager get-secret-value --secret-id "$REPO_SECRET_ARN" \
+  --region eu-west-2 --query SecretString --output text \
+  > "$bootstrap_dir/deploy-key"
+chmod 600 "$bootstrap_dir/deploy-key"
+curl -fsSL https://api.github.com/meta -o "$bootstrap_dir/github-meta.json"
+python3 - "$bootstrap_dir" <<'HOSTKEYS'
+import json
+import sys
+from pathlib import Path
+folder = Path(sys.argv[1])
+keys = json.loads((folder / 'github-meta.json').read_text())['ssh_keys']
+(folder / 'known_hosts').write_text(
+    ''.join('github.com ' + key + '\n' for key in keys)
+)
+HOSTKEYS
+export GIT_SSH_COMMAND="ssh -i $bootstrap_dir/deploy-key"
+GIT_SSH_COMMAND+=" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+GIT_SSH_COMMAND+=" -o UserKnownHostsFile=$bootstrap_dir/known_hosts"
+
+echo "[bootstrap] Checking out the selected deployment revision."
+git clone --no-checkout git@github.com:karaalv/portfolio-agent.git \
+  "$bootstrap_dir/portfolio-agent"
+cd "$bootstrap_dir/portfolio-agent"
+git fetch origin "$DEPLOYMENT_REF"
+git checkout --detach FETCH_HEAD
+
+echo "[bootstrap] Refreshing secrets and deploying the prebuilt image."
+make deploy
+
+echo "[bootstrap] Initial $PORTFOLIO_AGENT_ENV deployment completed."
