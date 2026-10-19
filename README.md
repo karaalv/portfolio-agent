@@ -67,7 +67,8 @@ identification still need frontend implementation.
 ### Environment configuration
 
 Set `PORTFOLIO_AGENT_ENV` to `testing`, `development`, `staging` or
-`production`. The corresponding file must exist in the root:
+`production`. For local commands, place the corresponding
+environment file in the repository root:
 
 | Environment   | Required file      |
 |---------------| -------------------|
@@ -75,6 +76,11 @@ Set `PORTFOLIO_AGENT_ENV` to `testing`, `development`, `staging` or
 | `development` | `.env.development` |
 | `staging`     | `.env.staging`     |
 | `production`  | `.env.production`  |
+
+Containers receive runtime settings through Kubernetes; they
+do not need an environment file when required settings are
+already injected. Live test fixtures explicitly require
+`.env.testing`.
 
 Testing and development files override existing environment variables.
 Staging and production preserve existing variables so deployment-injected
@@ -283,8 +289,9 @@ AWS account, London ECR registry, service repository and
 new tag. Both health probes use `/api/system/health`.
 
 Regular `docker build` targets `linux/arm64`, matching the
-Graviton host. Non-ARM builders need ARM emulation; the GitHub
-workflow configures QEMU. `BUILD_PLATFORM` can be overridden.
+Graviton host. CI builds run natively on ARM through CodeBuild.
+Non-ARM local builders need ARM emulation. `BUILD_PLATFORM` can
+be overridden.
 
 ```sh
 make deploy IMAGE_TAG=<published-tag> ROLLOUT_TIMEOUT=300s

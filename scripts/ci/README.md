@@ -170,5 +170,8 @@ Remote cancellation is best effort; workflow concurrency avoids
 automatically cancelling an active deployment. No automatic
 rollback or public HTTP/WebSocket smoke test is added here.
 
-These workflows have not yet been exercised against AWS.
-The custom action remains a prerelease pending live validation.
+The workflows were merged into `main` through PR #9 on
+19 October 2026. [Testing on main](https://github.com/karaalv/portfolio-agent/actions/runs/39221870992)
+passed at merge commit `d58b2ba`. CodeBuild and SSM deployment
+have not yet been verified against AWS. The custom action
+remains a prerelease pending live validation.

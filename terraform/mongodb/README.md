@@ -2,7 +2,7 @@
 
 This root manages three Atlas projects, `Portfolio-Development`, `Portfolio-Test` and `Portfolio-Production`, with an M0 cluster in each. The `mongodb_environments` local declares the settings for each environment explicitly. All three clusters use Atlas region `EU_WEST_1` on AWS, Ireland. London (`EU_WEST_2`) was rejected by Atlas as unavailable for these M0 clusters during bootstrap. The projects remain in one root for now; separate environment configurations can be introduced later.
 
-Set the Atlas organisation ID and service account credentials in an ignored `terraform.tfvars`, using `terraform.tfvars.example` as a guide. Also set `state_bucket_name` to the S3 bucket created by `terraform-state/`. Do not commit credentials.
+Set the Atlas organisation ID and service account credentials in an ignored `terraform.tfvars`, using `variables.tf` as the input reference. Also set `state_bucket_name` to the S3 bucket created by `terraform-state/`. Do not commit credentials.
 
 Export `AWS_PROFILE=karaalv-sandbox` before initialising or using this root. Terraform uses that profile both for its S3 backend and to read the AWS root's state:
 

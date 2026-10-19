@@ -4,7 +4,13 @@ This root creates the S3 bucket used by the AWS and MongoDB Atlas Terraform root
 
 Created on 7 October 2026: `portfolio-agent-tfstate-eu-west-2-533267122031` in sandbox account `533267122031`, Region `eu-west-2`. AWS readback confirmed versioning, AES-256 encryption and all four public access blocks enabled. The bootstrap state remains in this directory and is ignored by Git.
 
-Export `AWS_PROFILE=karaalv-sandbox` and use London (`eu-west-2`). Choose a globally unique bucket name in an ignored `terraform.tfvars`, copied from `terraform.tfvars.example`:
+Export `AWS_PROFILE=karaalv-sandbox` and use London (`eu-west-2`).
+The existing ignored `terraform.tfvars` must retain
+`state_bucket_name = "portfolio-agent-tfstate-eu-west-2-533267122031"`.
+For initial setup in a different account, use `variables.tf` as
+the input reference and choose an appropriate unique name.
+The commands below are the bootstrap/manage flow; do not recreate
+the existing bucket from a fresh local state.
 
 ```sh
 terraform -chdir=terraform/terraform-state init
