@@ -54,6 +54,10 @@ class StreamManager:
 	def get_current_memory_id(self) -> str:
 		return self._current_memory_id
 
+	def get_response_text(self) -> str:
+		"""Join visible text across all response rounds."""
+		return ''.join(item.payload for item in self._stream_items)
+
 	def get_event_stream_state(self) -> EventStreamState:
 		return self._event_stream_state
 

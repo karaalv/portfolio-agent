@@ -18,10 +18,12 @@ def test_deltas_keep_identity_and_increase_sequence() -> None:
 	Package each delta without changing memory or turn identity.
 	"""
 	manager = StreamManager('visitor')
+	assert manager.get_response_text() == ''
 	assert manager.get_event_stream_state() == EventStreamState.IDLE
 	manager.set_message_state()
 	first = manager.add_delta('Hello ')
 	second = manager.add_delta('there')
+	assert manager.get_response_text() == 'Hello there'
 	assert [first.payload, second.payload] == ['Hello ', 'there']
 	assert [first.sequence_number, second.sequence_number] == [
 		0,

@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Iterator
 from datetime import timedelta
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import HTTPException, Request
@@ -20,7 +20,7 @@ from agent.tools import dispatch
 from api.maintenance import user_data_pruner
 from api.routes import agent_memory, users
 from exceptions.authorisation import JwtValidationException
-from posthog_client import _logging
+from posthog_client import _logging, ai_observability
 from posthog_client.ai_observability import (
 	generation_options_from_context,
 )
@@ -98,6 +98,12 @@ async def test_agent_turn_spans_include_stream_and_tools(
 	spans, monkeypatch
 ):
 	"""Model rounds and parallel tools are siblings under one turn."""
+	capture = Mock()
+	monkeypatch.setattr(
+		ai_observability,
+		'get_posthog_client',
+		lambda: SimpleNamespace(capture=capture),
+	)
 	monkeypatch.setattr(main, 'send_agent_ws_response', AsyncMock())
 	monkeypatch.setattr(
 		main,
@@ -165,6 +171,13 @@ async def test_agent_turn_spans_include_stream_and_tools(
 	)
 	recorded = spans.get_finished_spans()
 	turn = recorded[-1]
+	capture.assert_called_once()
+	trace_properties = capture.call_args.kwargs['properties']
+	assert trace_properties['$ai_trace_id'] == (
+		f'{turn.context.trace_id:032x}'
+	)
+	assert trace_properties['$ai_session_id'] == 'socket'
+	assert trace_properties['$session_id'] == 'session'
 	assert turn.name == 'agent.turn'
 	assert turn.parent is None
 	assert turn.attributes['outcome'] == 'completed'

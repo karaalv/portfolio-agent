@@ -25,11 +25,13 @@ from openai.types.responses import (
 from agent import main
 from agent.observability import AgentTimer
 from agent.streaming import delivery
+from posthog_client import ai_observability
 
 
 async def test_cancelled_turn_survives_failed_end_delivery(
 	output: AsyncMock,
 	monkeypatch: pytest.MonkeyPatch,
+	trace_capture: Mock,
 ) -> None:
 	"""Do not replace cancellation with a secondary delivery error."""
 	timer = AgentTimer()
@@ -45,6 +47,24 @@ async def test_cancelled_turn_survives_failed_end_delivery(
 		)
 	assert timer.outcome == 'cancelled'
 	assert timer.records[-1].status == 'cancelled'
+	trace_capture.assert_called_once()
+	properties = trace_capture.call_args.kwargs['properties']
+	assert properties['outcome'] == 'cancelled'
+	assert properties['$ai_is_error'] is True
+	assert properties['$ai_error'] == 'CancelledError'
+
+
+@pytest.fixture
+def trace_capture(monkeypatch: pytest.MonkeyPatch) -> Mock:
+	"""Capture root trace events without starting telemetry."""
+	monkeypatch.setenv('PORTFOLIO_AGENT_ENV', 'development')
+	capture = Mock()
+	monkeypatch.setattr(
+		ai_observability,
+		'get_posthog_client',
+		lambda: SimpleNamespace(capture=capture),
+	)
+	return capture
 
 
 @pytest.fixture
@@ -128,6 +148,7 @@ def _install_stream(
 async def test_deltas_and_end_are_delivered_in_order(
 	output: AsyncMock,
 	monkeypatch: pytest.MonkeyPatch,
+	trace_capture: Mock,
 ) -> None:
 	"""Send each text delta and one terminal event per turn."""
 	item = _message()
@@ -173,6 +194,16 @@ async def test_deltas_and_end_are_delivered_in_order(
 	]
 	assert closed == [0]
 
+	trace_capture.assert_called_once()
+	properties = trace_capture.call_args.kwargs['properties']
+	assert properties['$ai_input_state'] == [
+		{'role': 'user', 'content': 'Hello'}
+	]
+	assert properties['$ai_output_state'] == [
+		{'role': 'assistant', 'content': 'Hello there'}
+	]
+	assert properties['$ai_is_error'] is False
+
 
 @pytest.mark.parametrize(
 	'kind, expected',
@@ -188,6 +219,7 @@ async def test_terminal_failures_stop_without_persisting_output(
 	expected: str,
 	output: AsyncMock,
 	monkeypatch: pytest.MonkeyPatch,
+	trace_capture: Mock,
 ) -> None:
 	"""End failed turns without continuing tools or saving output."""
 	events: list[ResponseStreamEvent] = []
@@ -254,10 +286,17 @@ async def test_terminal_failures_stop_without_persisting_output(
 	)
 	assert cast(AsyncMock, main.run_function_calls).await_count == 0
 
+	trace_capture.assert_called_once()
+	properties = trace_capture.call_args.kwargs['properties']
+	assert properties['outcome'] == timer.outcome
+	assert properties['$ai_is_error'] is True
+	assert properties['$ai_output_state'] == []
+
 
 async def test_tool_recursion_shares_connection_and_lifecycle(
 	output: AsyncMock,
 	monkeypatch: pytest.MonkeyPatch,
+	trace_capture: Mock,
 ) -> None:
 	"""Replay tool results with one lifecycle across rounds."""
 	tool = ResponseFunctionToolCall(
@@ -312,6 +351,8 @@ async def test_tool_recursion_shares_connection_and_lifecycle(
 		call.args[:2] == ('visitor', 'socket')
 		for call in output.await_args_list
 	)
+
+	trace_capture.assert_called_once()
 
 
 async def test_direct_agent_calls_do_not_require_registry(
