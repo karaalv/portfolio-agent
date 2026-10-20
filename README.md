@@ -4,6 +4,10 @@
 [![Deploy to Staging](https://github.com/karaalv/portfolio-agent/actions/workflows/push_to_staging.yaml/badge.svg?branch=staging)](https://github.com/karaalv/portfolio-agent/actions/workflows/push_to_staging.yaml)
 [![Deploy to Production](https://github.com/karaalv/portfolio-agent/actions/workflows/push_to_prod.yaml/badge.svg?branch=production)](https://github.com/karaalv/portfolio-agent/actions/workflows/push_to_prod.yaml)
 
+The backend for portfolio website version 3. This service has its own
+version label, **Portfolio Agent v2**. Deployment finalisation is recorded
+in the [portfolio documentation notice](../portfolio-documentation/README.md).
+
 Version 2 of my portfolio assistant, built to answer questions
 about my background, projects, skills and work through retrieval
 augmented generation (RAG). It speaks as an assistant on my
@@ -61,8 +65,8 @@ The API, corpus entry points and terminal runner start PostHog before the
 wrapped OpenAI client in active environments and drain telemetry last.
 HTTP replay context arrives through `X-POSTHOG-SESSION-ID`; WebSockets
 use the handshake `session_id` query parameter. The backend remains the
-authority for visitor identity. Browser replay recording and frontend
-identification still need frontend implementation.
+authority for visitor identity. Portfolio v3 implements browser replay,
+identification and the matching HTTP/socket correlation hand-off.
 
 ### Environment configuration
 
@@ -330,7 +334,7 @@ was fully torn down, so no state migration is required.
 | `tests/`                                | Scoped unit/integration suites, shared fixtures and the terminal runner.        |
 | `docs/`                                 | API contracts, schemas, system features and architectural considerations.       |
 | `terraform/aws/`, `terraform/mongodb/`  | Shared AWS, isolated environments and persistent Atlas infrastructure.          |
-| `kubernetes/`, `Dockerfile`, `makefile` | Deployment assets requiring review against the v2 runtime.                      |
+| `kubernetes/`, `Dockerfile`, `makefile` | Configured container and Kubernetes deployment assets.                      |
 
 ## Further documentation
 
