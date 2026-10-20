@@ -4,6 +4,11 @@ import asyncio
 import sys
 
 from fastapi import WebSocket
+from starlette.websockets import (
+	WebSocketDisconnect,
+	WebSocketDisconnected,
+	WebSocketState,
+)
 
 from api.websocket.helpers.responses import (
 	create_ws_heartbeat_response,
@@ -116,10 +121,21 @@ class WebSocketManager:
 			await asyncio.gather(*pending, return_exceptions=True)
 		finally:
 			try:
-				async with asyncio.timeout(_CLOSE_TIMEOUT_SECONDS):
-					await self.websocket.close(
-						code=code, reason=reason
-					)
+				if (
+					self.websocket.client_state
+					is not WebSocketState.DISCONNECTED
+					and self.websocket.application_state
+					is not WebSocketState.DISCONNECTED
+				):
+					async with asyncio.timeout(
+						_CLOSE_TIMEOUT_SECONDS
+					):
+						await self.websocket.close(
+							code=code, reason=reason
+						)
+			except (WebSocketDisconnect, WebSocketDisconnected):
+				# The peer may disconnect after the state check.
+				pass
 			except Exception:
 				self._log_exception(
 					'Failed to close socket.', 'close'

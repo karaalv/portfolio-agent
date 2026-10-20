@@ -2,9 +2,14 @@
 
 import asyncio
 from datetime import timedelta
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
+from starlette.websockets import (
+	WebSocketDisconnect,
+	WebSocketDisconnected,
+	WebSocketState,
+)
 
 from api.websocket import manager as module
 from api.websocket.helpers.responses import (
@@ -276,8 +281,72 @@ async def test_activity_ignores_heartbeats(
 async def test_close_failure_finishes_cleanup(
 	manager: WebSocketManager,
 	socket: AsyncMock,
+	monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-	"""A close transport error cannot strand shutdown waiters."""
-	socket.close.side_effect = RuntimeError('Already disconnected')
+	"""Unexpected close failures are logged and finish cleanup."""
+	log_exception = Mock()
+	monkeypatch.setattr(manager, '_log_exception', log_exception)
+	socket.close.side_effect = RuntimeError('Broken transport')
 	await asyncio.gather(manager.close(), manager.close())
 	assert manager._close_complete.is_set()
+	socket.close.assert_awaited_once()
+	log_exception.assert_called_once_with(
+		'Failed to close socket.', 'close'
+	)
+
+
+@pytest.mark.parametrize(
+	'state_attribute', ['client_state', 'application_state']
+)
+async def test_disconnected_socket_skips_close_frame(
+	manager: WebSocketManager,
+	socket: AsyncMock,
+	response: WebSocketWarningResponse,
+	monkeypatch: pytest.MonkeyPatch,
+	state_attribute: str,
+) -> None:
+	"""Disconnected sockets still release queues and owned tasks."""
+	log_exception = Mock()
+	monkeypatch.setattr(manager, '_log_exception', log_exception)
+	manager.start()
+	await manager.send_message(response)
+	setattr(socket, state_attribute, WebSocketState.DISCONNECTED)
+	await asyncio.gather(manager.close(), manager.close())
+	await asyncio.wait_for(manager._message_queue.join(), 1)
+	assert manager.is_closed
+	assert manager._close_complete.is_set()
+	assert manager._sender_task is not None
+	assert manager._sender_task.done()
+	assert manager._heartbeat_task is not None
+	assert manager._heartbeat_task.done()
+	socket.close.assert_not_awaited()
+	log_exception.assert_not_called()
+
+
+@pytest.mark.parametrize(
+	'failure',
+	[
+		WebSocketDisconnect(code=1006),
+		WebSocketDisconnected('Socket already closed'),
+	],
+)
+async def test_disconnect_during_close_is_expected(
+	manager: WebSocketManager,
+	socket: AsyncMock,
+	monkeypatch: pytest.MonkeyPatch,
+	failure: Exception,
+) -> None:
+	"""A disconnect after the state check is normal cleanup."""
+	log_exception = Mock()
+	monkeypatch.setattr(manager, '_log_exception', log_exception)
+	socket.close.side_effect = failure
+	manager.start()
+	await asyncio.gather(manager.close(), manager.close())
+	assert manager.is_closed
+	assert manager._close_complete.is_set()
+	assert manager._sender_task is not None
+	assert manager._sender_task.done()
+	assert manager._heartbeat_task is not None
+	assert manager._heartbeat_task.done()
+	socket.close.assert_awaited_once()
+	log_exception.assert_not_called()
