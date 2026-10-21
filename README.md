@@ -5,8 +5,10 @@
 [![Deploy to Production](https://github.com/karaalv/portfolio-agent/actions/workflows/push_to_prod.yaml/badge.svg?branch=production)](https://github.com/karaalv/portfolio-agent/actions/workflows/push_to_prod.yaml)
 
 The backend for portfolio website version 3. This service has its own
-version label, **Portfolio Agent v2**. Deployment finalisation is recorded
-in the [portfolio documentation notice](../portfolio-documentation/README.md).
+stable release, **Portfolio Agent v2**, is finalised and deployed.
+The frontend and overarching portfolio documentation are both `v3`.
+See the [release record](../portfolio-documentation/delivery/releases.md)
+for version ownership and maintenance conventions.
 
 Version 2 of my portfolio assistant, built to answer questions
 about my background, projects, skills and work through retrieval
