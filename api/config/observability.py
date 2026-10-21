@@ -1,6 +1,7 @@
-"""Identify common scanner paths for HTTP telemetry filtering."""
+"""Identify noisy unmatched paths for HTTP telemetry filtering."""
 
 SCANNER_PATH_PATTERNS: tuple[str, ...] = (
+	r'^/$',
 	r'(^|/)\.env(?:[./_-]|$)',
 	r'(^|/)[^/]+\.env(?:[./_-]|$)',
 	r'^/\.(?:git|svn|hg)(?:/|$)',
