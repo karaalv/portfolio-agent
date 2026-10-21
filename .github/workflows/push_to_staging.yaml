@@ -134,7 +134,7 @@ jobs:
           allowed-account-ids: '533267122031'
 
       - name: Deploy the tested revision and stream CloudWatch logs
-        uses: karaalv/aws-ec2-ssm-script-runner@v0
+        uses: karaalv/aws-ec2-ssm-script-runner@v1
         with:
           instance-name: portfolio-agent-staging
           bucket-name: ${{ env.SCRIPT_BUCKET }}
