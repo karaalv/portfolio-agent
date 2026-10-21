@@ -29,7 +29,7 @@ jobs:
       PORTFOLIO_AGENT_ENV: testing
     steps:
       - name: Check out the tested revision
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -72,13 +72,13 @@ jobs:
       id-token: write
     steps:
       - name: Check out the tested revision and Git history
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Authenticate with AWS through OIDC
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
@@ -127,7 +127,7 @@ jobs:
       url: https://api.staging.alvinkaranja.dev
     steps:
       - name: Authenticate with AWS through OIDC
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
