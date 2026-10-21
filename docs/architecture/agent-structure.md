@@ -99,3 +99,28 @@ returned, including a recoverable failure packaged for replay.
 The input and context refiners use the separate
 `INPUT_REFINER_REASONING` and `CONTEXT_REFINER_REASONING` settings
 in `rag.config`, both defaulting to `LOW`.
+
+## AI conversation traces
+
+Each `agent_chat` invocation captures one explicit PostHog
+`$ai_trace` event when it finishes, including failed and cancelled
+turns. Its trace ID matches the OpenTelemetry turn trace and the
+ID passed to every nested generation and embedding call.
+
+- `$ai_input_state` contains the current visitor message.
+- `$ai_output_state` contains the assembled visible assistant text
+  across response rounds, including partial text on failure.
+  No emitted text produces an empty output list.
+- `$ai_latency` measures the whole turn, including persistence and
+  response cleanup. The event timestamp records its start.
+- `$ai_span_name` is `Portfolio chat`. The event includes the turn,
+  AI session and optional browser replay session identifiers.
+- Non-completed outcomes set `$ai_is_error`; `$ai_error` records
+  the exception class or outcome without copying exception details.
+
+Generation events retain their detailed model inputs and outputs.
+The root trace provides the visitor-question-to-answer view; it
+omits system prompts, retrieved history and internal tool payloads.
+Capture runs in development, staging and production, not testing.
+Capture failures are logged without replacing the agent outcome.
+Existing traces are not backfilled.

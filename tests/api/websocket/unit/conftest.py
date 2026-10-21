@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 import pytest_asyncio
 from fastapi import WebSocket
+from starlette.websockets import WebSocketState
 
 from api.websocket.helpers.responses import (
 	create_ws_warning_response,
@@ -18,13 +19,13 @@ from schemas.api.ws.response import WebSocketWarningResponse
 @pytest.fixture
 def socket() -> AsyncMock:
 	"""Expose awaitable transport operations without a server."""
-	return AsyncMock(spec=WebSocket)
+	return _create_socket()
 
 
 @pytest.fixture
 def socket_factory() -> Callable[[], AsyncMock]:
 	"""Create independent transports for multiple connections."""
-	return lambda: AsyncMock(spec=WebSocket)
+	return _create_socket
 
 
 @pytest.fixture
@@ -55,3 +56,11 @@ async def registry() -> AsyncIterator[WebSocketRegistry]:
 		yield instance
 	finally:
 		await instance.stop()
+
+
+def _create_socket() -> AsyncMock:
+	"""Represent a socket accepted by the controller."""
+	transport = AsyncMock(spec=WebSocket)
+	transport.client_state = WebSocketState.CONNECTED
+	transport.application_state = WebSocketState.CONNECTED
+	return transport

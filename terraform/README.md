@@ -25,8 +25,9 @@ terraform -chdir=terraform/aws/production init
 terraform -chdir=terraform/mongodb init -backend-config="bucket=$TF_STATE_BUCKET"
 ```
 
-Copy each root's `terraform.tfvars.example` and fill in its
-inputs. Keep actual variable files and all state out of Git.
+Create each root's ignored `terraform.tfvars` using its
+`variables.tf` declarations. Example variable files are not
+shipped. Keep actual variable files and all state out of Git.
 Apply shared before environment roots, then update Atlas network
 access. Atlas can be bootstrapped first with its AWS state lookup
 disabled. Node bootstrap needs an existing image, application

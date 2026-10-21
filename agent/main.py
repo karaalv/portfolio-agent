@@ -6,6 +6,7 @@ import asyncio
 import sys
 from collections.abc import Callable
 from contextlib import aclosing
+from time import perf_counter
 
 from openai.types.responses import (
 	Response,
@@ -46,6 +47,7 @@ from openai_client.main import stream_agent_response
 from posthog_client.ai_observability import (
 	AIContext,
 	ai_observability_context,
+	capture_agent_trace,
 )
 from posthog_client.tracing import start_span
 from schemas.agent.streaming.stream_manager import (
@@ -53,6 +55,7 @@ from schemas.agent.streaming.stream_manager import (
 )
 from shared.ids import generate_uuid_str
 from shared.logging import LogStyle, rich_print
+from shared.time import get_utc_datetime_now
 
 
 async def agent_chat(
@@ -73,6 +76,8 @@ async def agent_chat(
 	Pass a fresh timer to inspect timings across all rounds.
 	"""
 
+	started_at = get_utc_datetime_now()
+	started_clock = perf_counter()
 	timer = timer if timer is not None else AgentTimer()
 	stream_manager = StreamManager(
 		user_id=user_id, verbosity_level=verbosity_level
@@ -166,6 +171,15 @@ async def agent_chat(
 					finally:
 						interaction.finish(timer.outcome)
 			finally:
+				capture_agent_trace(
+					user_input=user_input,
+					output_text=stream_manager.get_response_text(),
+					duration_seconds=perf_counter() - started_clock,
+					started_at=started_at,
+					outcome=timer.outcome,
+					turn_id=stream_manager.get_turn_id(),
+					error=sys.exception(),
+				)
 				turn_span.set_attribute('outcome', timer.outcome)
 				if timer.outcome in {
 					'failed',

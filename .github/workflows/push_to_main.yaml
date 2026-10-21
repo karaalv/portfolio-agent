@@ -22,7 +22,7 @@ jobs:
       PORTFOLIO_AGENT_ENV: testing
     steps:
       - name: Check out the tested revision
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 

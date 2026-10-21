@@ -23,17 +23,16 @@ export AWS_PROFILE=karaalv-sandbox
 export AWS_REGION=eu-west-2
 aws sts get-caller-identity
 
-cp terraform/aws/shared/terraform.tfvars.example terraform/aws/shared/terraform.tfvars
-cp terraform/aws/staging/terraform.tfvars.example terraform/aws/staging/terraform.tfvars
-cp terraform/aws/production/terraform.tfvars.example terraform/aws/production/terraform.tfvars
-
 terraform -chdir=terraform/aws/shared init
 terraform -chdir=terraform/aws/staging init
 terraform -chdir=terraform/aws/production init
 ```
 
-Fill in each environment's certificate and secret ARNs. The
-module discovers London's default VPC and selects the first
+Create ignored `terraform.tfvars` files where inputs are needed,
+using each root's `variables.tf` as the reference. Example files
+are not shipped. Fill in each environment's certificate and
+secret ARNs. The module discovers London's default VPC and
+selects the first
 default subnet by sorted subnet ID. The default network must
 retain its public routing and DNS configuration. Certificates
 must be issued in `us-east-1` and cover the corresponding API
