@@ -153,7 +153,7 @@ CodeBuild logs are streamed by
 /aws/codebuild/portfolio-agent-arm-codebuild
 ```
 
-Deployments use `karaalv/aws-ec2-ssm-script-runner@v0`.
+Deployments use `karaalv/aws-ec2-ssm-script-runner@v1`.
 CloudWatch logging is enabled and sent to:
 
 ```text

@@ -102,6 +102,7 @@ async def test_http_handlers_keep_server_identity_and_session(
 @pytest.mark.parametrize(
 	'path',
 	[
+		'/',
 		'/.env',
 		'/.env.production',
 		'/config/.env',
@@ -133,7 +134,9 @@ def test_scanner_404_skips_failure_telemetry(
 	('path', 'status', 'matched'),
 	[
 		('/api/missing', 404, False),
-		('/', 404, False),
+		('/', 404, True),
+		('/', 401, False),
+		('/', 500, False),
 		('/favicon.ico', 404, False),
 		('/.envoy', 404, False),
 		('/.env', 401, False),
