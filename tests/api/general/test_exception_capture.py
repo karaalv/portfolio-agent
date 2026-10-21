@@ -12,6 +12,7 @@ from api.middleware.posthog_session_id import (
 	PostHogSessionIdMiddleware,
 )
 from api.middleware.request_id import RequestIdMiddleware
+from api.utils import exception_capture
 from exceptions.core import PortfolioAgentException
 from posthog_client import error_tracking
 from shared.logging.logger import LOGGER_NAME
@@ -37,7 +38,9 @@ async def test_http_handlers_keep_server_identity_and_session(
 ):
 	"""Return the intended response even if exception upload fails."""
 	capture = Mock()
-	monkeypatch.setattr(error_tracking, 'capture_exception', capture)
+	monkeypatch.setattr(
+		error_tracking, 'capture_exception', capture
+	)
 	app = FastAPI()
 	for (
 		exception_type,
@@ -61,7 +64,9 @@ async def test_http_handlers_keep_server_identity_and_session(
 				status_code=401, detail='Access denied'
 			)
 		if kind == 'http_server':
-			raise HTTPException(status_code=503, detail='Unavailable')
+			raise HTTPException(
+				status_code=503, detail='Unavailable'
+			)
 		raise RuntimeError('unexpected failure')
 
 	try:
@@ -89,7 +94,92 @@ async def test_http_handlers_keep_server_identity_and_session(
 	assert properties['$session_id'] == 'session-1'
 	assert properties['status_code'] == status
 	assert properties['route'] == '/failure'
+	assert properties['request_url'] == 'https://test/failure'
+	assert properties['request_path'] == '/failure'
 	assert caplog.records[0].levelno == level
+
+
+@pytest.mark.parametrize(
+	'path',
+	[
+		'/.env',
+		'/.env.production',
+		'/config/.env',
+		'/config.dev.env',
+		'/.git/HEAD',
+		'/.GIT/config',
+		'/wp-admin/install.php',
+		'/wp-login.php',
+		'/config.json',
+		'/AGENTS.md',
+	],
+)
+def test_scanner_404_skips_failure_telemetry(
+	monkeypatch, path: str
+) -> None:
+	"""Drop known unmatched probes from logs and error capture."""
+	report = Mock()
+	monkeypatch.setattr(
+		exception_capture, 'report_exception', report
+	)
+	request = _failure_request(path)
+	exception_capture.capture_http_failure(
+		request, HTTPException(status_code=404)
+	)
+	report.assert_not_called()
+
+
+@pytest.mark.parametrize(
+	('path', 'status', 'matched'),
+	[
+		('/api/missing', 404, False),
+		('/', 404, False),
+		('/favicon.ico', 404, False),
+		('/.envoy', 404, False),
+		('/.env', 401, False),
+		('/.env', 500, False),
+		('/api/config', 404, True),
+	],
+)
+def test_other_http_failures_keep_url_context(
+	monkeypatch, path: str, status: int, matched: bool
+) -> None:
+	"""Retain real failures without exposing query credentials."""
+	report = Mock()
+	monkeypatch.setattr(
+		exception_capture, 'report_exception', report
+	)
+	request = _failure_request(path)
+	if matched:
+		from fastapi.routing import APIRoute
+
+		request.scope['route'] = APIRoute(
+			path, endpoint=lambda: None
+		)
+	exception_capture.capture_http_failure(
+		request, HTTPException(status_code=status)
+	)
+	report.assert_called_once()
+	properties = report.call_args.args[2]
+	assert properties['request_url'] == f'https://test{path}'
+	assert properties['request_path'] == path
+	assert properties['route'] == (path if matched else None)
+	assert 'secret-token' not in str(properties)
+
+
+def _failure_request(path: str) -> Request:
+	"""Build request context containing a sensitive query value."""
+	return Request(
+		{
+			'type': 'http',
+			'scheme': 'https',
+			'server': ('test', 443),
+			'path': path,
+			'query_string': b'access_token=secret-token&offset=20',
+			'headers': [],
+			'method': 'GET',
+		}
+	)
 
 
 async def test_http_authentication_attaches_verified_identity(
@@ -100,7 +190,9 @@ async def test_http_authentication_attaches_verified_identity(
 	from api.dependencies.auth import access_token
 
 	monkeypatch.setattr(
-		access_token, 'validate_token', lambda _: {'sub': 'verified'}
+		access_token,
+		'validate_token',
+		lambda _: {'sub': 'verified'},
 	)
 	request = Request(
 		{
@@ -115,7 +207,9 @@ async def test_http_authentication_attaches_verified_identity(
 		}
 	)
 	assert (
-		await access_token.require_access_token(request, '127.0.0.1')
+		await access_token.require_access_token(
+			request, '127.0.0.1'
+		)
 		== 'verified'
 	)
 	assert request.state.user_id == 'verified'

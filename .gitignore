@@ -34,6 +34,7 @@ __pycache__/
 .pytest_cache/
 
 # API Keys and credentials
+.deploy-keys/
 credentials.json
 token.json
 client_secret*.json
