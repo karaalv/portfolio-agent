@@ -172,6 +172,8 @@ rollback or public HTTP/WebSocket smoke test is added here.
 
 The workflows were merged into `main` through PR #9 on
 19 October 2026. [Testing on main](https://github.com/karaalv/portfolio-agent/actions/runs/39221870992)
-passed at merge commit `d58b2ba`. CodeBuild and SSM deployment
-have not yet been verified against AWS. The custom action
-remains a prerelease pending live validation.
+passed at merge commit `d58b2ba`. Staging and production now run
+the complete test, CodeBuild and SSM deployment pipeline. The
+production deployment succeeded on 21 October 2026, and its
+public health endpoint returned HTTP 200. The custom action is
+released as stable `v1`.
