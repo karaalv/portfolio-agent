@@ -17,4 +17,4 @@ Set `development_access_cidr` to a trusted client IPv4 address with a `/32` pref
 
 This root does not create database users. Create database credentials separately before connecting an application. Atlas project and M0 availability must be checked in the organisation before applying.
 
-Bootstrap completed on 7 October 2026: three projects, three M0 clusters in Ireland and two client IP access rules. Production has no IP access rule because AWS remote-state lookup is disabled in the local configuration. A post-apply plan refreshed the live Atlas resources and reported no changes. State is stored at `mongodb/terraform.tfstate` in `portfolio-agent-tfstate-eu-west-2-533267122031`.
+Bootstrap completed on 7 October 2026 with three projects, three M0 clusters in Ireland and two client IP access rules. On 31 October 2026, AWS remote-state lookup was enabled and the production EC2 `/32` access rule was applied. Keep `read_aws_remote_state = true` for the deployed application and reapply this root if the production EC2 public IP changes. State is stored at `mongodb/terraform.tfstate` in `portfolio-agent-tfstate-eu-west-2-533267122031`.
