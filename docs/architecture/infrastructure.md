@@ -43,9 +43,12 @@ session and distinct ID headers. Credentialled CORS uses the
 corresponding frontend/API origins. Certificates are supplied
 per environment and must be issued in `us-east-1`.
 
-Route 53 checks the API at `/api/system/health` and the website
-at `/`. CloudWatch alarms and SNS notifications are hosted in
-`us-east-1`, where Route 53 health metrics are published.
+EventBridge Scheduler invokes an ARM Lambda every five minutes
+to check the API at `/api/system/health` and the website at `/`.
+The checker, CloudWatch metrics, alarms and SNS notifications
+are hosted in `us-east-1`. Two consecutive failed or missing
+five-minute periods trigger an alarm; recovery also notifies.
+Kubernetes probes remain local to the pod and are unchanged.
 Recipients must confirm their SNS email subscriptions.
 
 ## Persistent data
