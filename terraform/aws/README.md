@@ -1,8 +1,8 @@
 # AWS infrastructure
 
 The AWS configuration has three independent roots. Regional
-resources use London (`eu-west-2`), with Route 53 health alarms
-and their SNS topics in `us-east-1`.
+resources use London (`eu-west-2`), with scheduled health checks,
+CloudWatch alarms and their SNS topics in `us-east-1`.
 
 | Root | Responsibility | S3 state key |
 | --- | --- | --- |
@@ -118,9 +118,15 @@ The origin remains HTTP on port `30001`, with viewer TLS
 terminated by CloudFront.
 
 Health checks use `/api/system/health` for the API and `/` for
-the website. Route 53 checks every 30 seconds with a failure
-threshold of three. CloudWatch alarms evaluate three one-minute
-periods and notify on alarm and recovery. `alarm_emails` defaults
+the website. EventBridge Scheduler invokes an ARM Lambda once
+every five minutes. Each invocation checks both HTTPS endpoints
+with a five-second timeout and publishes `Healthy` metrics to
+`PortfolioAgent/Health`. CloudWatch alarms evaluate two
+consecutive five-minute periods and notify on alarm and recovery.
+Missing metrics count as failures, covering a stopped checker.
+Endpoint and invocation retries are disabled to limit traffic.
+The checker logs results to `/aws/lambda/<environment-name>-health`
+with 14-day retention. Route 53 endpoint checks are removed. `alarm_emails` defaults
 to `alvinnjiiri@gmail.com`. Confirm each SNS email subscription
 to receive alerts.
 These checks monitor the existing Vercel sites but do not manage
